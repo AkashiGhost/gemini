@@ -1,0 +1,209 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://innerplay.app/schemas/world-schema.json",
+  "title": "World Definition",
+  "description": "Defines the physical and logical rules of a story world. The pipeline uses this as the ground truth for what the narrator can describe and what the player is permitted to attempt. Code-side physics enforcement reads player_cannot and constraint_redirects to intercept invalid actions before they reach the LLM.",
+  "type": "object",
+  "required": [
+    "id",
+    "setting",
+    "locations",
+    "physics",
+    "player_can",
+    "player_cannot",
+    "constraint_redirects",
+    "ambient_baseline",
+    "duration_target_minutes"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for this world, used as a foreign key in arc and game schemas. Use kebab-case (e.g., 'therapy-office-1994').",
+      "pattern": "^[a-z0-9-_]+$"
+    },
+    "setting": {
+      "type": "object",
+      "description": "Top-level sensory and contextual framing of the world. This feeds directly into the narrator's opening system prompt.",
+      "required": ["description", "time", "location", "atmosphere"],
+      "additionalProperties": true,
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "One or two sentence overview of the world as a whole. This is read by the narrator model as world-context, not spoken aloud verbatim."
+        },
+        "time": {
+          "type": "string",
+          "description": "Narrative time period (e.g., 'Late evening, autumn 1994', 'Year 2147, post-collapse'). Can be approximate or evocative."
+        },
+        "location": {
+          "type": "string",
+          "description": "Physical location anchor (e.g., 'A private therapy office in downtown Boston')."
+        },
+        "atmosphere": {
+          "type": "string",
+          "description": "Dominant emotional or sensory tone the narrator should maintain throughout (e.g., 'clinical unease sliding into dread', 'cold and antiseptic with bursts of warmth')."
+        }
+      }
+    },
+    "locations": {
+      "type": "array",
+      "description": "Discrete traversable spaces in the world. Each location has its own description and knows which other locations connect to it. The state machine uses connection arrays to validate movement requests.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "description", "connections"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique location identifier within this world. Used in connections arrays and state tracking.",
+            "pattern": "^[a-z0-9-_]+$"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name, can be spoken by the narrator (e.g., 'The Waiting Room', 'Elara's Chair')."
+          },
+          "description": {
+            "type": "string",
+            "description": "Sensory description of this location when the player arrives or looks around. The narrator may paraphrase this rather than read it verbatim."
+          },
+          "connections": {
+            "type": "array",
+            "description": "Array of location ids the player can move to from here. An empty array means the player is locked in. The pipeline rejects movement to any location not listed here.",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "danger_level": {
+            "type": "integer",
+            "description": "Optional 0-5 scale. 0 = safe, 5 = immediately fatal. Used by the pipeline to gate certain actions or trigger consequences.",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "first_visit_narration": {
+            "type": "string",
+            "description": "Optional narration override spoken only on the player's first visit to this location."
+          },
+          "ambient_sounds": {
+            "type": "array",
+            "description": "Optional list of ambient sound ids from ambient_baseline that activate when the player is in this location.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "physics": {
+      "type": "object",
+      "description": "Defines what kind of world this is and the immutable laws that govern it. The LLM must never contradict these rules. The pipeline injects these into the system prompt as hard constraints.",
+      "required": ["type", "rules"],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "World physics category. Controls which default rule sets the pipeline loads. 'realistic' = no supernatural elements; 'low-magic' = subtle/ambiguous; 'high-magic' = overt fantasy; 'sci-fi' = technology-as-magic.",
+          "enum": ["realistic", "low-magic", "high-magic", "sci-fi"]
+        },
+        "rules": {
+          "type": "array",
+          "description": "Array of plain-English law statements that define absolute constraints. Written as directives to the narrator (e.g., 'The player cannot leave the office building during the session', 'Time moves forward only'). Each rule is injected as a bullet into the system prompt.",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "sensory_available": {
+          "type": "array",
+          "description": "Optional list of senses the narrator is permitted to invoke. Defaults to all five if omitted. Useful for restricting to audio-only narration in voice games.",
+          "items": {
+            "type": "string",
+            "enum": ["sight", "sound", "smell", "touch", "taste"]
+          }
+        }
+      }
+    },
+    "player_can": {
+      "type": "array",
+      "description": "Explicit list of action categories the player is allowed to attempt. Written as verbs or verb phrases (e.g., 'ask questions', 'move between rooms', 'pick up objects'). The pipeline uses this as a positive allow-list to build player affordance prompts.",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "player_cannot": {
+      "type": "array",
+      "description": "Action categories that are impossible in this world regardless of player input. Written as verbs or verb phrases. These are matched against player intent classifications before the narration model fires.",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "constraint_redirects": {
+      "type": "object",
+      "description": "Maps keywords from player_cannot to the narrative response the narrator speaks when a player attempts an impossible action. Keys are lowercase action keywords (matching words the intent classifier would tag). Values are short narrator lines (1-2 sentences) that redirect without breaking immersion.",
+      "additionalProperties": {
+        "type": "string",
+        "description": "Redirect narration line for the matched impossible action keyword."
+      },
+      "minProperties": 1
+    },
+    "ambient_baseline": {
+      "type": "array",
+      "description": "The ambient sound layer that exists at world baseline before phase-specific sounds are added. Each entry maps to an audio asset the Web Audio API will loop or play. The arc schema's sound_state overrides and extends this.",
+      "minItems": 0,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "description", "loop", "default_volume"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for this ambient track, referenced in arc.phases[].sound_state arrays.",
+            "pattern": "^[a-z0-9-_]+$"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name used in the sound design dashboard."
+          },
+          "description": {
+            "type": "string",
+            "description": "What this sound is and the emotional function it serves (e.g., 'Low-frequency hum of HVAC. Creates clinical background tension.')."
+          },
+          "loop": {
+            "type": "boolean",
+            "description": "If true, the Web Audio API plays this as a looping buffer. If false, it plays once and stops."
+          },
+          "default_volume": {
+            "type": "number",
+            "description": "Gain value from 0.0 (silent) to 1.0 (full). This is the starting gain; phase transitions may ramp this up or down.",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "asset_path": {
+            "type": "string",
+            "description": "Optional relative path to the audio file (e.g., 'assets/audio/hvac-hum.mp3'). Resolved at runtime."
+          },
+          "fade_in_seconds": {
+            "type": "number",
+            "description": "Optional. Seconds to fade in when this track activates.",
+            "minimum": 0
+          },
+          "fade_out_seconds": {
+            "type": "number",
+            "description": "Optional. Seconds to fade out when this track is removed.",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "duration_target_minutes": {
+      "type": "number",
+      "description": "Intended total play duration in minutes. The pipeline uses this to calibrate word budgets per beat and pacing pressure in later phases.",
+      "minimum": 1,
+      "maximum": 120
+    }
+  }
+}

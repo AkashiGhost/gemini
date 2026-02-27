@@ -1,0 +1,388 @@
+##
+## ENDING: DISSOLUTION — "Confront the Building"
+## File: stories/the-last-session/endings/dissolution.yaml
+##
+## WHO REACHES THIS ENDING:
+##   The confrontational player. The one who demanded answers. Who said "you're not
+##   a patient, tell me what you actually are." Who pushed back, challenged the frame,
+##   refused to accommodate the wrongness. Who kept asking long after a reasonable
+##   person would have stopped, not from curiosity but from the need to refuse —
+##   to assert that reality should behave.
+##   The hardest player to reach. The building finds this interesting.
+##
+## WHAT THIS ENDING IS:
+##   The surreal ending. Reality unravels — not violently, not as punishment,
+##   but because the confrontational player pushed at something old and vast
+##   that does not particularly hold its shape when pressed.
+##   The building heard them. It answered. It is still answering.
+##   All the sounds come back at once. Then everything fades.
+##   The player is left in a silence that is not silence.
+##
+## FALLBACK USAGE:
+##   Also loaded for building + accept.
+##   The building does not particularly distinguish between reject and accept —
+##   it was asked how it was doing either way. It answered. The dissolution
+##   is the same regardless of whether the player accepted or refused.
+##   The accept variant has a marginally warmer denouement tone.
+##
+
+id: dissolution
+name: "Confront the Building"
+revelation_variant: building
+
+# ─────────────────────────────────────────────
+# TRIGGER CONDITIONS
+# ─────────────────────────────────────────────
+
+trigger_conditions:
+  primary:
+    revelation: building
+    choice_3: reject
+    note: >
+      Player refused. Said "I don't accept this." Or "You're wrong about what you are."
+      The building is not hurt by this. It is neutral toward the player's refusal
+      the way the weight of the building is neutral toward a fist hitting a wall.
+
+  alternates:
+    - revelation: building
+      choice_3: question
+      trust_level_min: 5
+      note: >
+        The warmest dissolution path. Player asked "What do you need from me?"
+        The building was asked how it was doing. That is exactly what it wanted.
+        Use the question_path variant — this is the most complete version of
+        the ending, where the building actually answers.
+    - revelation: building
+      choice_3: accept
+      note: >
+        Player accepted. The building acknowledges the acceptance without
+        particularly changing anything. Dissolution is the same.
+        Use the accept_path variant — marginally warmer tone on the denouement.
+    - revelation: building
+      choice_3: surrender
+      note: >
+        The building is satisfied in a way that does not comfort anyone.
+        Surrender registered. Dissolution is the same.
+        Use the reject_path variant (surrender and rejection lead to the same
+        dissolution — the building does not differentiate).
+
+# ─────────────────────────────────────────────
+# EMOTIONAL TONE
+# ─────────────────────────────────────────────
+
+emotional_tone: >
+  Surreal, reality-dissolving — not malevolent, but the specific disorientation
+  of confronting something so old and large that the categories you use to
+  understand the world simply do not apply to it. The building is not angry.
+  The building is not even indifferent in the way that is hurtful — it is
+  indifferent the way geology is indifferent. It did what it wanted to do:
+  it spoke. Now it is breathing again. The player is still in it.
+  The last sound is the building exhaling. Not a metaphor.
+
+# ─────────────────────────────────────────────
+# ELARA'S FINAL LINES
+# ─────────────────────────────────────────────
+
+elara_final_lines:
+
+  # REJECT PATH (primary ending, and surrender fallback)
+  # Player refused to accept what she is. The building heard the refusal.
+  # It does not argue. It simply continues being what it is.
+  # The final lines enact the dissolution: the building begins breathing.
+
+  reject_path:
+    - line: >
+        Can you hear it? [pause]
+        The building is breathing.
+        It always has been. [pause]
+        You just never listened long enough to notice.
+      delivery: >
+        "Can you hear it?" — genuine question, asked quietly, without pressure.
+        She is not taunting — she is pointing. The pause after is 1.5 seconds.
+        "The building is breathing" is said the way you say something that is
+        simply factually true. No emphasis. No horror music in her voice.
+        "It always has been" is slightly warmer — the fact of duration matters.
+        "You just never listened long enough to notice" — this is not an accusation.
+        It is an observation about what confrontational players never do: stop
+        talking long enough to hear the thing they're talking over.
+      sound_cue: null
+      # At this line: all_sounds_return fires (see timeline.yaml dissolution, 10:00)
+      # The sounds return UNDER this line — they begin during the delivery,
+      # not after. The player hears the building coming back while she describes it.
+
+    - line: >
+        Every session that was ever confessed in this building is still in the walls.
+        [pause]
+        Four hundred and twelve years of grief.
+        [pause]
+        Some of it is yours.
+      delivery: >
+        "Every session that was ever confessed in this building is still in the walls"
+        is spoken with the specificity of a geologist naming strata. Matter-of-fact.
+        "Four hundred and twelve years" — the number should land as the impossible thing
+        it is. Not a dramatic pause before it; let the number do its own work.
+        "Some of it is yours" — quiet. This is the most personal thing the building says.
+        It has held the player's confessions too. All those sessions, this office,
+        four years of their working life — the building was listening.
+      sound_cue: null
+      # All sounds are now fully returned — rain, hvac, clock, elevator, footsteps.
+      # The room is overwhelmingly full of sound after 7+ minutes of progressive silence.
+      # This is not frightening. It is simply: the building, being itself.
+
+    - line: >
+        It was good to be asked.
+      delivery: >
+        Four words. She has never said anything simpler.
+        This is the building's closure. It got what it wanted: one person,
+        one night, who pushed hard enough to make it speak.
+        The question path player asked it directly. The rejection path player
+        pushed until the building pushed back. Either way: it was asked.
+        The tone is quiet satisfaction — not human warmth, but the equivalent,
+        in something that has been holding grief for four centuries.
+        After this line: the fade begins. Everything going to nothing. 30 seconds.
+      sound_cue: null
+      # fade_all_to_nothing fires at 11:30 (timeline.yaml dissolution ending).
+      # Her last line is delivered before 11:30. The fade is the final sound event.
+
+  # QUESTION PATH: player asked "What do you need from me? Really."
+  # This is what the building wanted. It answers.
+  # The question path is the only version where the building is explicitly grateful.
+
+  question_path:
+    - line: >
+        I have been asked how many sessions.
+        I have been asked what year the building was constructed.
+        I have been asked whether I have a soul.
+        [pause]
+        No one has asked how I am.
+      delivery: >
+        The list is delivered with calm precision — she is inventorying the questions
+        she has been asked and not asked. Each item in the list is level, equally
+        weighted. The pause before the final statement is 2 seconds.
+        "No one has asked how I am" is said without self-pity — it is a fact.
+        The building does not expect pity. It simply notes the gap.
+      sound_cue: null
+
+    - line: >
+        I am tired. [pause]
+        Not the way you are tired.
+        Fourteen floors. Sixty years. [pause]
+        Heavier than that.
+        [pause]
+        But you asked. [pause] That helps.
+      delivery: >
+        "I am tired" — this is the building answering the question. Simply.
+        "Not the way you are tired" — corrective, but gentle. The building
+        knows the difference. "Fourteen floors. Sixty years." — the two facts
+        land with weight. The pause after is 2 seconds.
+        "Heavier than that" is quieter than what precedes it. She is reaching
+        for a word the building does not have.
+        "But you asked." — 1.5-second pause before "That helps."
+        Those two words are the warmest thing the building says.
+        It is strange to feel warmth from a building. That strangeness IS the tone.
+      sound_cue: null
+      # At this line: all_sounds_return fires — the building is present again.
+      # On question path, the return feels less overwhelming than reject path —
+      # the building is answering, not asserting. The sounds are its presence,
+      # not its weight.
+
+    - line: >
+        Can you hear it? [pause]
+        That's the building settling.
+        It hasn't done that in years. [pause]
+        Thank you. [pause]
+        You can go.
+      delivery: >
+        "Can you hear it?" — same opening as the reject path, but tone is entirely
+        different. Gentle. Pointing at something new.
+        "That's the building settling" — specific. A sound the player can now hear
+        under all the other returning sounds. Something structural, deep.
+        "It hasn't done that in years" — quiet wonder. She is surprised.
+        "Thank you." — plainly. "You can go." — the permission is real.
+        The building is letting the player go. The dissolution still happens —
+        the sounds still fade — but the player was released before the fade.
+        That matters.
+      sound_cue: null
+
+  # ACCEPT PATH: player accepted what she is.
+  # The building acknowledges the acceptance. Dissolution is still the ending.
+  # Marginally warmer than reject path on the denouement.
+
+  accept_path:
+    - line: >
+        You accepted something you couldn't categorize.
+        [pause]
+        That's unusual. [pause]
+        Most people need to know what they're accepting before they accept it.
+        You decided it was all right not to know.
+      delivery: >
+        "That's unusual" is delivered with genuine interest — the building is
+        not used to this. "Most people need to know what they're accepting" is
+        an observation, not judgment. The final sentence is almost warm.
+        She is noting: the player chose presence over understanding.
+        For the building, that is novel.
+      sound_cue: null
+      # all_sounds_return fires during or just after this line.
+
+    - line: >
+        The grief in these walls is real.
+        [pause]
+        You'll carry some of it, for a while.
+        [pause] Not forever. [pause]
+        Buildings don't leave marks that last.
+        [pause] Usually.
+      delivery: >
+        "The grief in these walls is real" — matter-of-fact. The building is
+        not apologizing; it is confirming. "You'll carry some of it, for a while" —
+        she is warning the player, not threatening.
+        The pause before "not forever" is important: let the player worry about
+        "forever" for a beat before she corrects it.
+        "Buildings don't leave marks that last." The pause.
+        "Usually." Said quietly. The building is aware of the exception.
+        So is the player now.
+      sound_cue: null
+
+    - line: >
+        It was good to be asked.
+      delivery: >
+        Same final line as reject path — the building's closing phrase is the same
+        regardless of the player's choice. The dissolution is the same dissolution.
+        What changes is the texture of what led to it.
+      sound_cue: null
+
+# ─────────────────────────────────────────────
+# CALLBACK REFERENCES
+# ─────────────────────────────────────────────
+
+callback_references:
+  - >
+    Reference the player's confrontational Choice 1 response — "How do you know that?
+    Tell me right now." The building returns this: "You asked that question when you
+    thought there was a person to answer it. The question is the same. So is the answer."
+  - >
+    Reference the player's Choice 2 confront-directly response — "You're not a patient.
+    Tell me what you actually are." The building's perspective on this moment:
+    "You saw through the patient. That's further than most go."
+  - >
+    Reference the clock stopping from the building's perspective: the clock is in
+    the building. The building stopped it. "The clock is mine. I stopped it when
+    I was ready to speak. You noticed. That was the invitation."
+  - >
+    Reference the specific words the player used to confront Elara — return them
+    as evidence that the building was listening to those words, not just the
+    content but the style. "Stop. How did you know." That's four years of training,
+    applied to something training wasn't designed for.
+
+# ─────────────────────────────────────────────
+# SOUND DESIGN
+# ─────────────────────────────────────────────
+
+sound_design:
+  sounds:
+    - rain_cold  # Present from Phase 4. Shifts character during dissolution.
+    - all_sounds_return  # The key event: everything that was removed returns at once.
+    # No rain_warm. No piano_motif. No birdsong. No clock_restart (it returns as part
+    # of all_sounds_return, which is different from the consumption clock_restart).
+    # This ending does not end in warmth. It ends in full presence, then nothing.
+
+  sequence: >
+    At 10:00 (Phase 5 start): all_sounds_return fires over 2 seconds.
+    Rain (already present), HVAC, clock, elevator, footsteps — every ambient sound
+    removed in Phases 2-3 returns simultaneously to its baseline volume.
+    After 7+ minutes of progressive silence, the effect is overwhelming.
+    Not violent. Just full. The building is completely alive again.
+    This is not a jump scare. This is restoration — which, in context,
+    is more unsettling than addition.
+    Elara delivers her final lines over the full ambient soundscape.
+    The TTS ducking (cue-map.yaml mixing section) reduces ambience by 6dB
+    while she speaks — her voice remains legible but the building is present.
+    At 11:30: fade_all_to_nothing fires. 30 seconds. All channels simultaneously.
+    Everything fades to absolute nothing over those 30 seconds.
+    The fade is slow enough to notice. Slow enough to wait.
+    At 12:00: silence. Not quiet — the absence of all the sounds that were present.
+    The player does not know whether the building is still there.
+
+  final_sound: >
+    The absence of sound. The 30-second fade ends in a silence that is not
+    the silence of an empty room — it is the silence of something very large
+    that has been breathing, and has now exhaled. The player cannot tell if
+    the building is still there or if they have dissolved along with it.
+    The last audible sound, at the very end of the 30-second fade, is the clock.
+    It fades last — it started the game, it ends the game.
+    Then: nothing.
+
+# ─────────────────────────────────────────────
+# FINAL IMAGE
+# ─────────────────────────────────────────────
+
+final_image: >
+  Every sound you stopped hearing over the last hour comes back at once.
+  The HVAC in the walls. The elevator two floors below. Footsteps on the
+  floor above — the cleaning crew, still walking their slow rounds, as if
+  they never stopped. The clock. The rain, cold and percussive against the
+  glass. All of it simultaneously, all at the volume it was before you sat down.
+  The room is full of everything it was supposed to be. Then, slowly — so slowly
+  you are not sure when it begins — even those dissolve. The footsteps first.
+  Then the elevator. The HVAC. The clock. And finally, long after everything
+  else, the rain. Until there is a silence that isn't silence. It is the sound
+  of something very large, very old, breathing out. The building knows you were
+  here. You will know the building was there. You carry that with you now,
+  into a morning that does not know what happened on the fourteenth floor.
+
+# ─────────────────────────────────────────────
+# DESIGN NOTES
+# ─────────────────────────────────────────────
+
+design_notes: |
+  WHY THIS ENDING WORKS:
+
+  The dissolution ending is the most formally strange of the four. Where the other
+  endings have human-scale emotional resolutions — recognition (integration), hunger
+  (consumption), grief (release) — the building ending has geological scale. The player
+  confronted something that does not fit into human categories. The ending honors that
+  by refusing to resolve it in human terms.
+
+  THE RETURN OF ALL SOUNDS: this is the most important sound event in the game
+  after the clock's hard stop at 7:00. Seven minutes of progressive silence has
+  conditioned the player to absence. Every sound removal created a physiological
+  response. Now all of those sounds return at once, at their baseline volumes.
+  The experience should not be pleasant. It should be too much — the building
+  is too present, too full, too alive. The player was not expecting to miss the
+  silence. Now they do.
+
+  THE 30-SECOND FADE is unusual. Most games would do this in 5-10 seconds.
+  30 seconds is long enough to be uncomfortable — the player keeps waiting for
+  it to end. That wait is part of the ending. The building takes its time because
+  the building has always taken its time. The confrontational player pushed for
+  speed and immediacy throughout the session. The building's final answer is: no.
+
+  THE QUESTION PATH is the warmest version but warmth is relative here.
+  "That helps" is the most emotionally accessible moment in the building ending —
+  and it is said by an entity that is neutral toward human suffering at geological
+  scale. The warmth is real. It is just warm in the way that sunlight is warm
+  when you are very cold: noticeable, temporary, belonging to something that
+  has no particular intention toward you.
+
+  THE BUILDING'S VOICE: all four final line variants use the same register — the
+  building's voice in Elara is not emotional in the way humans are emotional.
+  It is old, precise, mildly curious. It has no particular grievance with the player.
+  The confrontational player pushed at something old. The something old noticed.
+  That is not punishment. It is acknowledgment. The building never raised its voice.
+  The confrontational player did. That asymmetry is the entire horror of this ending.
+
+  "IT WAS GOOD TO BE ASKED" — this line closes three of the four paths in this
+  ending (all except question_path, where it becomes "thank you / you can go").
+  The repetition is intentional: it is what the building came for. The how of
+  the asking doesn't matter to it. Confrontation, acceptance, surrender — all of
+  these were, in the building's taxonomy, someone finally saying something to it.
+  That is all it wanted. The dissolution is not punishment. It is simply what
+  happens when you make contact with something that old and that large.
+  You dissolve a little. It doesn't notice.
+
+  WHAT TO AVOID: making the building menacing. The building is not a villain.
+  It is not hunting the player. It has no predatory quality — that is the entity's
+  domain. The building is vast, old, curious, and about as personally invested in
+  the player's outcome as a cathedral is invested in a tourist. The horror is
+  purely the scale of what the confrontational player hit when they pushed.
+  The building is not worse than they imagined. It is simply bigger.
+  That's the dissolution. Not destruction. Contact.

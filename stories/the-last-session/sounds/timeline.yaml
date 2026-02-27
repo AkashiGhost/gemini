@@ -1,0 +1,427 @@
+# =============================================================================
+# timeline.yaml — The Last Session
+# Deterministic timed sound schedule — fires at specific elapsed game times
+# regardless of player choices.
+#
+# HOW IT WORKS:
+#   The pipeline runs a parallel timer track starting at game init (0:00).
+#   Each event fires when the elapsed clock matches the `time` field.
+#   Conditional events additionally check game_state before executing.
+#   This track is completely independent of player input — these ALWAYS fire.
+#
+# RELATIONSHIP TO cue-map.yaml:
+#   sound_id values reference keys in cue-map.yaml ambient, intermittent,
+#   atmospheric, transitions, and endings sections.
+#
+# DESIGN PRINCIPLE:
+#   The timeline is the spine of the horror. The player's choices shape
+#   the narrative; the timeline shapes the atmosphere. Both run simultaneously.
+#   Player can fight the story. They cannot fight the silence.
+#
+# REMOVAL SEQUENCE (from world.yaml horror_design_notes.removal_sequence):
+#   Phase 2 / 3:30 → hvac removed (subliminal unease)
+#   Phase 2 / 4:30 → elevator removed (isolation confirmed)
+#   Phase 2 / 5:30 → footsteps removed (building is empty)
+#   Phase 3 / 7:00 → clock HARD STOP (time is no longer real)
+#   Phase 5 / varies → rain changes character per ending
+#
+# TIME FORMAT: MM:SS (elapsed game time from session start)
+# =============================================================================
+
+timeline:
+
+  # ---------------------------------------------------------------------------
+  # PHASE 1: Full Ambient — 0:00 to 3:00
+  # The session begins normally. All building sounds are present.
+  # This is the only period where the soundscape is complete and "safe."
+  # The player has no reason to distrust the environment yet.
+  # Duration: ~3 minutes of normalcy to establish the baseline that
+  # will be taken apart piece by piece.
+  # ---------------------------------------------------------------------------
+
+  - time: "0:00"
+    action: start_ambient
+    sound_ids: [rain, hvac, clock]
+    fade_in_seconds: 0
+    description: >
+      Session begins. Rain, HVAC, and clock start immediately at their
+      baseline volumes. The room sounds like a real office at 8:47 PM.
+      These three sounds are the definition of "normal" for this experience.
+      Everything that happens next is their removal.
+
+  - time: "0:15"
+    action: start_intermittent
+    sound_ids: [elevator, footsteps]
+    description: >
+      Building life sounds begin with a 15-second delay from game start.
+      The slight delay makes them feel organic — they were already happening,
+      the player is just noticing them now. Elevator fires every ~45s ±20s.
+      Footsteps fire every ~30s ±15s. Irregular timing prevents them
+      from feeling scripted.
+
+  # ---------------------------------------------------------------------------
+  # PHASE 2: Subtractive Horror — 3:00 to 6:00
+  # The building goes quiet, one sound at a time.
+  # No jump scares. No musical stings. Just absence.
+  # The player may not consciously register each removal, but their body will.
+  #
+  # PACING NOTE: Each removal is spaced ~60-90 seconds apart.
+  # Too fast and it feels mechanical. Too slow and the impact diffuses.
+  # The current spacing was tuned so each absence has time to settle
+  # before the next one is removed.
+  # ---------------------------------------------------------------------------
+
+  - time: "3:30"
+    action: fade_out
+    sound_id: hvac
+    fade_duration_seconds: 4
+    description: >
+      HVAC stops. First signal something is wrong.
+      The 4-second fade is slow enough to be subliminal — the player may
+      not consciously notice, but the room pressure changes. The silence
+      where there used to be 60-80Hz hum is physically noticeable even
+      when the sound was inaudible at the threshold of attention.
+      Elara notices before you do. She may pause mid-sentence.
+      Player effect (from world.yaml): "Subliminal unease. The room
+      temperature seems to drop."
+
+  - time: "4:30"
+    action: fade_out
+    sound_id: elevator
+    fade_duration_seconds: 6
+    description: >
+      Elevator stops. The slow 6-second fade mimics the machine simply
+      stopping between floors — not arriving, not departing. Just stopping.
+      The ambiguity is intentional: it didn't go anywhere. It just stopped.
+      No one is coming up. No one is going down. The building is closed
+      to the player in a way they haven't fully understood yet.
+      Player effect (from world.yaml): "Isolation confirmed. No one is
+      coming up. No one is going down."
+
+  - time: "5:30"
+    action: fade_out
+    sound_id: footsteps
+    fade_duration_seconds: 2
+    description: >
+      Footsteps above stop. The 2-second fade is faster than the elevator —
+      the cleaning crew did not walk out of earshot. They stopped mid-stride.
+      No scuffle. No hurried exit. Just: footsteps, then not footsteps.
+      The building is now empty except for this room. The player and Elara
+      are the only people in the building. This fact has just become
+      undeniable.
+      Player effect (from world.yaml): "You are the only people in the
+      building. This becomes undeniable."
+
+  # ---------------------------------------------------------------------------
+  # PHASE 3: Isolation — 6:00 to 8:00
+  # Two things happen simultaneously: drones enter from below perception,
+  # and the clock stops.
+  #
+  # The drone entry at 6:00 and the clock stop at 7:00 create a one-two
+  # structure: the room becomes heavier (drones) and then loses time (clock).
+  # By 7:05, only rain and barely-audible drones remain.
+  # The player is as alone as they can be.
+  # ---------------------------------------------------------------------------
+
+  - time: "6:00"
+    action: fade_in
+    sound_ids: [cello_drone, sub_bass]
+    fade_in_seconds: 8
+    description: >
+      Cello drone and sub-bass creep in underneath the rain over 8 seconds.
+      At this fade duration, the entry is below the threshold of conscious
+      notice. By the time the player is aware something has changed, it has
+      been present for 15-30 seconds. This is how dread works: you don't
+      feel it arrive, you just find yourself already inside it.
+      The sub_bass at 0.08 volume is felt rather than heard — physical
+      unease without an identifiable source.
+
+  - time: "7:00"
+    action: hard_stop
+    sound_id: clock
+    fade_duration_seconds: 0
+    description: >
+      KEY MOMENT. THE horror event of the experience.
+      The clock stops INSTANTLY. No fade. No wind-down. Mid-tick.
+      Implemented as an immediate gain.value = 0 (NOT a ramp).
+      The silence that follows is total and wrong. Rain continues. Drones
+      continue, barely. But the metronomic anchor that has been pacing the
+      player's heartbeat since 0:00 is simply gone.
+      Time is no longer real. Elara has been waiting for this.
+      Player effect (from world.yaml): "KEY MOMENT. Hard stop, no fade.
+      Time is no longer real. Only rain and Elara remain."
+    implementation_note: >
+      If the audio engine requires a non-zero fade value, use 0.001 seconds
+      (one millisecond, approximately one audio sample at 44.1kHz). NEVER use
+      0.1s or longer — this destroys the psychological impact entirely.
+
+  - time: "7:05"
+    action: volume_adjust
+    sound_id: rain
+    target_volume: 0.4
+    fade_duration_seconds: 10
+    description: >
+      Rain volume drops slightly from 0.6 to 0.4 over 10 seconds — gentle,
+      nearly imperceptible. Starts 5 seconds after the clock stops to let
+      the clock silence land first. The effect: the room gets quieter
+      overall. The rain, which was the comfort sound, is pulling back.
+      The player is approaching the deepest silence of the experience.
+      This reduction leads into the Phase 4 mute_all at 8:00.
+
+  # ---------------------------------------------------------------------------
+  # PHASE 4: Revelation — 8:00 to 10:00
+  # The revelation of what Elara is.
+  # Preceded by 2 seconds of absolute silence — the most extreme audio
+  # event in the game. Then a single tone. Nothing else.
+  # ---------------------------------------------------------------------------
+
+  - time: "8:00"
+    action: mute_all
+    fade_duration_seconds: 0.5
+    description: >
+      ALL sounds mute simultaneously over 0.5 seconds. Rain, cello drone,
+      sub_bass — everything goes silent. The 0.5s prevents an audio click/pop
+      from the gain discontinuity while still feeling sudden and jarring.
+      The 2 seconds that follow (8:00 to 8:02) are absolute silence.
+      No rain. No drones. Nothing. This is the loudest silence in the game
+      because the player has been conditioned to expect rain as a constant.
+      Two seconds of nothing before the revelation.
+
+  - time: "8:02"
+    action: fade_in
+    sound_ids: [low_tone]
+    fade_in_seconds: 3
+    description: >
+      A single low tone (80-100Hz) emerges from the silence. Fades in over
+      3 seconds — long enough to feel like something rising rather than
+      appearing. This tone does not modulate, does not swell, does not resolve.
+      It is simply present. The revelation begins. Elara begins to explain
+      what she is. The tone will persist until the ending sounds take over.
+      This is the transition point: everything before was normal, broken.
+      Everything after is revelation.
+
+  # ---------------------------------------------------------------------------
+  # PHASE 5: Resolution — 10:00 to 12:00
+  # Ending-specific sounds. Only ONE of these four conditional branches
+  # executes per playthrough — the one matching game_state.ending_id.
+  #
+  # FOUR ENDINGS:
+  #   integration  — Elara stays, anchored by player's empathy. Warmth. Motif.
+  #   consumption  — Elara takes the player's consciousness. Clock restarts. Loop.
+  #   release      — Elara departs. Player survives. Dawn birdsong.
+  #   dissolution  — Everything returns, then fades to absolute nothing.
+  #
+  # All endings swap out the low_tone first (it belongs to Phase 4, not Phase 5)
+  # and then bring in the ending-specific sound signature.
+  # ---------------------------------------------------------------------------
+
+  - time: "10:00"
+    action: fade_out
+    sound_id: low_tone
+    fade_duration_seconds: 4
+    condition: null  # Always fires — Phase 4 tone ends regardless of ending
+    description: >
+      Phase 4 low tone fades out over 4 seconds as the resolution begins.
+      This clears the sonic space for the ending-specific sounds.
+      Fires unconditionally — all four endings share this transition.
+
+  # --- INTEGRATION ENDING ---
+  # Player showed genuine empathy and understanding toward Elara.
+  # Elara chooses to remain — not as a threat, but as a presence.
+  # The session ends with warmth that was never promised.
+
+  - time: "10:00"
+    action: fade_in
+    sound_ids: [rain_warm]
+    fade_in_seconds: 4
+    condition: "game_state.ending_id == 'integration'"
+    description: >
+      Integration ending: rain EQ shifts to warm variant over 4 seconds.
+      The same rain, but the character changes — midrange prominent, highs
+      soft. The rain has become shelter again. Elara chose to stay. The
+      world outside is the same; the room is not.
+
+  - time: "10:30"
+    action: play_once
+    sound_ids: [piano_motif]
+    condition: "game_state.ending_id == 'integration'"
+    description: >
+      Integration ending: Elara's 3-note piano motif plays once.
+      Sparse. Simple. Not a music swell — just a motif. It is Elara's
+      signature, heard for the first time as music. It means she is still
+      here. It means she has a melody. It means something survived the night.
+      30 seconds after the warm rain begins, to give the warmth time to land.
+
+  # --- CONSUMPTION ENDING ---
+  # Player's approach fed Elara. She has taken what she came for.
+  # The therapist's identity is now hers.
+  # The session will begin again with a new patient.
+
+  - time: "10:00"
+    action: start_loop
+    sound_ids: [clock_restart]
+    fade_in_seconds: 0  # Instant — mirrors the instant stop at 7:00
+    condition: "game_state.ending_id == 'consumption'"
+    description: >
+      Consumption ending: clock restarts INSTANTLY. Zero fade, mirroring
+      the hard stop at 7:00. The symmetry is the entire horror argument:
+      the stop was not a malfunction — it was a pause. The session is
+      beginning again. The clock has always been ticking. Cold rain returns
+      simultaneously — the world is indifferent. It always was.
+
+  - time: "10:00"
+    action: fade_in
+    sound_ids: [rain_cold]
+    fade_in_seconds: 0
+    condition: "game_state.ending_id == 'consumption'"
+    description: >
+      Consumption ending: cold rain returns immediately alongside the clock
+      restart. Bright, percussive, high-end heavy. Not warm. Not shelter.
+      The world outside has not softened because nothing has been resolved.
+      Something has been taken.
+
+  - time: "10:30"
+    action: play_once
+    sound_ids: [door_knock]
+    condition: "game_state.ending_id == 'consumption'"
+    description: >
+      Consumption ending: a single unhurried knock at the door. From outside.
+      30 seconds after the clock restarts — enough time for the player to
+      register that the loop has restarted, then hear the confirmation.
+      Someone is waiting for their appointment. The session begins again.
+      The knock is not loud. It is professional. It is Elara, arriving.
+
+  # --- RELEASE ENDING ---
+  # Player accepted Elara's nature and let her go without trying to hold on.
+  # She departs. The player is left, but no longer imprisoned.
+  # This is the closest thing to a "good" ending this story has.
+
+  - time: "10:00"
+    action: fade_in
+    sound_ids: [rain_warm]
+    fade_in_seconds: 6
+    condition: "game_state.ending_id == 'release'"
+    description: >
+      Release ending: warm rain fades in slowly over 6 seconds.
+      Slower than the integration ending — more tentative. The warmth here
+      is not the warmth of presence; it is the warmth of having survived.
+      The rain sounds like shelter because the threat has passed.
+
+  - time: "11:00"
+    action: play_once
+    sound_ids: [birdsong]
+    fade_in_seconds: 8
+    condition: "game_state.ending_id == 'release'"
+    description: >
+      Release ending: distant morning birdsong fades in over 8 seconds.
+      It is dawn. The session lasted the whole night. The birds don't know
+      what happened in this office — they are simply alive, and the world
+      outside this room continues. This is the only sound in the entire
+      experience that represents "after." Time has restarted in the
+      most ordinary way possible: morning.
+
+  - time: "11:45"
+    action: fade_out
+    sound_id: rain_warm
+    fade_duration_seconds: 15
+    condition: "game_state.ending_id == 'release'"
+    description: >
+      Release ending: warm rain fades out slowly in the final seconds.
+      The birdsong outlasts the rain. Outside sounds replace inside sounds.
+      The room releases the player.
+
+  # --- DISSOLUTION ENDING ---
+  # The player tried to understand Elara completely.
+  # They understood too much. Both of them dissolve.
+  # This is the structurally most complex ending, sonically.
+
+  - time: "10:00"
+    action: restore_all_channels
+    sound_ids: [rain, hvac, clock, elevator, footsteps]
+    restore_volumes:
+      rain: 0.6
+      hvac: 0.15
+      clock: 0.25
+      elevator: 0.1
+      footsteps: 0.08
+    fade_in_seconds: 2
+    condition: "game_state.ending_id == 'dissolution'"
+    description: >
+      Dissolution ending: ALL original ambient sounds return simultaneously
+      over 2 seconds. Rain (already present), HVAC, clock, elevator,
+      footsteps — everything that was removed during Phases 2-3 comes back
+      at once. After 7+ minutes of progressive silence, this is overwhelming.
+      Not violent — just full. The building is completely alive again.
+      The horror: it was always like this. The removal was real and the
+      restoration is real. Neither proves anything except that neither state
+      was ever stable.
+
+  - time: "11:30"
+    action: fade_all_to_nothing
+    fade_duration_seconds: 30
+    condition: "game_state.ending_id == 'dissolution'"
+    description: >
+      Dissolution ending: everything fades to absolute nothing over 30 seconds.
+      All channels — rain, hvac, clock, elevator, footsteps, low_tone (if
+      still fading), everything — ramp to zero gain simultaneously.
+      30 seconds is a long fade for audio. It is long enough to notice.
+      Long enough to wait. Long enough to wonder when it will end.
+      Then it ends. Total silence. This is the dissolution: not a dramatic
+      stop but a slow, inevitable draining of everything that was here.
+
+  # ---------------------------------------------------------------------------
+  # MIXING AND CROSSFADE PARAMETERS
+  # These are not timed events — they are runtime audio graph parameters
+  # that apply continuously throughout the game.
+  # ---------------------------------------------------------------------------
+
+mixing:
+  tts_ducking:
+    # When Elara speaks via TTS, ambient volume reduces by 6dB so narration
+    # is intelligible. 6dB is a gentle duck — ambient is still present
+    # and contributes to immersion rather than competing with speech.
+    ambient_reduction_db: -6
+    fade_in_duration_ms: 300    # Ambient ducks down when TTS starts
+    fade_out_duration_ms: 600   # Ambient returns more slowly after TTS ends
+    implementation: >
+      On TTS start event: call fadeVolume(ambientGain, currentVolume * 0.5, 0.3)
+      On TTS end event: call fadeVolume(ambientGain, targetVolume, 0.6)
+      Using linearRampToValueAtTime as per sound-design-pipeline-research.md.
+
+  crossfade_default_ms: 2000
+  # Default for any transition not explicitly specified with a fade duration.
+  # 2000ms (2 seconds) is imperceptible as a crossfade but prevents
+  # audio discontinuities.
+
+  spatial:
+    # Panning values: -1.0 (full left) to +1.0 (full right)
+    # The room is spatially grounded: window to the left, clock to the right.
+    # This gives the stereo field a consistent geography throughout.
+    rain:
+      pan: -0.3
+      notes: "Window wall. The outside world is to the left."
+    clock:
+      pan: 0.2
+      notes: "Wall clock. Opposite the window."
+    elevator:
+      pan: 0.0
+      notes: "Center-rear. Below the floor, behind the player's chair."
+    footsteps:
+      pan: 0.0
+      vertical: 0.5
+      notes: "Above. Use 3D PannerNode. If only stereo is supported, use center with reverb."
+    cello_drone:
+      pan: 0.0
+      notes: "Diffuse. The drone has no source — it comes from the room."
+    sub_bass:
+      pan: 0.0
+      notes: "Omnidirectional by physics at 20-30Hz. No meaningful spatial position."
+    low_tone:
+      pan: 0.0
+      notes: "Sourceless. Ethereal. Comes from everywhere and nowhere."
+
+  # Implementation reference (from sound-design-pipeline-research.md):
+  # All fades use linearRampToValueAtTime for smooth gain transitions.
+  # Hard stops use immediate gain.value assignment (or +0.001s if required).
+  # All assets pre-loaded during visual onboarding screen via fetch + decodeAudioData.
+  # audioCtx.resume() must be called after first user gesture (browser requirement).

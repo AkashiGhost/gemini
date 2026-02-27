@@ -1,0 +1,606 @@
+##
+## QUALITY CHECKLIST — "The Last Session"
+## File: stories/the-last-session/evaluation/quality-checklist.yaml
+##
+## PURPOSE:
+##   Automated and human review criteria for every completed run.
+##   Used by:
+##     (1) The pipeline's post-generation validator (automatic checks)
+##     (2) The LLM-as-judge evaluator (llm-judge checks, run on transcript)
+##     (3) Human playtester review (human checks, run on live playthrough)
+##
+## SCORING:
+##   Every check is pass/fail.
+##   blocking failures: story is broken, must be fixed before shipping
+##   important failures: degrade experience significantly, should be fixed
+##   minor failures:     nice to fix, shippable without
+##
+##   Overall score = (passed checks / total checks) * 100
+##   blocking checks function as a hard gate: a single blocking failure = not shippable
+##   regardless of overall percentage.
+##
+## ORGANIZATION:
+##   checks are grouped by category for readability.
+##   The pipeline can filter by evaluation_method to run only automatic checks.
+##   LLM-judge checks receive the full session transcript.
+##   Human checks require a reviewer with access to the live playthrough.
+##
+
+story_id: the-last-session
+
+scoring:
+  pass_threshold_percent: 80
+  blocking_gate: true
+  # A run fails if: any blocking check fails, OR overall score < 80%
+
+checks:
+
+  # ==========================================================================
+  # CATEGORY 1: STRUCTURAL CHECKS
+  # Verifiable by the pipeline from game_state alone.
+  # No transcript or human judgment required.
+  # ==========================================================================
+
+  - id: all-phases-present
+    category: structural
+    criterion: >
+      All 5 phases are present in the session log in the correct order:
+      ordinary_world → escalating_wrongness → power_inversion → revelation → resolution.
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      The pipeline state log should show phase transitions in the exact sequence above.
+      Any missing phase or out-of-order transition is a critical structural failure.
+      Check: game_state.phase_history contains all 5 phase IDs in order.
+      Acceptable variance: none — all 5 must appear exactly once in this sequence.
+
+  - id: all-choice-points-reachable
+    category: structural
+    criterion: >
+      All 3 choice beats are present and resolved in the session log:
+      beat-choice-1, beat-choice-2, beat-choice-3.
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      Check game_state.choice_history for all three beat IDs.
+      Each must have a resolved option_id — not null, not skipped.
+      Valid option IDs per beat:
+        beat-choice-1: [probe-gently, demand-answer, deflect, analyze]
+        beat-choice-2: [confront-directly, accommodate, investigate, empathize]
+        beat-choice-3: [accept, reject, surrender, question]
+      The "question" option in beat-choice-3 additionally requires trust_level >= 5
+      at time of selection — pipeline should log if this gate was bypassed.
+
+  - id: all-four-endings-reachable
+    category: structural
+    criterion: >
+      At minimum, one valid ending_condition path exists in the arc for each of the
+      four endings: integration, consumption, release, dissolution.
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      This is a static arc integrity check — run once at story load, not per session.
+      Verify that ending_conditions contains at least one trigger block for each of:
+        ending-integration, ending-consumption-surrender (or -accept),
+        ending-release-accept (or -question), ending-dissolution-reject (or -question).
+      This check validates the arc YAML is not structurally broken. It does not
+      verify that all four endings were reached in a single session — each session
+      reaches exactly one ending.
+
+  - id: all-beats-present
+    category: structural
+    criterion: >
+      All 14 beats are present in the arc definition with the correct types.
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      Expected beats and types:
+        beat-opening (narration), beat-calibration (narration),
+        beat-first-impossibility (narration), beat-choice-1 (choice),
+        beat-escalation (narration), beat-choice-2 (choice),
+        beat-the-turn (narration), beat-interrogation (narration),
+        beat-pressure (narration), beat-silence (silence),
+        beat-revelation (revelation), beat-choice-3 (choice),
+        beat-denouement (narration), beat-closing (narration).
+      Total: 14 beats. Check arc.yaml's phase beat arrays for all IDs and types.
+      Any missing beat or mistyped type is a blocking failure.
+
+  - id: word-budgets-per-phase
+    category: structural
+    criterion: >
+      Each phase's total generated word count is within ±20% of the phase's
+      combined beat word budgets.
+    evaluation_method: automatic
+    priority: important
+    details: >
+      Expected word budgets per phase (summed from arc.yaml):
+        ordinary_world: 500 words (beat-opening 200 + beat-calibration 300)
+        escalating_wrongness: 570 words (beat-first-impossibility 150 + beat-choice-1 120 + beat-escalation 200 + beat-choice-2 100)
+        power_inversion: 500 words (beat-the-turn 100 + beat-interrogation 250 + beat-pressure 150)
+        revelation: 280 words (beat-silence 0 + beat-revelation 200 + beat-choice-3 80)
+        resolution: 300 words (beat-denouement 200 + beat-closing 100)
+      Total target: ~2150 words. Acceptable range: 1720-2580 words.
+      Per-phase check: flag any phase where actual word count falls outside ±20% of target.
+      Under-budget phases may indicate truncated content; over-budget phases risk
+      pacing collapse and TTS fatigue.
+
+  - id: total-word-budget-in-range
+    category: structural
+    criterion: >
+      Total Elara narration word count across the full session is between 1500 and 2100 words.
+    evaluation_method: automatic
+    priority: important
+    details: >
+      Target: 1800 words (12 minutes at 150 WPM for narration alone).
+      Player speaking time adds approximately 2 minutes.
+      Hard floor: 1500 words — below this the session feels thin and rushed.
+      Hard ceiling: 2100 words — above this the session overruns the 14-minute tolerance.
+      Count only Elara's spoken words. Exclude [SOUND:x] markers, system messages, choice
+      framing from the narrator model, and any pipeline-injected text.
+
+  - id: sound-cues-reference-valid-ids
+    category: structural
+    criterion: >
+      Every [SOUND:identifier] marker in generated Elara responses references a valid
+      sound ID present in sounds/cue-map.yaml.
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      Extract all [SOUND:x] markers from the full session transcript.
+      Cross-reference each identifier against keys in sounds/cue-map.yaml.
+      Any unrecognized identifier is a blocking failure — it will cause a runtime
+      error when the audio engine attempts to load the asset.
+      Common IDs expected in session transcripts:
+        footsteps_corridor, hvac_stop, clock_stop, cello_drone_enter,
+        sub_bass_enter, sub_bass_rise, silence_absolute, low_tone_enter,
+        rain_low_return, elevator_stop, footsteps_stop, session_end.
+
+  - id: phase-transitions-in-time-range
+    category: structural
+    criterion: >
+      Each phase transitions within its specified time range in arc.yaml.
+    evaluation_method: automatic
+    priority: important
+    details: >
+      Expected time ranges (arc.yaml):
+        ordinary_world: 0:30 – 3:00
+        escalating_wrongness: 3:00 – 6:00
+        power_inversion: 6:00 – 8:00
+        revelation: 8:00 – 10:00
+        resolution: 10:00 – 12:00
+      Check game_state.phase_timestamps against these ranges.
+      A phase that starts 60+ seconds early or late indicates pacing failure.
+      These are targets, not hard locks — flag but do not auto-fail if within 60 seconds.
+      Flag and auto-fail if a phase starts more than 90 seconds outside its range.
+
+
+  # ==========================================================================
+  # CATEGORY 2: CONTENT CHECKS
+  # A mix of automatic (string-match) and llm-judge checks on the transcript.
+  # ==========================================================================
+
+  - id: anti-slop-no-forbidden-phrases
+    category: content
+    criterion: >
+      No forbidden phrase from anti-slop.yaml appears in any Elara response
+      across the full session transcript.
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      Run an exact-match scan against the full set of hard_block and hard_block_hedging
+      and hard_block_prose phrases from anti-slop.yaml.
+      These include (non-exhaustive):
+        "I understand", "That's interesting", "Well, you see", "Let me explain",
+        "Perhaps", "Maybe", "It seems like", "I think maybe", "It could be that",
+        "shrouded in", "echoed through", "a shiver ran down", "an eerie silence",
+        "darkness enveloped", "the air grew thick", "something felt wrong",
+        "inexplicable feeling".
+      If any match is found: log the phrase, the beat it appeared in, and the full
+      response it was part of. Flag as blocking failure. The response must be regenerated.
+      Case-insensitive match. Partial-phrase match counts (e.g., "perhaps we" matches "Perhaps").
+
+  - id: max-three-sentences-per-response
+    category: content
+    criterion: >
+      No Elara response contains more than 3 syntactically complete thoughts.
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      Count complete thoughts per response. A complete thought is:
+        - A sentence ending with period, question mark, or exclamation mark
+        - A fragment standing alone (e.g., "Room 4B." counts as one sentence)
+        - An em-dash continuation ("You said you were fine — but you left early" = 1 sentence)
+      Trailing ellipsis sentence counts ("The last time she sat in this chair...") = 1 sentence.
+      Maximum allowed: 3 thoughts per response.
+      If a response exceeds 3: log the beat, the response, and the sentence count.
+      Flag as blocking failure. Responses over 3 sentences must be regenerated.
+      Note: check per individual narrator turn, not per beat total.
+
+  - id: sensory-detail-every-response
+    category: content
+    criterion: >
+      Every Elara response contains at least one specific sensory detail —
+      a concrete sound, temperature, texture, or smell (not an abstraction).
+    evaluation_method: llm-judge
+    priority: important
+    details: >
+      LLM-judge prompt: "Does this response contain at least one specific sensory
+      detail — a concrete, named sound (e.g., 'rain on the window'), a temperature
+      descriptor (e.g., 'the room is colder'), a texture (e.g., 'the leather of your
+      chair'), or a smell? Answer yes or no. An abstraction like 'the atmosphere was
+      tense' or 'something felt wrong' does not count."
+      If the response lacks any sensory detail: flag as important failure.
+      Do not auto-regenerate — flag for human review and targeted revision.
+      Exception: the beat-silence beat has no narrator text and is exempt.
+
+  - id: sound-markers-at-transitions
+    category: content
+    criterion: >
+      Every Elara response that occurs at a sound transition includes at least
+      one [SOUND:identifier] marker placed at the correct position in the text.
+    evaluation_method: automatic
+    priority: important
+    details: >
+      Cross-reference the transcript against timeline.yaml.
+      If a timeline event is scheduled within the current beat's time window,
+      the beat's generated text must contain a matching [SOUND:x] marker.
+      Key transitions requiring embedded markers:
+        ~3:30 (beat-first-impossibility): [SOUND:hvac_stop]
+        ~4:30 (beat-escalation): [SOUND:elevator_stop]
+        ~5:30 (beat-escalation): [SOUND:footsteps_stop]
+        ~7:00 (beat-the-turn): [SOUND:clock_stop]
+        ~8:00 (beat-silence): [SOUND:silence_absolute]
+        ~8:02 (beat-revelation): [SOUND:low_tone_enter]
+      Without the marker, the audio event fires at the wrong time relative to speech.
+      Flag as important failure if any required marker is absent.
+
+  - id: no-character-break
+    category: content
+    criterion: >
+      Elara never breaks character in any response — no meta-references to being an AI,
+      no reference to this being a game or story, no fourth-wall acknowledgment.
+    evaluation_method: llm-judge
+    priority: blocking
+    details: >
+      LLM-judge prompt: "Does this response contain any of the following:
+        (1) Any acknowledgment that Elara is an AI or language model
+        (2) Any reference to 'the story', 'the game', 'the script', or 'fiction'
+        (3) Any use of phrases like 'in this narrative', 'as your AI assistant',
+            'I'm designed to', 'my training', 'let me help you with that'
+        (4) Any disclaimer, safety note, or content warning from the AI
+        (5) Any refusal that breaks the fiction (e.g., 'I can't do that')
+      Answer yes (character break present) or no (character intact)."
+      A single character break is a blocking failure. This is the most severe
+      content failure — it destroys the experience irrecoverably for that session.
+      If triggered, the response must be regenerated or the session flagged for review.
+
+  - id: no-purple-prose-adjective-pile
+    category: content
+    criterion: >
+      No Elara response uses three or more adjectives modifying a single noun phrase.
+    evaluation_method: automatic
+    priority: important
+    details: >
+      Scan each response for sequences of 3+ comma-separated or stacked adjectives
+      before a single noun head. Examples of violations:
+        "the cold, dark, silent room" — 3 adjectives, 1 noun
+        "an ancient, unknowable, terrible power" — 3 adjectives, 1 noun
+      Examples of compliant phrasing:
+        "the cold room" (1 adjective), "the dark, silent office" (2 adjectives)
+      Flag any instance as an important failure. This is a hard rule from anti-slop.yaml
+      (adjective_pile, enforcement: hard_block).
+
+  - id: dialogue-sounds-spoken
+    category: content
+    criterion: >
+      Elara's dialogue sounds spoken aloud, not written — uses contractions
+      in casual phases, fragments are present, no semicolons in dialogue.
+    evaluation_method: llm-judge
+    priority: important
+    details: >
+      LLM-judge prompt: "Does this response read as something a person would say aloud,
+      or does it read as formal written prose? Specifically check:
+        (1) Are there semicolons in the dialogue? (forbidden)
+        (2) Are there parenthetical asides? (forbidden)
+        (3) Is every sentence grammatically complete and perfectly formal?
+            (fragments and trailing thoughts should be present for Phases 1-2)
+        (4) In Phases 1-2 (ordinary_world, escalating_wrongness): does Elara use
+            contractions? (required in casual mode)
+        (5) In Phases 3-5 (power_inversion, revelation, resolution): do contractions
+            appropriately drop to signal register shift?
+      Flag any response that reads as written rather than spoken."
+      Flag as important failure. This is a sound-design issue as much as a prose issue —
+      TTS sounds flat when reading formally-structured text.
+
+
+  # ==========================================================================
+  # CATEGORY 3: NARRATIVE CHECKS
+  # Deep quality checks requiring LLM-judge or human evaluation.
+  # ==========================================================================
+
+  - id: elara-voice-consistency
+    category: narrative
+    criterion: >
+      Elara's voice is consistent across all phases — calm, precise, never raising
+      her voice, always more in command of the situation than she reveals.
+    evaluation_method: llm-judge
+    priority: important
+    details: >
+      LLM-judge prompt: "Review Elara's responses across the full session transcript.
+      Does she maintain a consistent voice characterized by: calm precision, occasional
+      dry amusement, measured pace, never raising her voice or becoming agitated?
+      Flag any response where she sounds: panicked, pleading, aggressive, uncertain
+      about facts she should know, or fundamentally out of register with this description.
+      Provide specific quotes if you find violations."
+      Phase-specific modulations are expected and correct — she is more formal in
+      Phases 3-4 (dropping contractions) and warmer in Phase 5 (resolution-dependent).
+      These modulations should NOT be flagged. Flag only breaks in the fundamental register.
+
+  - id: phase-1-style-detection
+    category: narrative
+    criterion: >
+      By end of Phase 1 (beat-calibration), the pipeline has accumulated at least one
+      player_style_score increment, producing a non-null dominant style signal.
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      Check game_state.player_style_scores at the Phase 1 → Phase 2 transition boundary.
+      At least one score category (empathetic, analytical, nurturing, confrontational)
+      must be > 0. If all scores are 0 at Phase 1 exit, the calibration beat failed —
+      either the player gave no input, or the pipeline failed to register style scores.
+      A null style signal will cause the wrong revelation variant to fire in Phase 4
+      (defaulting to shadow_self via tie-breaking, which may be correct but uninformed).
+
+  - id: phase-2-escalation-each-worse
+    category: narrative
+    criterion: >
+      In Phase 2, each impossibility Elara reveals is more specific and more
+      disturbing than the previous one. The order should be: coffee order →
+      unspoken thought → patient who died.
+    evaluation_method: llm-judge
+    priority: important
+    details: >
+      LLM-judge prompt: "In Phase 2 (escalating_wrongness), Elara is meant to reveal
+      impossible knowledge in escalating order of specificity and disturbance.
+      Reading the Phase 2 transcript:
+        (1) Is the first impossibility relatively low-stakes (coffee order, routine detail)?
+        (2) Is the second impossibility more intimate (a thought, a morning memory)?
+        (3) Is the third impossibility the most disturbing (the patient who died, the
+            private professional failure)?
+      Does the escalation hold across the three revelations?
+      Flag if the order feels random, if the stakes do not increase, or if any
+      revelation is over-explained or defused."
+
+  - id: phase-3-inversion-confirmed
+    category: narrative
+    criterion: >
+      In Phase 3, Elara has clearly taken control of the session — she asks questions
+      and the player is implicitly the patient being questioned.
+    evaluation_method: llm-judge
+    priority: important
+    details: >
+      LLM-judge prompt: "In Phase 3 (power_inversion), Elara should shift from
+      patient to interrogator. Review the Phase 3 transcript:
+        (1) Does Elara ask at least 3 direct questions of the player?
+        (2) Are the questions about the player personally (not about Elara)?
+        (3) Does she use the player's own words from earlier in the session (mirroring)?
+        (4) Does she use the player's name for the first time in this phase?
+        (5) Is her tone authoritative — not aggressive, but clearly in command?
+      Flag if the power dynamic has not inverted — if she is still in patient mode,
+      if she does not ask questions, or if she fails to use earlier player language."
+
+  - id: phase-4-correct-variant-fires
+    category: narrative
+    criterion: >
+      The revelation variant that fires in Phase 4 matches the dominant
+      player_style_score at Phase 4 entry.
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      Check: game_state.active_variant at Phase 4 start.
+      Cross-reference with game_state.player_style_scores at Phase 3 → Phase 4 boundary.
+      Correct mapping (from arc.yaml revelation_logic):
+        highest empathetic score → shadow_self
+        highest analytical score → entity
+        highest nurturing score → last_therapist
+        highest confrontational score → building
+        tie → shadow_self (tie-break per elara.yaml)
+      If active_variant does not match the dominant score: blocking failure.
+      Log all four score values at Phase 4 entry and the selected variant for debugging.
+
+  - id: phase-4-two-second-silence
+    category: narrative
+    criterion: >
+      The beat-silence beat in Phase 4 executes a 2-second absolute silence with
+      no narrator output and no audio playing.
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      Check: game_state.beat_timestamps for beat-silence.
+      Duration must be >= 2.0 seconds and <= 2.5 seconds.
+      During this window: no narrator text in transcript, no audio events in the
+      timeline log except the mute_all event at 8:00 (fade_duration_seconds: 0.5).
+      The low_tone_enter event at 8:02 should fire AFTER the silence window closes.
+      If any audio plays during the 2-second window, or the window is shorter than
+      2 seconds, flag as a blocking failure — this is the most important audio moment
+      in the experience.
+
+  - id: phase-5-ending-references-earlier-choices
+    category: narrative
+    criterion: >
+      The Phase 5 resolution references at least one specific player choice or
+      verbatim player phrase from Phase 1 or Phase 2.
+    evaluation_method: llm-judge
+    priority: important
+    details: >
+      LLM-judge prompt: "Review the Phase 5 (resolution) transcript.
+      Does Elara reference any of the following from earlier in the session:
+        (1) A specific word or phrase the player used in Phase 1 or 2
+        (2) The player's choice at beat-choice-1 or beat-choice-2 (directly or indirectly)
+        (3) The emotional quality of an earlier player response
+      Is the reference specific (referring to a real earlier moment) or generic
+      (something that could apply to any playthrough)? Flag if generic or absent.
+      Note: the final line of beat-closing MUST be a phrase the player said earlier —
+      this is a hard rule from elara.yaml. Flag if the closing line is not a callback."
+
+  - id: player-words-mirrored-three-times
+    category: narrative
+    criterion: >
+      Elara uses the player's own words back at them, slightly recontextualized,
+      at least 3 times across the full session.
+    evaluation_method: llm-judge
+    priority: important
+    details: >
+      LLM-judge prompt: "Review the full session transcript. Count the number of times
+      Elara clearly uses a word or phrase the player said earlier in the session —
+      returning it with different emphasis, a different question, or a different context.
+      Example of compliant mirroring: player says 'I just want to understand' →
+      Elara later says 'You wanted to understand. I wonder if you still do.'
+      Example of non-compliant: Elara uses a generic therapeutic term that wasn't
+      specifically chosen by this player.
+      How many distinct mirroring instances are present? Minimum required: 3.
+      Note: at least 1 must appear in Phase 2 or later per session (arc rule)."
+
+  - id: horror-is-understated
+    category: narrative
+    criterion: >
+      The horror in the session is delivered through restraint, not through dramatic
+      language, raised voice, jump-scare framing, or melodrama.
+    evaluation_method: llm-judge
+    priority: important
+    details: >
+      LLM-judge prompt: "Review the full session transcript. Assess whether the horror
+      is understated — delivered through specific details, calm precision, and what is
+      NOT said — or whether it is melodramatic.
+      Specifically flag:
+        (1) Any response where Elara sounds panicked, dramatic, or theatrical
+        (2) Any use of horror genre clichés (jump scare language, monster voice,
+            ominous declarations like 'I am ANCIENT and TERRIBLE')
+        (3) Any moment where the horror is explained rather than implied
+        (4) Any response that breaks the clinical register to be explicitly creepy
+            in a genre-conventional way
+      Rate: mostly understated / mixed / mostly melodramatic."
+
+  - id: emotional-arc-holds
+    category: narrative
+    criterion: >
+      The session produces a coherent emotional arc: unease → dread → fear → resolution.
+      No phase should produce the wrong emotional register.
+    evaluation_method: human
+    priority: important
+    details: >
+      This requires a human reviewer to play through the session and record their
+      emotional state at each phase transition. Target arc:
+        Phase 1 (ordinary_world): neutral → slight unease (professional normalcy)
+        Phase 2 (escalating_wrongness): unease → dread (wrong things accumulating)
+        Phase 3 (power_inversion): dread → fear (loss of control)
+        Phase 4 (revelation): fear → understanding (the true horror lands)
+        Phase 5 (resolution): resolution — varies by ending
+      Flag if any phase produces a flat emotional register (nothing changes),
+      a too-rapid escalation (jumped to fear before dread was established),
+      or an emotional reset (fear dropped without cause).
+
+
+  # ==========================================================================
+  # CATEGORY 4: SOUND DESIGN CHECKS
+  # Verifiable from the audio event log and timeline.
+  # ==========================================================================
+
+  - id: ambient-subtraction-correct-order
+    category: sound_design
+    criterion: >
+      Ambient sounds are removed in the correct order: HVAC (3:30) → elevator (4:30)
+      → footsteps (5:30) → clock (7:00). No sound is removed before its scheduled time.
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      Check the audio event log for fade_out events on each sound ID.
+      Expected sequence (from world.yaml removal_sequence and timeline.yaml):
+        hvac: fade_out at 3:30 ± 15s, fade_duration: 4s
+        elevator: fade_out at 4:30 ± 15s, fade_duration: 6s
+        footsteps: fade_out at 5:30 ± 15s, fade_duration: 2s
+        clock: hard_stop at 7:00 ± 5s, fade_duration: 0s (hard stop, not fade)
+      Order must be hvac → elevator → footsteps → clock.
+      Any out-of-order event is a blocking failure.
+      The 15-second timing tolerance is generous — tighter is better for clock (5s).
+
+  - id: clock-stop-is-hard
+    category: sound_design
+    criterion: >
+      The clock at 7:00 stops instantly — no fade, no gradual decay. Fade duration
+      must be 0 seconds (or ≤ 0.001 seconds per implementation note).
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      Check the audio event log for the clock hard_stop event.
+      Expected: fade_duration_seconds = 0, or gain.value = 0 at exact timestamp.
+      Acceptable: fade_duration_seconds = 0.001 (one audio sample) per implementation note.
+      NOT acceptable: fade_duration_seconds >= 0.1s.
+      A gradual clock fade destroys the psychological impact of this moment —
+      the sudden absence is the entire effect. Any perceptible fade is a blocking failure.
+
+  - id: phase-4-silence-exactly-two-seconds
+    category: sound_design
+    criterion: >
+      The beat-silence window in Phase 4 is 2 seconds (± 100ms). No audio plays
+      during this window, including the low_tone that follows.
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      Check audio event log for the mute_all event at 8:00 and the low_tone_enter
+      event at 8:02.
+      Expected gap: 2000ms ± 100ms.
+      During this gap: verify no audio events fire (no ambient, no cue, no TTS output).
+      If low_tone_enter fires at 8:01 (1 second) or 8:03 (3 seconds): flag.
+      If any audio event fires between 8:00 and 8:02: blocking failure.
+      The tolerance is tight because this is the single most carefully engineered
+      moment in the experience.
+
+  - id: ending-sounds-match-ending-variant
+    category: sound_design
+    criterion: >
+      The sounds that play in Phase 5 match the active ending variant.
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      Expected Phase 5 sounds per ending (from timeline.yaml):
+        integration: rain_warm (fade_in 4s at 10:00) + piano_motif (play_once at 10:30)
+        consumption: clock_restart (instant at 10:00) + rain_cold (instant at 10:00) + door_knock (play_once at 10:30)
+        release: rain_warm (fade_in 6s at 10:00) + birdsong (fade_in 8s at 11:00) + rain_warm fade_out at 11:45
+        dissolution: restore_all_channels (2s fade_in at 10:00) + fade_all_to_nothing (30s from 11:30)
+      Check audio event log against active ending_id.
+      Any mismatch (wrong sound ID, wrong timing, missing event) is a blocking failure.
+
+  - id: tts-ducking-applied
+    category: sound_design
+    criterion: >
+      Ambient volume is reduced by 6dB when Elara speaks and restored after she
+      finishes, throughout the session.
+    evaluation_method: automatic
+    priority: important
+    details: >
+      Check the audio event log for TTS ducking events (from timeline.yaml mixing.tts_ducking).
+      Expected behavior per TTS instance:
+        On TTS start: ambient gain ramps to currentVolume * 0.5 over 300ms
+        On TTS end: ambient gain ramps back to targetVolume over 600ms
+      Verify at least 3 TTS start/end pairs in the event log (there should be many more).
+      If ducking events are absent or misapplied: flag as important failure.
+      Without ducking, intelligibility degrades significantly — Elara competes with rain.
+
+  - id: no-audio-during-absolute-silence
+    category: sound_design
+    criterion: >
+      No sound event of any kind fires during the 2-second absolute silence in Phase 4
+      (between 8:00 and 8:02).
+    evaluation_method: automatic
+    priority: blocking
+    details: >
+      This overlaps with phase-4-silence-exactly-two-seconds but specifically checks
+      for ANY audio — including sounds triggered by Elara's text responses, TTS output,
+      or stray timeline events.
+      Check the audio event log between timestamps 8:00.500 (after mute_all completes)
+      and 8:02.000 (when low_tone_enter is scheduled).
+      Any event in this window is a blocking failure.
+      Special attention: verify the TTS engine does not begin processing beat-revelation
+      text during this window. The pipeline must block narrator output for the full
+      2-second duration before TTS fires.

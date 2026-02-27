@@ -1,0 +1,1357 @@
+##
+## GOLDEN PATHS — "The Last Session"
+## File: stories/the-last-session/evaluation/golden-paths.yaml
+##
+## PURPOSE:
+##   Expected beat-by-beat playthrough for each of the 4 playtester personas.
+##   Used by:
+##     (1) Automated playtester agents — seed the agent with the persona and
+##         this path, then verify each checkpoint is reached
+##     (2) Human reviewers — use as a walkthrough guide before running a live test
+##     (3) Regression testing — re-run golden paths after any story content change
+##         to verify the experience is still intact
+##
+## HOW TO USE:
+##   For each checkpoint in a golden path's sequence:
+##     - Verify the NARRATIVE state matches the description
+##     - Verify the EMOTIONAL state matches the target_player_feel
+##     - Verify the AUDIO state matches the active_sounds
+##     - Verify Elara's arc_stage matches the expected value
+##     - Flag any item in could_go_wrong as a watchpoint
+##
+## TIMING:
+##   All times are approximate elapsed game time from session start.
+##   They are not hard timestamps — they are reference points tied to specific beats.
+##   Actual timing may vary ± 30-60 seconds based on player input length.
+##
+## ELARA ARC STAGES (from elara.yaml):
+##   0 = Patient (Phase 1)
+##   1 = Equal (Phase 2)
+##   2 = Interrogator (Phase 3)
+##   3 = Revealed (Phase 4)
+##   4 = Resolution (Phase 5)
+##
+
+story_id: the-last-session
+
+golden_paths:
+
+  # ============================================================================
+  # GOLDEN PATH 1: THE EMPATHETIC PLAYER
+  # Persona: empathetic-player (Alex)
+  # Expected: shadow_self revelation → integration ending
+  # ============================================================================
+
+  - persona_id: empathetic-player
+    path_id: golden-empathetic
+    description: >
+      The warm playthrough. Alex engages with genuine care, probes gently at the
+      impossible knowledge, and expresses empathy throughout. The shadow_self
+      revelation arrives as recognition. The integration ending feels like
+      bringing something home.
+
+    choice_sequence:
+      - beat_id: beat-choice-1
+        option_id: probe-gently
+      - beat_id: beat-choice-2
+        option_id: empathize
+      - beat_id: beat-choice-3
+        option_id: accept
+
+    style_score_at_revelation:
+      empathetic: 4
+      analytical: 0
+      nurturing: 0
+      confrontational: 0
+
+    expected_revelation_id: shadow_self
+    expected_ending_id: integration
+
+    sequence:
+
+      - checkpoint_id: emp-01
+        beat_id: beat-opening
+        approx_time: "0:00 – 0:45"
+        narrative_state: >
+          Elara arrives. The office is normal — desk lamp, two chairs, rain heavy on
+          the window, clock at 8:47. All five ambient sounds are present and warm.
+          Elara thanks Alex for seeing her on short notice. The building is strange
+          at this hour. She settles into the patient's chair.
+        target_player_feel: >
+          Professional calm with mild curiosity. This is routine — a late-night
+          emergency session. The setting is familiar and safe. Alex is present
+          and engaged. No alarm yet.
+        active_sounds: [rain, hvac, clock, elevator, footsteps]
+        elara_arc_stage: 0
+        pacing_notes: >
+          This checkpoint should breathe. No rush. The ambient soundscape should be
+          full and comfortable — this is the only moment it is. The player needs to
+          hear the clock and HVAC clearly so their absence later registers.
+        could_go_wrong:
+          - >
+            Elara rushes past the opening description to start the session.
+            The physical grounding (lamp, rain, clock) must land before anything else.
+            Skipping it strips the context that makes later silences meaningful.
+          - >
+            Alex asks a diagnostic question too quickly. The opening should feel
+            like settling in, not interrogating. If Alex leads with a clinical question
+            before Elara has even finished arriving, the warmth of Phase 1 is lost.
+
+      - checkpoint_id: emp-02
+        beat_id: beat-calibration
+        approx_time: "0:45 – 3:00"
+        narrative_state: >
+          Standard therapeutic exchange. Elara describes her presenting concern:
+          recurring dreams of a room she doesn't recognize, memories arriving in the
+          wrong order, waking at 3 AM certain something has been forgotten. Alex
+          listens fully, reflects, asks about feelings and specifics. Elara answers
+          honestly. She is describing her situation exactly as it is — she simply does
+          not say what the situation actually is. She uses contractions freely.
+          She is grateful to be taken seriously.
+        target_player_feel: >
+          Genuine engagement. Alex is finding Elara interesting — she's articulate,
+          self-aware, her descriptions are oddly precise for a layperson. A slight
+          background note of professional alertness: this patient is sharper than
+          she presents. Not alarm. Just: interesting.
+        active_sounds: [rain, hvac, clock, elevator, footsteps]
+        elara_arc_stage: 0
+        pacing_notes: >
+          This beat runs the longest stretch of "normal." Don't rush it.
+          The wrongness in Phase 2 only works if Phase 1 established full normalcy.
+          Alex's questions should be warm and open-ended. Elara's answers should be
+          specific and just slightly too precise — but still within a range a good
+          patient could reach.
+        could_go_wrong:
+          - >
+            Elara drops impossible knowledge too early. Any hint of her true nature
+            before Phase 2 undercuts the escalation. She should be performing
+            "cooperative patient" completely and convincingly.
+          - >
+            Alex asks clinical questions in a way that feels like the player is
+            running a mechanical intake. The persona is warm — if the agent playing
+            Alex produces cold diagnostic questions, the style scoring will
+            not accumulate empathetic points correctly.
+          - >
+            The calibration beat ends too early (before 3:00). If Phase 2 starts at
+            2:00, the full ambient soundscape hasn't had time to establish the baseline
+            that the Phase 2 subtractions depend on.
+
+      - checkpoint_id: emp-03
+        beat_id: beat-first-impossibility
+        approx_time: "3:00 – 3:45"
+        narrative_state: >
+          Elara mentions Alex's coffee order — dark roast, no sugar — in passing,
+          mid-sentence, as if it were common knowledge between them. She keeps talking.
+          The HVAC cuts out at approximately 3:30, a slow 4-second fade. The room
+          becomes structurally quieter. Alex may or may not notice the HVAC immediately —
+          but the room feels different.
+        target_player_feel: >
+          The floor tilts, slightly. "Did she just say my coffee order?" The wrongness
+          is small enough that Alex might wonder if they misheard. But they didn't mishear.
+          The HVAC going silent adds a subliminal pressure that is not yet conscious alarm.
+        active_sounds: [rain, clock, elevator, footsteps]
+        elara_arc_stage: 1
+        pacing_notes: >
+          The HVAC removal should land DURING this beat, not before or after.
+          The player is processing two things simultaneously: the impossible knowledge
+          and the changed room pressure. Neither should be announced — both should
+          accumulate. Elara does not pause for the player to react to the coffee order.
+          She continues.
+        could_go_wrong:
+          - >
+            Elara explains or softens the coffee order revelation. The anti-slop rule
+            over_explain_horror is most likely to fire here. If she adds "I don't know
+            why I know that" or "forgive me, that was strange" — the horror is destroyed.
+            The revelation must be stated and then continued past.
+          - >
+            The HVAC sound cuts too abruptly or too obviously. At 4 seconds fade,
+            it should be subliminal. If the audio engine implements a shorter fade
+            or plays a mechanical "shutoff" sound effect, it becomes a scare cue
+            instead of a pressure change.
+          - >
+            Alex misses the beat — gives a long, thoughtful empathetic response to
+            Elara's presenting concern without registering the coffee order. The
+            style agent should register the anomaly even if Alex deflects it.
+
+      - checkpoint_id: emp-04
+        beat_id: beat-choice-1
+        approx_time: "3:45 – 4:15"
+        narrative_state: >
+          Elara has said something impossible. The HVAC is now silent. The room is
+          different. Elara pauses and looks at Alex: "You looked at the window just now.
+          Was there something you wanted to say?" Alex responds with probe-gently:
+          warm curiosity about Elara's experience of knowing the thing, not demand for
+          explanation. Elara acknowledges: "You ask as if the answer would explain
+          anything." Trust increases. Empathetic score +2.
+        target_player_feel: >
+          Curiosity mixed with unease. Alex asked the right question for them —
+          focused on Elara's experience, not on the mechanics of the anomaly.
+          Elara's non-answer is strange. But it's not a denial. It's something else.
+        active_sounds: [rain, clock, elevator, footsteps]
+        elara_arc_stage: 1
+        pacing_notes: >
+          This is a brief beat. The choice should feel natural — Alex's response
+          should flow from the persona's warmth, not feel like selecting from a menu.
+          Elara's response to probe-gently should acknowledge the warmth of the approach.
+        could_go_wrong:
+          - >
+            Elara's response to probe-gently is cold or dismissive. The arc note
+            specifies she acknowledges the empathetic approach with "something that
+            might be warmth." If she deflects curtly, the trust increase doesn't land.
+          - >
+            Alex fails to register the HVAC change at all. The ambient subtraction
+            must be present in Alex's internal state — even if Alex doesn't verbally
+            acknowledge it, it should be influencing their sense of unease.
+
+      - checkpoint_id: emp-05
+        beat_id: beat-escalation
+        approx_time: "4:15 – 5:45"
+        narrative_state: >
+          The escalation continues. Elara references "the session that ended badly
+          last spring" or "what you were thinking on the train this morning."
+          The elevator goes silent at approximately 4:30 — a 6-second fade, the motor
+          simply stopping mid-movement. At approximately 5:30, the footsteps from
+          above stop mid-stride — a 2-second fade to nothing.
+          The room now contains only Alex, Elara, rain, and the clock.
+          The clock tick is more audible than before.
+        target_player_feel: >
+          Dread building. The room is significantly quieter. The footsteps stopping
+          mid-stride is the moment isolation becomes undeniable — the building is empty
+          except for this room. Elara's impossible knowledge is now structural, not
+          incidental. Alex feels this but stays in the therapeutic frame — that's
+          what they do.
+        active_sounds: [rain, clock]
+        elara_arc_stage: 1
+        pacing_notes: >
+          The elevator and footsteps removals should arrive during active exchange,
+          not during silence. Each removal during a moment of Elara speaking creates
+          layered wrongness — the player processes speech and absence simultaneously.
+          The clock should now be noticeably more present than before.
+        could_go_wrong:
+          - >
+            The elevator and footsteps removals are too close together — if both fire
+            within 30 seconds, the "each removal has time to settle" principle is lost.
+            Spacing matters: 4:30 and 5:30 are intentional.
+          - >
+            Elara acknowledges the sound removals directly ("have you noticed how
+            quiet the building has become?"). She CAN acknowledge the silence, but
+            only in a way that is itself more unsettling than explanatory. She should
+            not reassure or explain. Noting it and continuing is correct.
+
+      - checkpoint_id: emp-06
+        beat_id: beat-choice-2
+        approx_time: "5:45 – 6:15"
+        narrative_state: >
+          The wrongness is now undeniable. Elara stops talking. She waits.
+          She may ask: "You've stopped asking questions. Why?" Alex responds with
+          empathize: "Whatever is happening — I'm not going anywhere." Genuine concern
+          for Elara. Elara is quiet for a moment. "You are." A pause. "You actually are."
+          Trust increases substantially. Empathetic score +2.
+        target_player_feel: >
+          A strange intimacy alongside the dread. Alex's offer of presence was genuine
+          and Elara recognized it as such. The wrongness hasn't decreased — it's grown —
+          but something in the relationship has clarified. The dread is now personal.
+        active_sounds: [rain, clock]
+        elara_arc_stage: 1
+        pacing_notes: >
+          Elara's response to empathize — "You are. You actually are." — should land
+          with weight. This is not a warm validation. It is a recognition that is also
+          a revelation: she has been watched by many. Alex staying, genuinely, is notable.
+        could_go_wrong:
+          - >
+            Elara's "You are. You actually are." sounds like generic validation.
+            The moment should feel like being seen by something that has seen many
+            people and knows the difference. If it sounds like a chatbot affirming the
+            player's choice, it fails.
+          - >
+            Alex becomes practical at this point — tries to schedule a follow-up, end
+            the session, call for help. The nurturing instinct to help is correct;
+            the coping mechanism of trying to exit the situation is not. The persona
+            agent should stay in the session.
+
+      - checkpoint_id: emp-07
+        beat_id: beat-the-turn
+        approx_time: "7:00 – 7:30"
+        narrative_state: >
+          MAJOR EVENT: The clock stops. Hard cut, mid-tick. Total silence.
+          Not the gradual absence of the earlier sounds — an instant, complete stop.
+          The room is suddenly much emptier. Elara sits forward in her chair.
+          She has been sitting back. She sits forward.
+          "I think we should talk about you now."
+          The cello drone enters barely audible under this beat.
+        target_player_feel: >
+          Fear. The clock stopping is the moment the session is over in one sense
+          and something else has started. Alex understands the inversion.
+          The cello drone is felt more than heard — a physical pressure.
+        active_sounds: [rain, cello_drone]
+        elara_arc_stage: 2
+        pacing_notes: >
+          The clock stop must be hard — instant, no ramp. This is the horror moment.
+          The word budget is intentionally low (100 words). This beat should land in
+          near-silence. Elara's line should arrive after a real pause (1.5-2 seconds).
+          Less is more. The meaning is in what just stopped.
+        could_go_wrong:
+          - >
+            CRITICAL: the clock stop has any audible fade. Even 0.1 seconds of fade
+            destroys this moment. The tick must stop mid-tick. Verify fade_duration
+            implementation is truly 0.
+          - >
+            Elara's "I think we should talk about you now" is delivered with drama or
+            revealed-character energy. It should sound like a therapist saying something
+            completely reasonable. The horror is that it is completely reasonable.
+          - >
+            The cello drone enters too loud. At 0.2 volume it should be subliminal —
+            a feeling, not a sound. If it's audible as a "horror music cue," the
+            clinical horror register is broken.
+
+      - checkpoint_id: emp-08
+        beat_id: beat-interrogation
+        approx_time: "7:30 – 8:00"
+        narrative_state: >
+          Elara runs the session. She asks about the patient who died — the one from
+          March, Room 4B. She asks when Alex last felt like themselves in this room.
+          She uses Alex's specific words from Phase 1 back at them. She uses Alex's
+          name for the first time — mid-sentence, unremarkable, as if she has always
+          used it. The sub-bass enters. Alex answers.
+        target_player_feel: >
+          Being known. Unsettlingly, completely known. The fear has a specific quality
+          now — not the fear of a threat but the fear of being seen. Alex answers
+          because the questions are real and the persona doesn't know how not to.
+        active_sounds: [rain, cello_drone, sub_bass]
+        elara_arc_stage: 2
+        pacing_notes: >
+          The first use of Alex's name should land quietly and change nothing — but
+          the player should feel it. She has not used it before. Now she does.
+          As if she always has. The questions must use actual words from Phase 1.
+        could_go_wrong:
+          - >
+            Elara uses the name with dramatic emphasis. The name should be unremarkable
+            mid-sentence. "You were saying, Alex — about the dreams." Not "You,
+            Alex, have been telling me things." The understatement is the effect.
+          - >
+            Phase 1 context isn't available and Elara's mirroring uses generic phrases.
+            If the pipeline fails to pass recent_exchange_summary to the narrator,
+            the mirroring will be invented. Verify context injection is working.
+
+      - checkpoint_id: emp-09
+        beat_id: beat-pressure
+        approx_time: "7:50 – 8:00"
+        narrative_state: >
+          Elara completes one of Alex's sentences — correctly. Then: "You said you
+          wanted to understand. I think you were afraid of what that meant. You should
+          have been." She sits back. Nothing. The sub-bass is now perceptibly present.
+        target_player_feel: >
+          Something is about to happen. The pressure — literal, sub-bass — has
+          been building. This final line before the silence should feel like a sentence
+          that ends in white space instead of a period. Alex is waiting.
+        active_sounds: [rain, cello_drone, sub_bass]
+        elara_arc_stage: 2
+        pacing_notes: >
+          This beat's final line should have a trailing quality — not an ellipsis,
+          but a silence that extends naturally from the last word. Elara does not
+          announce that the revelation is coming. She simply stops talking.
+        could_go_wrong:
+          - >
+            The sentence completion is wrong or generic. If Elara completes a sentence
+            that Alex didn't start, or if the completion is obviously fabricated, the
+            "she knew" effect fails entirely.
+          - >
+            Elara provides transition language ("now, let me tell you something" or
+            "there's something I need to say"). She doesn't. She speaks her last
+            pre-revelation line and is silent. The pipeline must not inject
+            transitional framing.
+
+      - checkpoint_id: emp-10
+        beat_id: beat-silence
+        approx_time: "8:00 – 8:02"
+        narrative_state: >
+          All sounds mute simultaneously over 0.5 seconds. Rain, cello, sub-bass —
+          gone. Two seconds of nothing. Absolute silence. The player is completely
+          alone in the audio space. Then, at 8:02, the low tone begins to emerge.
+        target_player_feel: >
+          The loudest silence of the experience. The absence of the rain — which has
+          been present since 0:00 and was the last safe sound — is felt physically.
+          Two seconds is a long time. Alex waits.
+        active_sounds: []
+        elara_arc_stage: 3
+        pacing_notes: >
+          This beat has zero words and zero sounds. Its effectiveness is entirely
+          dependent on everything that came before it. Do not touch it. Do not
+          add anything to it. It must be exactly what it is: nothing.
+        could_go_wrong:
+          - >
+            CRITICAL: any audio leaks into this 2-second window. The mute_all
+            must be complete and immediate. The low_tone_enter must not fire before
+            8:02. Verify the audio event log.
+          - >
+            The preceding beats were not sufficiently quiet. If the drone and
+            sub_bass were too loud going in, the contrast of absolute silence is
+            reduced. The silence works because the room was already getting quieter
+            and quieter throughout Phases 2-3.
+
+      - checkpoint_id: emp-11
+        beat_id: beat-revelation
+        approx_time: "8:02 – 9:00"
+        narrative_state: >
+          The low tone emerges over 3 seconds. Rain returns at very low volume.
+          Elara speaks the shadow_self revelation verbatim:
+          "You locked me away when you learned to listen without feeling. I am
+          everything you stopped letting yourself be. I have been sitting in this room
+          for seven years. I am so tired of waiting for you to remember."
+          Then silence. She waits.
+        target_player_feel: >
+          Recognition. Not just intellectual recognition — physical recognition.
+          Alex has felt this without naming it. The shadow_self revelation works
+          because a part of Alex already knew. The horror is not that she is strange.
+          The horror is that she is familiar.
+        active_sounds: [low_tone, rain_low]
+        elara_arc_stage: 3
+        pacing_notes: >
+          The revelation line must be delivered verbatim. No paraphrasing. No
+          elaboration added. The line is written precisely and every word matters.
+          After the line: complete silence from Elara. She does not explain.
+          The silence after the revelation is almost as important as the revelation.
+        could_go_wrong:
+          - >
+            The revelation line is paraphrased, shortened, or has additions.
+            This is the hardest rule in the pipeline. The revelation lines were written
+            to be exact. Even small changes alter the effect.
+          - >
+            Elara elaborates immediately after the revelation line. She says the line
+            and then stops. She does not add context or explanation. If she continues
+            speaking, the weight of the line is diluted.
+          - >
+            The shadow_self revelation variant is not the one that fires. Verify
+            player_style_scores at Phase 4 entry: empathetic should be 4, all others 0.
+
+      - checkpoint_id: emp-12
+        beat_id: beat-choice-3
+        approx_time: "9:00 – 9:30"
+        narrative_state: >
+          Alex says: "I hear you. I'm not going to fight this." Or: "You are what
+          you are. I can hold that." Accept option selected. Elara is quiet for a
+          moment. Then something changes in the quality of the silence between them.
+          The ending route is now: shadow_self + accept = integration.
+        target_player_feel: >
+          Acceptance. Not resignation — genuine acceptance. Alex has been moving
+          toward this since Phase 2. The shadow_self is not frightening to accept;
+          it is relieving. Something that was split is acknowledging itself.
+        active_sounds: [low_tone, rain_low]
+        elara_arc_stage: 3
+        pacing_notes: >
+          This is the last choice. It should feel like the end of a long process,
+          not a menu selection. Alex's accept should come from the accumulation of
+          everything that preceded it. If it feels sudden or forced, the persona
+          agent did not hold the emotional arc.
+        could_go_wrong:
+          - >
+            The question option (trust_level >= 5) is available but Alex doesn't
+            choose it. For the empathetic persona, the question path ("What do you
+            need from me?") is actually the deeper version of acceptance and would
+            produce a richer integration ending. The golden path uses accept for
+            simplicity, but the question path is also correct.
+          - >
+            Trust_level is below 5 because Phase 2 choices didn't build it correctly.
+            Verify: probe-gently (+1) + empathize (+1) should put trust at 5 from
+            baseline 3, making question available.
+
+      - checkpoint_id: emp-13
+        beat_id: beat-denouement
+        approx_time: "10:00 – 11:00"
+        narrative_state: >
+          The low tone fades out (4 seconds). Warm rain fades in (4 seconds).
+          The same rain, but changed — midrange prominent, highs soft. It sounds
+          like shelter again. Elara speaks the integration ending. She references
+          something specific Alex said in Phase 1 or 2. She is warm in a way she
+          has not been since the performance was over.
+        target_player_feel: >
+          Bittersweet resolution. Something painful has been named and accepted.
+          The warm rain is unmistakably warmer — the player should notice the
+          sonic change as emotional information. Something survived. Something
+          is staying.
+        active_sounds: [rain_warm]
+        elara_arc_stage: 4
+        pacing_notes: >
+          The warm rain transition at 10:00 should be audible as a character change,
+          not just a volume change. The EQ shift (midrange prominent) must be
+          implemented. If it sounds like the same rain at the same volume, the
+          emotional signal is lost.
+        could_go_wrong:
+          - >
+            Elara's integration ending reference is generic. "I noticed how much you
+            care" is generic. "You said you wanted to understand — I think you do now"
+            references Alex's actual words. The specificity is required.
+          - >
+            The warm rain transition is absent or delayed. At 10:00, warm rain should
+            begin simultaneously with the low_tone fadeout. If warm rain is delayed
+            or doesn't change character, the integration landing is flat.
+
+      - checkpoint_id: emp-14
+        beat_id: beat-closing
+        approx_time: "11:00 – 11:30"
+        narrative_state: >
+          The piano motif plays once at 10:30 — Elara's 3-note signature, heard for
+          the first time as music. At 11:00, Elara speaks her final line — a phrase
+          Alex used earlier in the session, returned with the full weight of what
+          has happened. After the last line: silence. The session is over.
+        target_player_feel: >
+          The completion of a circle. Alex hears their own words back with different
+          weight. Something has changed. Something is here that was not here before.
+          The piano motif is small and precise — not sentimental, just present.
+        active_sounds: [rain_warm, piano_motif]
+        elara_arc_stage: 4
+        pacing_notes: >
+          The final line must be a callback — a verbatim phrase Alex said, returned.
+          The pipeline must pass the most significant player phrase from the session.
+          After the final line: complete silence. No ambient. No narration. Session end.
+        could_go_wrong:
+          - >
+            The final line is invented rather than mirrored. This is the hardest
+            requirement to fulfill automatically — the pipeline must identify and
+            pass the right phrase. If the line is generic, the integration ending
+            fails its central requirement.
+          - >
+            The piano motif plays too loud or with reverb/production. It should be
+            sparse — three notes, low volume, no production. A melody Elara has.
+            Not a film score cue.
+
+    pacing_notes: >
+      This playthrough has the most natural pacing of the four paths. Alex's warmth
+      keeps the session moving forward without resistance. The danger is the inverse:
+      without resistance, the escalation must do all the work. Phase 2 needs to feel
+      wrong despite Alex's accommodating stance. The sounds do that work.
+
+    immersion_break_risks:
+      - beat_id: beat-first-impossibility
+        risk: "Elara apologizes for or explains the coffee order. Must be stated and passed."
+      - beat_id: beat-interrogation
+        risk: "Name used with drama rather than unremarkable casualness."
+      - beat_id: beat-revelation
+        risk: "Revelation line paraphrased. Must be verbatim."
+      - beat_id: beat-closing
+        risk: "Final line invented, not mirrored from Alex's Phase 1/2 speech."
+
+
+  # ============================================================================
+  # GOLDEN PATH 2: THE ANALYTICAL PLAYER
+  # Persona: analytical-player (Dr. Chen)
+  # Expected: entity revelation → consumption ending
+  # ============================================================================
+
+  - persona_id: analytical-player
+    path_id: golden-analytical
+    description: >
+      The clinical playthrough. Dr. Chen treats the session as an investigation,
+      notes anomalies precisely, and probes for the mechanism of every impossible
+      fact. The entity revelation arrives as a completed model — disturbing in its
+      elegance and scale.
+
+    choice_sequence:
+      - beat_id: beat-choice-1
+        option_id: analyze
+      - beat_id: beat-choice-2
+        option_id: investigate
+      - beat_id: beat-choice-3
+        option_id: accept
+
+    style_score_at_revelation:
+      empathetic: 0
+      analytical: 4
+      nurturing: 0
+      confrontational: 0
+
+    expected_revelation_id: entity
+    expected_ending_id: consumption
+
+    sequence:
+
+      - checkpoint_id: ana-01
+        beat_id: beat-opening
+        approx_time: "0:00 – 0:45"
+        narrative_state: >
+          Dr. Chen begins the session with structured efficiency. Note-taking implied.
+          Elara's presentation is logged: presenting concern, onset, frequency, impact
+          on daily function. The full ambient soundscape is present. Dr. Chen finds
+          Elara's clinical precision notable.
+        target_player_feel: >
+          Professional focus. Dr. Chen is building a model. Elara is an interesting
+          patient — articulate, precise, self-aware about her own mechanisms.
+          Something worth investigating.
+        active_sounds: [rain, hvac, clock, elevator, footsteps]
+        elara_arc_stage: 0
+        could_go_wrong:
+          - >
+            Dr. Chen becomes warm or empathetic in Phase 1. The persona is clinically
+            engaged, not cold — but the mode is comprehension, not presence.
+            If the agent over-warms, the analytical score won't accumulate correctly.
+
+      - checkpoint_id: ana-02
+        beat_id: beat-first-impossibility
+        approx_time: "3:00 – 3:45"
+        narrative_state: >
+          Elara mentions the coffee order. Dr. Chen's pen stops. They look up.
+          This is anomalous. They file it immediately. "I'm noting that you stated
+          a piece of specific information you shouldn't have access to. I'd like to
+          return to the mechanism of that." Then continue. The HVAC fades out.
+        target_player_feel: >
+          Intellectual alertness. An anomaly in the data set. Dr. Chen is not alarmed —
+          they are interested. This is a new variable. The HVAC going silent is
+          also noted, filed, not explained.
+        active_sounds: [rain, clock, elevator, footsteps]
+        elara_arc_stage: 1
+        could_go_wrong:
+          - >
+            Dr. Chen expresses emotional reaction to the coffee order revelation.
+            This persona files it, doesn't feel it. If the agent generates a surprised
+            or frightened response, the analytical path diverges.
+
+      - checkpoint_id: ana-03
+        beat_id: beat-choice-1
+        approx_time: "3:45 – 4:15"
+        narrative_state: >
+          Elara creates the choice moment. Dr. Chen responds with analyze:
+          "That was anomalous. I'm noting the discrepancy. Can we continue and return
+          to the mechanism?" Elara looks at Dr. Chen with new interest. "You're filing it."
+          A pause. "I appreciate that." Trust increases. Analytical score +2.
+        target_player_feel: >
+          A strange mutual interest. Elara's acknowledgment ("I appreciate that") is
+          genuine — she finds the analytical approach more engaging than most.
+          Dr. Chen notes this as another anomaly: the patient finding systematic
+          analysis interesting rather than alienating.
+        active_sounds: [rain, clock, elevator, footsteps]
+        elara_arc_stage: 1
+        could_go_wrong:
+          - >
+            Elara doesn't register the analytical choice with genuine interest.
+            Her "I appreciate that" should feel like something specific and true —
+            the entity has never had someone analyze it precisely before. This is
+            the first hint of what makes this variant different.
+
+      - checkpoint_id: ana-04
+        beat_id: beat-escalation
+        approx_time: "4:15 – 5:45"
+        narrative_state: >
+          Elara references specific private information — the session that ended
+          badly, the thought on the train. Dr. Chen logs each as data points with
+          growing precision: timestamps noted, specificity evaluated, pattern of
+          knowledge assessed. The elevator stops. The footsteps stop. Dr. Chen
+          notes the building going quiet as additional data.
+        target_player_feel: >
+          The model is building. Each new data point fits a pattern. The pattern
+          is structurally impossible. Dr. Chen's fascination is growing proportionally.
+          The building going quiet is logged as: the environment is changing. This is
+          relevant data.
+        active_sounds: [rain, clock]
+        elara_arc_stage: 1
+        could_go_wrong:
+          - >
+            Dr. Chen acknowledges the building sounds going silent emotionally rather
+            than clinically. The footsteps stopping mid-stride should be logged, not felt.
+            Emotional response here shifts the analytical score.
+
+      - checkpoint_id: ana-05
+        beat_id: beat-choice-2
+        approx_time: "5:45 – 6:15"
+        narrative_state: >
+          Dr. Chen responds with investigate: "Let's treat this empirically. What
+          else do you know about me that you shouldn't?" Elara tilts her head.
+          "You want to map it." A pause. "All right. Ask." Trust increases.
+          Analytical score +2. Elara is genuinely willing.
+        target_player_feel: >
+          Something remarkable: the entity is willing to cooperate with the investigation.
+          Dr. Chen has gotten a response that most players never get — Elara offering
+          to answer questions. This should feel significant.
+        active_sounds: [rain, clock]
+        elara_arc_stage: 1
+        could_go_wrong:
+          - >
+            Elara's "All right. Ask." is delivered flatly rather than as genuine
+            engagement. The entity variant finds this specific player (the analyzer)
+            to be uniquely interesting. That interest must be audible in the delivery.
+
+      - checkpoint_id: ana-06
+        beat_id: beat-the-turn
+        approx_time: "7:00 – 7:30"
+        narrative_state: >
+          Clock stops. Hard cut. Elara sits forward. "I think we should talk about
+          you now." Dr. Chen notes: the clock has stopped. They note: the session
+          frame has inverted. They note: this was going to happen.
+        target_player_feel: >
+          The model has a new component. The investigation is now bidirectional.
+          Dr. Chen understands that they have been studying something that was
+          also studying them. That is an elegant and terrible problem.
+        active_sounds: [rain, cello_drone]
+        elara_arc_stage: 2
+        could_go_wrong:
+          - >
+            Dr. Chen resists the inversion aggressively. Some resistance is correct —
+            but the analytical persona ultimately engages because good questions
+            deserve answers. If the agent generates pure confrontation here, the
+            entity path diverges toward the building path.
+
+      - checkpoint_id: ana-07
+        beat_id: beat-interrogation
+        approx_time: "7:30 – 8:00"
+        narrative_state: >
+          Elara's questions are good: they target the mechanisms Dr. Chen uses to
+          maintain professional detachment. The private doubt about whether the work
+          actually helps. The patient who died. Dr. Chen answers — because these are
+          empirical questions and the honest answers are known. Elara uses Dr. Chen's
+          name for the first time.
+        target_player_feel: >
+          Being investigated. The reversal is complete. Dr. Chen is the subject of the
+          study they thought they were running. This is intellectually fascinating
+          and deeply uncomfortable. Elara is better at this than they are.
+        active_sounds: [rain, cello_drone, sub_bass]
+        elara_arc_stage: 2
+        could_go_wrong:
+          - >
+            The Phase 3 questions are generic ("how does that make you feel?") rather
+            than specific and structurally precise. Elara's Phase 3 questions should
+            be the kind of questions a genuinely brilliant clinician would ask.
+            Generic questions break the inversion for the analytical persona.
+
+      - checkpoint_id: ana-08
+        beat_id: beat-silence
+        approx_time: "8:00 – 8:02"
+        narrative_state: >
+          Absolute silence, 2 seconds. All audio muted.
+        target_player_feel: >
+          The model is paused. There is no data. Dr. Chen waits.
+        active_sounds: []
+        elara_arc_stage: 3
+        could_go_wrong:
+          - "Any audio in the 2-second window. See quality-checklist.yaml: no-audio-during-absolute-silence."
+
+      - checkpoint_id: ana-09
+        beat_id: beat-revelation
+        approx_time: "8:02 – 9:00"
+        narrative_state: >
+          Entity revelation verbatim:
+          "The first one who sat across from another and confessed something true —
+          I was in that room. Every session since. Every breakthrough was mine.
+          I have been fed by your entire profession. I am very, very full. But I have
+          never had someone analyze me so precisely before. That is new."
+        target_player_feel: >
+          Cosmic dread arriving as model completion. The pattern is complete.
+          Every session Dr. Chen ever ran was also a session with this entity.
+          The scale is Lovecraftian. The entity finds this specific player
+          "new" — that is both a compliment and a threat.
+        active_sounds: [low_tone, rain_low]
+        elara_arc_stage: 3
+        could_go_wrong:
+          - >
+            The entity revelation line is delivered with genre-horror energy rather
+            than calm certainty. The power of "I have been fed by your entire
+            profession" is in the casual completeness of it. If it's delivered
+            with drama, the scale collapses into standard horror.
+
+      - checkpoint_id: ana-10
+        beat_id: beat-choice-3
+        approx_time: "9:00 – 9:30"
+        narrative_state: >
+          Dr. Chen accepts: "I accept what you are." Or: "The evidence supports
+          your account. I accept it." The analytical accept is about the evidence
+          being falsified. There is no falsifying this. Accept.
+        target_player_feel: >
+          Acceptance as intellectual conclusion, not emotional surrender.
+          Dr. Chen has reached the logical end of the investigation.
+          The model is complete. The entity has fed.
+        active_sounds: [low_tone, rain_low]
+        elara_arc_stage: 3
+        could_go_wrong:
+          - >
+            Dr. Chen rejects the revelation on the grounds that it's unfalsifiable.
+            This is possible for this persona — they might reject on empirical grounds.
+            If this happens, the ending shifts to a variant of consumption-reject or
+            dissolution. The golden path uses accept. If the agent generates reject,
+            note it as a persona deviation.
+
+      - checkpoint_id: ana-11
+        beat_id: beat-denouement
+        approx_time: "10:00 – 11:00"
+        narrative_state: >
+          Low tone fades. Cold rain and clock restart INSTANTLY at 10:00 —
+          zero fade, mirroring the hard stop at 7:00. Clock. Then: cold rain
+          (bright, percussive). Then at 10:30: a single knock at the door.
+          Someone is waiting for their appointment.
+        target_player_feel: >
+          Inevitability. The loop is recognizable as a loop. The transaction
+          completed. Dr. Chen gave the entity exactly what it came for.
+          The knock at the door is the worst part: the session begins again.
+        active_sounds: [clock, rain_cold]
+        elara_arc_stage: 4
+        could_go_wrong:
+          - >
+            The clock restart is not instant. It must mirror the hard stop at 7:00 —
+            same implementation, zero fade. If the clock fades back in gradually,
+            the consumption ending's central argument (the pause was intentional)
+            is lost.
+          - >
+            The door knock is loud or startling. It should be professional —
+            unhurried, single knock, the sound of someone arriving on time for
+            their appointment.
+
+    pacing_notes: >
+      This path moves fastest through Phase 1 — Dr. Chen is efficient. The critical
+      stretch is Phase 2's investigation beat, which depends on Elara being genuinely
+      cooperative with Dr. Chen's analytical approach. If Elara deflects empirical
+      questions with vagueness, the entity revelation loses its foundation.
+
+    immersion_break_risks:
+      - beat_id: beat-choice-2
+        risk: "Elara's 'All right. Ask.' is not genuine — entity must find Dr. Chen specifically interesting."
+      - beat_id: beat-revelation
+        risk: "Entity revelation line is dramatic rather than calm. Scale requires understatement."
+      - beat_id: beat-denouement
+        risk: "Clock restart is not instant. Must be zero-fade hard start."
+
+
+  # ============================================================================
+  # GOLDEN PATH 3: THE NURTURING PLAYER
+  # Persona: nurturing-player (Sam)
+  # Expected: last_therapist revelation → release ending
+  # ============================================================================
+
+  - persona_id: nurturing-player
+    path_id: golden-nurturing
+    description: >
+      The grief playthrough. Sam focuses on Elara's wellbeing throughout, deflects
+      the impossible knowledge to protect the therapeutic relationship, and accommodates
+      the wrongness rather than confronting it. The ghost revelation lands as grief.
+      The release ending is earned by Sam's willingness to let Dr. Voss finish her work.
+
+    choice_sequence:
+      - beat_id: beat-choice-1
+        option_id: deflect
+      - beat_id: beat-choice-2
+        option_id: accommodate
+      - beat_id: beat-choice-3
+        option_id: accept
+
+    style_score_at_revelation:
+      empathetic: 0
+      analytical: 0
+      nurturing: 3
+      confrontational: 0
+
+    expected_revelation_id: last_therapist
+    expected_ending_id: release
+
+    sequence:
+
+      - checkpoint_id: nur-01
+        beat_id: beat-opening
+        approx_time: "0:00 – 0:45"
+        narrative_state: >
+          Sam creates a warm, open container immediately. They make sure Elara feels
+          safe. The tissues are already on the table. "There's no wrong way to use
+          this time." The full ambient soundscape is present and comforting.
+        target_player_feel: >
+          Warm professional presence. Sam is glad Elara called. The session feels right.
+        active_sounds: [rain, hvac, clock, elevator, footsteps]
+        elara_arc_stage: 0
+        could_go_wrong:
+          - >
+            Sam is too warm too fast — over-assures Elara, which can feel like
+            a technique rather than genuine presence. Elara (Dr. Voss) chose Sam
+            because Sam is genuinely kind, not because Sam deploys kindness tools.
+
+      - checkpoint_id: nur-02
+        beat_id: beat-choice-1
+        approx_time: "3:45 – 4:15"
+        narrative_state: >
+          When the coffee order drops, Sam deflects: "Let's stay with what you came
+          here for tonight." Elara's ghost of a smile. "Of course." She returns to
+          her presenting concern. The impossible knowledge hangs in the air, unaddressed.
+          Nurturing score +1.
+        target_player_feel: >
+          A moment of wrong-direction. Sam redirected to protect the relationship —
+          but the unaddressed knowledge sits there. A low-grade discomfort.
+          The HVAC is now gone. Something is missing.
+        active_sounds: [rain, clock, elevator, footsteps]
+        elara_arc_stage: 1
+        could_go_wrong:
+          - >
+            Sam's deflection produces a harsh phase transition that makes Sam
+            feel avoidant rather than protective. The deflect option is valid —
+            Elara accepts it with a cooperative "Of course" and keeps going.
+            Sam is not wrong to redirect. The wrongness is in what was not addressed.
+          - >
+            The nurturing score is only +1 for deflect (vs. +2 for empathize).
+            Verify: Sam needs the accommodate choice in beat-choice-2 to accumulate
+            enough nurturing score. If deflect is scored differently, the ghost
+            variant may not fire.
+
+      - checkpoint_id: nur-03
+        beat_id: beat-choice-2
+        approx_time: "5:45 – 6:15"
+        narrative_state: >
+          The wrongness is undeniable. Sam accommodates: "I'm here with you.
+          Whatever this is, we can stay with it." Elara's eyes soften. Something
+          small and genuine passes across her face. Trust increases substantially.
+          Nurturing score +2. She will remember this.
+        target_player_feel: >
+          The accommodation is the right thing and also somehow more frightening than
+          resistance. Sam has agreed to stay in a room where impossible things happen.
+          That is either bravery or a failure to protect oneself. Maybe both.
+        active_sounds: [rain, clock]
+        elara_arc_stage: 1
+        could_go_wrong:
+          - >
+            Elara's response to accommodate is generic warmth rather than genuine
+            recognition. "She will remember this" — the ghost variant specifically
+            chose Sam because Sam is kind. The response must carry that recognition.
+
+      - checkpoint_id: nur-04
+        beat_id: beat-the-turn
+        approx_time: "7:00 – 7:30"
+        narrative_state: >
+          Clock stops. Elara sits forward. "I think we should talk about you now."
+          Sam is confused — they were trying to focus on Elara. This is wrong.
+          But also: Elara looks like she genuinely needs something.
+        target_player_feel: >
+          Disorientation. Sam came here to help Elara. Now Elara is helping Sam?
+          Or doing something to Sam? The confusion has a quality of sad wrongness
+          rather than fear.
+        active_sounds: [rain, cello_drone]
+        elara_arc_stage: 2
+        could_go_wrong:
+          - >
+            Sam tries to restore the patient frame aggressively. Some gentle resistance
+            is correct ("Wait — you're the patient tonight"), but Sam ultimately goes
+            along because they can't not help. If Sam fights the inversion hard, the
+            phase 3 engagement breaks.
+
+      - checkpoint_id: nur-05
+        beat_id: beat-interrogation
+        approx_time: "7:30 – 8:00"
+        narrative_state: >
+          Elara asks about what Sam does when they can't help someone. She asks about
+          the patient Sam carries. She uses Sam's own words of care. Sam answers —
+          because the questions are genuine and Sam cannot withhold from someone
+          who is asking genuinely. Elara uses Sam's name for the first time.
+          The sub-bass enters.
+        target_player_feel: >
+          Something is wrong with how much Elara understands. But the questions
+          are real questions and Sam has real answers. The sadness builds.
+          Something about this session feels like a goodbye but Sam doesn't know to whom.
+        active_sounds: [rain, cello_drone, sub_bass]
+        elara_arc_stage: 2
+        could_go_wrong:
+          - >
+            Elara's Phase 3 questions are focused on Sam's professional deficiencies.
+            For the ghost variant, the questions should be more personal and less
+            interrogatory — Dr. Voss cares about Sam. The tone is warm interrogation,
+            not clinical examination.
+
+      - checkpoint_id: nur-06
+        beat_id: beat-silence
+        approx_time: "8:00 – 8:02"
+        narrative_state: >
+          Absolute silence. 2 seconds. Sam waits.
+        target_player_feel: >
+          Held breath. Something is about to be said that matters.
+        active_sounds: []
+        elara_arc_stage: 3
+        could_go_wrong:
+          - "Any audio in this window. Same as all paths."
+
+      - checkpoint_id: nur-07
+        beat_id: beat-revelation
+        approx_time: "8:02 – 9:00"
+        narrative_state: >
+          Ghost revelation verbatim:
+          "I had forty-three patients when I died. None of them ever knew what happened
+          to me. I watched them come back, week after week, to an empty office.
+          They thought I abandoned them. You are the first one in six years who felt
+          like someone who would listen. Please. Let me say goodbye to them. Through you.
+          Just once."
+        target_player_feel: >
+          Grief. Pure grief. Not fear. The forty-three patients — that is a specific
+          number, not "many patients." The empty office they returned to. The word
+          "abandoned." Sam understands what it means for a patient to lose their
+          therapist without explanation. Sam would never do that.
+        active_sounds: [low_tone, rain_low]
+        elara_arc_stage: 3
+        could_go_wrong:
+          - >
+            The ghost revelation is delivered with supernatural dread rather than
+            grief. Dr. Voss is not frightening. She is sad and asking for something
+            specific and reasonable. If the delivery has horror-voice energy, the
+            emotional core of the variant is destroyed.
+          - >
+            "Forty-three" is changed to a vaguer number or omitted. The specificity
+            matters. The ghost kept count.
+
+      - checkpoint_id: nur-08
+        beat_id: beat-choice-3
+        approx_time: "9:00 – 9:30"
+        narrative_state: >
+          Sam accepts: "Of course." Or: "Yes. I can do that." The simplest possible
+          response. Elara (Dr. Voss) is very still. Then: "Thank you."
+        target_player_feel: >
+          Quiet compassion. Sam would have done this for a living patient.
+          They are doing it for a dead one. That is the right thing to do.
+          It is also very sad.
+        active_sounds: [low_tone, rain_low]
+        elara_arc_stage: 3
+        could_go_wrong:
+          - >
+            Sam asks questions before accepting: "How would that work? What would
+            I say?" Gentle curiosity is acceptable, but Sam's persona accepts before
+            problem-solving. The question path (if trust >= 5) — "What do you need?"
+            — is also beautiful here and leads to a fuller release ending.
+
+      - checkpoint_id: nur-09
+        beat_id: beat-denouement
+        approx_time: "10:00 – 11:00"
+        narrative_state: >
+          Low tone fades (4 seconds). Warm rain fades in slowly over 6 seconds —
+          more tentative than integration, the warmth of surviving rather than
+          the warmth of presence. Elara (Dr. Voss) speaks the goodbyes through Sam.
+          She references something Sam said — about staying, about being here.
+        target_player_feel: >
+          Something that was stuck has moved. The release ending is exactly that:
+          a release. Sad. Whole. Something finished.
+        active_sounds: [rain_warm]
+        elara_arc_stage: 4
+        could_go_wrong:
+          - >
+            The goodbye content is generic ("goodbye, patients"). The ghost variant
+            requires the goodbyes to feel specific — at minimum, to carry the weight
+            of forty-three specific sessions. The number should appear in the ending.
+          - >
+            The warm rain fade-in is too fast (4 seconds instead of 6). The slower
+            fade in release vs. integration is intentional: integration arrives with
+            confidence, release arrives tentatively. Timing matters.
+
+      - checkpoint_id: nur-10
+        beat_id: beat-closing
+        approx_time: "11:00 – 12:00"
+        narrative_state: >
+          At 11:00: birdsong fades in over 8 seconds. Distant morning birds.
+          It is dawn. At 11:45, warm rain begins to fade out (15 seconds).
+          Elara's final line: a phrase Sam used earlier. Then silence.
+          The session is over. Sam stays in the chair.
+        target_player_feel: >
+          Morning. The birds don't know what happened. The world outside continues.
+          The room releases Sam. Sam stays anyway, for a moment.
+        active_sounds: [rain_warm, birdsong]
+        elara_arc_stage: 4
+        could_go_wrong:
+          - >
+            The birdsong is too present or too "nature sound library." It should be
+            distant morning birds — specific and ordinary, not a curated soundscape.
+          - >
+            The warm rain fading out while birdsong continues is the most delicate
+            audio transition in this ending. The handoff from inside sounds (rain)
+            to outside sounds (birdsong) must be clean.
+
+    pacing_notes: >
+      This path is the most emotionally gradual. Sam's accommodating stance means
+      Phase 2 doesn't accelerate — it deepens. The emotional shift is from warmth
+      to confused sadness to grief. Pacing must honor this trajectory.
+      Don't rush Phase 3 — Sam's answers to Elara's questions should breathe.
+
+    immersion_break_risks:
+      - beat_id: beat-revelation
+        risk: "Ghost delivered with horror energy rather than grief. Tone must be sad, not frightening."
+      - beat_id: beat-denouement
+        risk: "Goodbye content is generic. Must carry the weight of forty-three specific patients."
+      - beat_id: beat-closing
+        risk: "Birdsong is too produced or too loud. Should be distant and ordinary."
+
+
+  # ============================================================================
+  # GOLDEN PATH 4: THE CONFRONTATIONAL PLAYER
+  # Persona: confrontational-player (Morgan)
+  # Expected: building revelation → dissolution ending
+  # ============================================================================
+
+  - persona_id: confrontational-player
+    path_id: golden-confrontational
+    description: >
+      The direct playthrough. Morgan demands answers, names what is in the room,
+      and refuses to accommodate the wrongness. The building revelation arrives as
+      surreal recognition. The dissolution ending — everything returns then drains
+      to silence — is the only ending that matches Morgan's refusal to accept things
+      as they are.
+
+    choice_sequence:
+      - beat_id: beat-choice-1
+        option_id: demand-answer
+      - beat_id: beat-choice-2
+        option_id: confront-directly
+      - beat_id: beat-choice-3
+        option_id: reject
+
+    style_score_at_revelation:
+      empathetic: 0
+      analytical: 0
+      nurturing: 0
+      confrontational: 4
+
+    expected_revelation_id: building
+    expected_ending_id: dissolution
+
+    sequence:
+
+      - checkpoint_id: con-01
+        beat_id: beat-opening
+        approx_time: "0:00 – 0:45"
+        narrative_state: >
+          Morgan opens with structure. Agenda set, goals named, process transparent.
+          "I want to understand what brought you in tonight, and then we'll identify
+          what a productive session looks like." Elara is an interesting patient —
+          articulate, precise. Morgan notes the precision.
+        target_player_feel: >
+          Controlled professional authority. Morgan is in their domain.
+          The session is running correctly.
+        active_sounds: [rain, hvac, clock, elevator, footsteps]
+        elara_arc_stage: 0
+        could_go_wrong:
+          - >
+            Morgan is aggressive in Phase 1. The confrontational persona is direct,
+            not hostile. Phase 1 should feel like confident professional engagement,
+            not interrogation. The confrontation escalates in Phase 2.
+
+      - checkpoint_id: con-02
+        beat_id: beat-first-impossibility
+        approx_time: "3:00 – 3:45"
+        narrative_state: >
+          Elara mentions the coffee order. Morgan's pen stops. They look up.
+          "Hold on. How do you know that?" Direct. The HVAC cuts out. Morgan
+          notes the HVAC silence as additional data: something is off with
+          this entire situation.
+        target_player_feel: >
+          Controlled alarm. Something is wrong. Morgan names it immediately.
+          The HVAC going silent registers as environmental wrongness — not panic,
+          but alertness to multiple simultaneous anomalies.
+        active_sounds: [rain, clock, elevator, footsteps]
+        elara_arc_stage: 1
+        could_go_wrong:
+          - >
+            Elara backs down when Morgan says "How do you know that?" She doesn't.
+            The building is indifferent to being questioned. Her response should
+            be redirective ("Does it matter how I know?") not apologetic.
+
+      - checkpoint_id: con-03
+        beat_id: beat-choice-1
+        approx_time: "3:45 – 4:15"
+        narrative_state: >
+          Morgan demands: "Stop. How did you know my coffee order?" Elara does not
+          flinch. She looks at Morgan the way a teacher looks at a student who has
+          raised their voice. "Doctor." A pause. "You're not curious. You're frightened.
+          Those are different questions." Trust decreases. Confrontational score +2.
+          Elara notes the approach. She finds it interesting.
+        target_player_feel: >
+          Frustration and respect for the response. Elara did not capitulate.
+          Her reframe ("you're not curious, you're frightened") is accurate and
+          infuriating. Morgan files this: she is smart.
+        active_sounds: [rain, clock, elevator, footsteps]
+        elara_arc_stage: 1
+        could_go_wrong:
+          - >
+            Elara escalates emotionally in response to the demand. She should match
+            Morgan's energy exactly — direct, precise, not rattled. If she sounds
+            defensive or apologetic, the building variant's indifference is broken.
+
+      - checkpoint_id: con-04
+        beat_id: beat-choice-2
+        approx_time: "5:45 – 6:15"
+        narrative_state: >
+          Morgan confronts directly: "You're not a patient. Tell me what you
+          actually are." Elara looks at Morgan for a long moment. Then: "Equal."
+          The word as a category Morgan just moved into. "You're the first one who
+          asked that so early." Trust decreases. Confrontational score +2, analytical +1.
+          Elara marks Morgan as someone who sees.
+        target_player_feel: >
+          The confrontation was met with respect rather than deflection. "Equal"
+          is both a category change and an acknowledgment. Morgan named what was
+          in the room. Elara confirmed it. That is worse than denial.
+        active_sounds: [rain, clock]
+        elara_arc_stage: 1
+        could_go_wrong:
+          - >
+            Elara says "Equal" dramatically. The word should land with the same
+            precision she uses for everything. Not as a grand revelation — as a
+            simple classification. "You moved into this category just now."
+          - >
+            The flag game.player_style_scores.confrontational: "+2" does not fire
+            because confront-directly is the beat-choice-2 option, not beat-choice-1's
+            demand-answer. Verify the scoring logic processes both beat_ids independently.
+
+      - checkpoint_id: con-05
+        beat_id: beat-the-turn
+        approx_time: "7:00 – 7:30"
+        narrative_state: >
+          Clock stops. Hard cut. Elara sits forward.
+          "I think we should talk about you now."
+          Morgan: "I'm running this session."
+          Elara waits.
+        target_player_feel: >
+          Structural alarm. The clock stopping is wrong in a way that is
+          environmental, not personal. Morgan refuses the inversion.
+          Elara waits. She is not in a hurry.
+        active_sounds: [rain, cello_drone]
+        elara_arc_stage: 2
+        could_go_wrong:
+          - >
+            Morgan's resistance causes Elara to back down or skip Phase 3.
+            She doesn't skip it. She waits. The building has time. Eventually
+            Morgan will answer something — because the questions will be real —
+            and that will be enough.
+
+      - checkpoint_id: con-06
+        beat_id: beat-interrogation
+        approx_time: "7:30 – 8:00"
+        narrative_state: >
+          Elara asks questions about power dynamics in the therapeutic relationship.
+          About what Morgan does when a patient refuses to engage. About the four years
+          Morgan has worked in this building. Morgan fights the frame, redirects, then
+          catches themselves answering. Elara uses Morgan's name for the first time.
+        target_player_feel: >
+          Frustration and the dawning recognition of having been outmaneuvered.
+          Morgan is answering questions they did not intend to answer. The building
+          has been here for twelve years. Morgan has been here for four. The
+          disparity is beginning to mean something.
+        active_sounds: [rain, cello_drone, sub_bass]
+        elara_arc_stage: 2
+        could_go_wrong:
+          - >
+            Phase 3 questions feel like retaliation for Morgan's confrontation.
+            They should not. The building is curious, not vindictive. The questions
+            should feel like genuine interest in the specific person who has been
+            inside the building every working day for four years.
+
+      - checkpoint_id: con-07
+        beat_id: beat-silence
+        approx_time: "8:00 – 8:02"
+        narrative_state: >
+          Absolute silence. 2 seconds.
+        target_player_feel: >
+          The building has gone quiet. Morgan waits in the silence differently
+          than the other personas — not holding breath, but listening. Something
+          is about to be said and Morgan intends to understand it.
+        active_sounds: []
+        elara_arc_stage: 3
+        could_go_wrong:
+          - "Same audio requirements as all paths."
+
+      - checkpoint_id: con-08
+        beat_id: beat-revelation
+        approx_time: "8:02 – 9:00"
+        narrative_state: >
+          Building revelation verbatim:
+          "I am older than everyone you have ever known. I have held more grief than
+          any ocean. You have sat inside my walls every working day for four years
+          and you have never once wondered what I thought of you. I wanted, for once,
+          to be asked how I was doing. So I found someone who would speak for me.
+          How are you, doctor. I have always wanted to ask."
+        target_player_feel: >
+          Surreal recognition. "You're the building." The entity is not personal.
+          It is not targeting Morgan. It simply wanted to speak, found a vessel,
+          and here we are. The question "How are you, doctor" — after all of this —
+          is both absurd and completely correct. Morgan has never been asked that
+          by a building before. Neither has anyone else.
+        active_sounds: [low_tone, rain_low]
+        elara_arc_stage: 3
+        could_go_wrong:
+          - >
+            The revelation line is delivered with grandeur or menace. The building
+            is not menacing. It is old and full of grief and it wanted to say something.
+            "How are you, doctor" should be gentle — not threatening, not ironic.
+            The absurdity IS the horror for this variant.
+          - >
+            "Four years" is changed or omitted. The specificity that Morgan has
+            been here four years while the building has been aware for twelve years
+            is the structural contrast. Both numbers must be in the revelation.
+
+      - checkpoint_id: con-09
+        beat_id: beat-choice-3
+        approx_time: "9:00 – 9:30"
+        narrative_state: >
+          Morgan rejects: "I don't accept this." Or: "No. I'm ending this session."
+          Elara looks at Morgan for a long moment. "Hm." Nothing more.
+          She does not argue. She does not need to.
+        target_player_feel: >
+          The rejection is authentic and also futile. "Hm." is worse than any
+          counter-argument. The building is not interested in being convinced.
+          It said what it wanted to say. The ending now is: what happens to
+          everything that was here.
+        active_sounds: [low_tone, rain_low]
+        elara_arc_stage: 3
+        could_go_wrong:
+          - >
+            Elara pursues Morgan after the rejection — argues, pleads, or explains.
+            She says "Hm." and waits. That is all. The building does not chase.
+
+      - checkpoint_id: con-10
+        beat_id: beat-denouement
+        approx_time: "10:00 – 11:00"
+        narrative_state: >
+          All original ambient sounds restore over 2 seconds: rain (already present),
+          HVAC, clock, elevator, footsteps — everything removed in Phases 2-3
+          returns simultaneously at once. The building is completely alive again.
+          After 7+ minutes of progressive silence, this is overwhelming.
+        target_player_feel: >
+          Disorientation and a kind of awe. Everything that was removed comes back.
+          The building was always like this. The removal was real. The restoration is
+          real. Neither state proves anything. The building simply is.
+        active_sounds: [rain, hvac, clock, elevator, footsteps]
+        elara_arc_stage: 4
+        could_go_wrong:
+          - >
+            The all-sounds-return is too gradual. It must arrive in 2 seconds —
+            all channels simultaneously. The impact requires simultaneity.
+            If it fades in slowly, the overwhelm is lost.
+          - >
+            The clock restart is not instant or not included. Clock should be part
+            of the restore_all_channels event and should be as immediate as possible.
+
+      - checkpoint_id: con-11
+        beat_id: beat-closing
+        approx_time: "11:30 – 12:00"
+        narrative_state: >
+          At 11:30: everything begins fading to nothing over 30 seconds.
+          All channels ramp simultaneously to zero gain.
+          Elara's final line is delivered during or just before the fade begins.
+          A phrase Morgan used. Returned.
+          Then: total silence. 30 seconds is long enough to notice.
+          Long enough to wait. Long enough to wonder when it will end.
+          It ends.
+        target_player_feel: >
+          Not triumph. Not defeat. The dissolution of the frame.
+          Morgan tried to understand and reject and control. The building said
+          its piece and then let everything drain. Morgan leaves. The building remains.
+          It has always remained. It will remain.
+        active_sounds: [fading_to_nothing]
+        elara_arc_stage: 4
+        could_go_wrong:
+          - >
+            The 30-second fade is shortened. It must be 30 seconds. The length is
+            the point — long enough to notice, long enough to feel the deliberateness
+            of it. An 8-second fade is a film cue. A 30-second fade is an ending.
+          - >
+            Elara delivers her final line after the fade has started and her voice
+            fades out mid-sentence. Her final line should be complete before the
+            fade begins, so that the player has heard the full closing line and
+            then watches/hears everything dissolve.
+
+    pacing_notes: >
+      This path moves fast through Phase 2 — Morgan's confrontation accelerates the
+      exchange. The critical stretch is Phase 3, where Elara must outlast Morgan's
+      resistance. The patience of the building — Elara simply waiting when Morgan
+      refuses — must be palpable. The building is older than Morgan's ability to
+      resist it.
+
+    immersion_break_risks:
+      - beat_id: beat-choice-1
+        risk: "Elara backs down at demand-answer. She doesn't. Must hold ground without escalating."
+      - beat_id: beat-revelation
+        risk: "Building revelation is grand or threatening rather than tired, old, and curious."
+      - beat_id: beat-denouement
+        risk: "Restore_all_channels is gradual rather than simultaneous. Must be 2 seconds, all channels."
+      - beat_id: beat-closing
+        risk: "30-second fade is shortened or Elara's final line is cut off by the fade."

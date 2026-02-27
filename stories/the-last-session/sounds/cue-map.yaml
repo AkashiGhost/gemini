@@ -1,0 +1,546 @@
+# =============================================================================
+# cue-map.yaml — The Last Session
+# Sound asset registry: every audio cue used in the game.
+#
+# STRUCTURE:
+#   ambient    — looping background sounds managed by the ambient engine
+#   intermittent — non-looping sounds played on a timer with variance
+#   transitions — one-shot stop/fade events for ambient removal sequence
+#   atmospheric — drones added as tension builds in Phase 3+
+#   endings     — sounds used exclusively in Phase 5 resolution variants
+#
+# DESIGN PRINCIPLE (from world.yaml):
+#   "Subtractive horror — things DISAPPEAR. The building goes silent around you."
+#   Horror lives in absence, not presence. Every cue here either establishes
+#   normalcy (to be taken away) or marks the end of that normalcy.
+#
+# ASSET GENERATION (from sound-design-pipeline-research.md):
+#   - Ambient loops → ElevenLabs SFX (30s, native loop toggle)
+#   - Drones/sustained tones → Stable Audio 2.5 via fal.ai (up to 3 min)
+#   - Quick SFX prototyping → CassetteAI via fal.ai (~1s generation)
+#   - All paths are relative to the game assets root
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# AMBIENT — Loop-based background sounds present at session start.
+# These establish the "normal" that will be systematically removed.
+# The pipeline starts all of these immediately at game init (time 0:00).
+# ---------------------------------------------------------------------------
+
+ambient:
+
+  rain:
+    name: "Rain on windows"
+    description: >
+      Heavy, steady rain against floor-to-ceiling windows. Slightly left-panned
+      to simulate the window wall being to the player's left. Psychologically,
+      rain is a comfort sound — familiar, safe, maternal. This is intentional.
+      It must feel like shelter so that its eventual EQ-shift in Phase 5 lands
+      as a gut punch. Rain is the LAST ambient element standing. It outlives the
+      HVAC, elevator, footsteps, and clock. By Phase 4, rain is the only proof
+      the outside world still exists. Then it changes.
+    asset_path: "assets/audio/rain-heavy-window.mp3"
+    generation_prompt: "Heavy rain on glass windows, steady, atmospheric, slightly resonant, dark ambience, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.6
+    loop: true
+    spatial:
+      pan: -0.3    # Left-dominant — window wall is to the player's left
+    fade_in_seconds: 0   # Present immediately from first frame
+    fade_out_seconds: 8  # Used only at very end (dissolution ending)
+    persists_through: "all phases — changes EQ warmth in Phase 5 per ending variant"
+    tag: null  # Not LLM-triggered — always running
+
+  hvac:
+    name: "HVAC system hum"
+    description: >
+      Low mechanical building hum, 60-80 Hz fundamental frequency. Clinical.
+      Institutional. So constant it becomes part of the room's silence rather
+      than a sound in itself. Players will not consciously notice it until it
+      stops. That disappearance is the FIRST signal something is wrong — not
+      with drama, not with a sound cue, but with the removal of a sound.
+      The room becomes structurally quieter, like a pressure change.
+      Removed at 3:30 (Phase 2) with a slow 4-second fade — gradual enough
+      to be subliminal, abrupt enough to be noticed in retrospect.
+    asset_path: "assets/audio/hvac-hum-low.mp3"
+    generation_prompt: "Low frequency air conditioning hum, building HVAC system, 60-80Hz mechanical drone, clinical interior, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.15   # Intentionally low — below conscious threshold
+    loop: true
+    spatial:
+      pan: 0.0     # Omnidirectional — comes from the building itself
+    fade_in_seconds: 0
+    fade_out_seconds: 4  # Phase 2 removal — see timeline.yaml at 3:30
+    removes_at: "Phase 2 / 3:30"
+    tag: null
+
+  clock:
+    name: "Wall clock tick"
+    description: >
+      Steady metronomic wall clock tick. Its function is temporal grounding —
+      while it ticks, time is measurable and real. The player's heartbeat
+      syncs to it subconsciously. This is the most psychologically powerful
+      sound in the entire experience because of what happens when it stops.
+      At 7:00 (Phase 3), the clock does NOT fade. It stops INSTANTLY.
+      Zero fade duration. The silence that follows is total and wrong.
+      The player has lost their last anchor to normal time. This is the
+      KEY HORROR MOMENT of the game. Do not soften it. Do not add a
+      'winding down' effect. It must stop mid-tick.
+    asset_path: "assets/audio/clock-tick-wall.mp3"
+    generation_prompt: "Old mechanical wall clock ticking, steady rhythm, wood resonance, precise metronomic beat, quiet room, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.25
+    loop: true
+    spatial:
+      pan: 0.2     # Slightly right — clock is on the right wall
+    fade_in_seconds: 0
+    fade_out_seconds: 0  # HARD STOP — intentionally zero. No fade. See timeline.yaml at 7:00.
+    removes_at: "Phase 3 / 7:00 — HARD STOP, no fade"
+    design_note: >
+      The zero fade_out is a deliberate horror design choice, not a bug.
+      Any fade here destroys the psychological impact. The pipeline must
+      implement this as an immediate gain.value = 0, NOT a ramp.
+    tag: null
+
+# ---------------------------------------------------------------------------
+# INTERMITTENT — Non-looping sounds played at irregular intervals.
+# These simulate a living building. Their disappearance signals isolation.
+# The pipeline manages timing via playback_interval + variance.
+# ---------------------------------------------------------------------------
+
+intermittent:
+
+  elevator:
+    name: "Distant elevator"
+    description: >
+      Occasional mechanical movement 2-3 floors below — cable groan, motor
+      hum, the soft thud of arrival. Played every ~45 seconds with ±20s
+      variance to feel organic, not programmatic. Psychologically, this is
+      the most important of the three "building life" sounds: while the
+      elevator moves, someone else is in the building. The player is not
+      alone. Its removal at 4:30 doesn't just remove a sound — it removes
+      the possibility of rescue. No one is coming up. No one is going down.
+      The slow 6-second fade mimics the elevator simply stopping between
+      floors and going silent, which is more unsettling than a clean stop.
+    asset_path: "assets/audio/elevator-distant.mp3"
+    generation_prompt: "Distant elevator machinery, cable mechanism, motor hum, building mechanical ambient, muffled through floors"
+    generation_tool: elevenlabs_sfx
+    volume: 0.1
+    loop: false
+    spatial:
+      pan: 0.0     # Center-rear — below and behind the player
+    playback_interval_seconds: 45
+    playback_interval_variance_seconds: 20
+    fade_in_seconds: 1
+    fade_out_seconds: 6  # Phase 2 removal — gradual, like it just... stopped
+    removes_at: "Phase 2 / 4:30"
+    tag: null
+
+  footsteps:
+    name: "Footsteps above"
+    description: >
+      Irregular, unhurried footsteps from the floor above (15th floor).
+      Probably the cleaning crew — the rhythm is slow, purposeful, human.
+      Played every ~30 seconds with ±15s variance. They represent the last
+      human presence in the building outside this room. When they stop, the
+      player and Elara are the only people here. The critical design note:
+      they do not run. They do not hurry. They simply stop mid-stride and
+      are never heard again. The 2-second fade simulates them walking out
+      of earshot — but there is no earshot to walk into.
+    asset_path: "assets/audio/footsteps-above-office.mp3"
+    generation_prompt: "Footsteps on hardwood floor above, slow walking pace, muffled through concrete ceiling, office building, irregular"
+    generation_tool: elevenlabs_sfx
+    volume: 0.08   # Very quiet — felt more than heard
+    loop: false
+    spatial:
+      pan: 0.0
+      vertical: 0.5  # Above the player (requires Web Audio API panner node)
+    playback_interval_seconds: 30
+    playback_interval_variance_seconds: 15
+    fade_in_seconds: 0
+    fade_out_seconds: 2
+    removes_at: "Phase 2 / 5:30"
+    tag: null
+
+# ---------------------------------------------------------------------------
+# TRANSITIONS — One-shot events that control the removal of ambient sounds.
+# These are referenced by the timeline but defined here for asset registry.
+# They are not independent sounds — they ARE the ambient sounds being killed.
+# ---------------------------------------------------------------------------
+
+transitions:
+
+  hvac_stop:
+    name: "HVAC silence transition"
+    description: >
+      Represents the HVAC hum fading out over 4 seconds. Not a separate
+      audio asset — this is a gain automation event on the hvac channel.
+      Defined here so the timeline can reference it as a named cue_id.
+      The 4-second fade is slow enough to be subliminal on first pass.
+    asset_path: null   # No separate asset — gain event on hvac channel
+    volume: 0.0        # Target volume (fade to zero)
+    loop: false
+    fade_duration_seconds: 4
+    trigger_type: gain_automation
+    target_channel: hvac
+    triggered_at: "3:30"
+
+  elevator_stop:
+    name: "Elevator silence transition"
+    description: >
+      Elevator fades out over 6 seconds. The slow fade mimics the machine
+      simply stopping between floors — ambiguous, unsettling, no clean
+      resolution. Longer than HVAC because the elevator sound has more
+      psychological weight (it represents human presence).
+    asset_path: null
+    volume: 0.0
+    loop: false
+    fade_duration_seconds: 6
+    trigger_type: gain_automation
+    target_channel: elevator
+    triggered_at: "4:30"
+
+  footsteps_stop:
+    name: "Footsteps silence transition"
+    description: >
+      Footsteps fade out over 2 seconds — faster than elevator because
+      footsteps stopping mid-stride should feel more abrupt. The cleaning
+      crew did not finish walking somewhere. They stopped. The short
+      fade preserves that wrongness.
+    asset_path: null
+    volume: 0.0
+    loop: false
+    fade_duration_seconds: 2
+    trigger_type: gain_automation
+    target_channel: footsteps
+    triggered_at: "5:30"
+
+  clock_stop:
+    name: "Clock hard stop"
+    description: >
+      THE key horror event. Clock stops with ZERO fade — immediate silence.
+      Implemented as an instant gain.value = 0 (NOT linearRampToValueAtTime).
+      If the pipeline implements this as any kind of fade, even 100ms, the
+      moment is destroyed. The wrongness lives in the instantaneous absence.
+      See world.yaml clock.fade_out_seconds: 0 — this is not an omission.
+    asset_path: null
+    volume: 0.0
+    loop: false
+    fade_duration_seconds: 0  # CRITICAL — must be instant, no ramp
+    trigger_type: instant_stop
+    target_channel: clock
+    triggered_at: "7:00"
+    design_note: "Use audioCtx.currentTime + 0.001 (one sample) if the engine requires a time value. Never 0.3s, never 0.1s."
+
+  silence_full:
+    name: "Full silence — pre-revelation"
+    description: >
+      All active sounds muted simultaneously over 0.5 seconds before
+      the revelation beat. Applies to whatever is still running at 8:00
+      (rain + cello_drone + sub_bass at minimum). The 0.5s prevents
+      an audio click/pop from the abrupt gain change while still feeling
+      sudden enough to shock. After 2 seconds of silence, low_tone enters.
+    asset_path: null
+    volume: 0.0
+    loop: false
+    fade_duration_seconds: 0.5
+    trigger_type: mute_all
+    triggered_at: "8:00"
+
+# ---------------------------------------------------------------------------
+# ATMOSPHERIC — Drones and tones that are ADDED as tension builds.
+# These are additive horror — they creep in under the rain.
+# The player should be unsure when exactly they started.
+# ---------------------------------------------------------------------------
+
+atmospheric:
+
+  cello_drone:
+    name: "Low cello sustained drone"
+    description: >
+      A single sustained cello note — not a melody, not a chord. Just a
+      bowed, resonant, barely-breathing tone in the low register (around
+      D2 or E2). Introduced at 6:00 with an 8-second fade-in to be
+      imperceptible at first. By the time the player consciously registers
+      it, it has already been present for 30-60 seconds. This is textbook
+      anxiety music: it doesn't signal danger, it creates the feeling that
+      danger was always here.
+    asset_path: "assets/audio/cello-drone-low.mp3"
+    generation_prompt: "Low cello drone, single sustained bowed note, D2 register, resonant, slightly breathy, psychological horror atmosphere, 90 seconds"
+    generation_tool: stable_audio_2
+    volume: 0.2
+    loop: true
+    spatial:
+      pan: 0.0
+    fade_in_seconds: 8    # Long fade — must enter under the threshold of perception
+    introduced_at: "Phase 3 / 6:00"
+    tag: null
+
+  sub_bass:
+    name: "Sub-bass rumble"
+    description: >
+      20-30 Hz infrasound rumble — at this volume (0.08) it is felt more
+      than heard, creating a physical sense of unease without a identifiable
+      source. Research shows infrasound at this frequency range can induce
+      anxiety, unease, and the sensation that something is wrong without
+      the listener being able to name why. Volume kept deliberately below
+      hearing threshold. If the player asks "do you hear that?", the
+      honest answer is no — but their body does.
+    asset_path: "assets/audio/sub-bass-rumble.mp3"
+    generation_prompt: "Deep sub-bass rumble 20-30Hz, barely audible infrasound, ominous building tension, horror atmosphere, seamless loop"
+    generation_tool: stable_audio_2
+    volume: 0.08   # Below conscious threshold — felt not heard
+    loop: true
+    spatial:
+      pan: 0.0
+    fade_in_seconds: 8
+    introduced_at: "Phase 3 / 6:00"
+    design_note: "Volume intentionally near-inaudible. Raising it defeats the purpose."
+    tag: null
+
+  low_tone:
+    name: "Single sustained low frequency revelation tone"
+    description: >
+      A single, pure, sustained low tone (approximately 80-100 Hz) that
+      emerges from the 2-second silence after the mute_all event at 8:00.
+      This is the first sound of the revelation phase. It is not a drone
+      — it is THE sound. The moment of emergence from total silence into
+      a single, clean, unwavering tone is when the player understands
+      something fundamental has changed. It does not modulate. It does
+      not swell. It is simply there, and will continue until the ending
+      takes over.
+    asset_path: "assets/audio/low-tone-revelation.mp3"
+    generation_prompt: "Single sustained low tone 80-100Hz, pure sine wave with slight organic texture, ominous, revelation moment, not melodic"
+    generation_tool: stable_audio_2
+    volume: 0.3
+    loop: true
+    spatial:
+      pan: 0.0
+    fade_in_seconds: 3
+    introduced_at: "Phase 4 / 8:02"
+    tag: "[revelation_tone]"  # LLM can embed this tag if narrating the revelation beat
+
+# ---------------------------------------------------------------------------
+# ENDINGS — Sounds used exclusively in Phase 5 (10:00-12:00).
+# Each ending variant receives a unique sound signature.
+#
+# FOUR ENDINGS:
+#   integration   — Elara chooses to stay, anchored by player's empathy
+#   consumption   — Elara consumes the player's consciousness
+#   release       — Elara departs; player is left but freed
+#   dissolution   — Elara and player both dissolve; everything returns, then fades
+#
+# Sound design principle: each ending's audio must be emotionally conclusive
+# without being literal. The rain's EQ character is the primary differentiator.
+# ---------------------------------------------------------------------------
+
+endings:
+
+  rain_warm:
+    name: "Rain — warm EQ variant"
+    description: >
+      The same rain recording as the baseline, but EQ-shifted toward the
+      midrange (200-800 Hz boosted, highs rolled off at 6kHz). The effect
+      is subjective but unmistakable: the rain sounds warmer, closer,
+      more like shelter than threat. Used for integration and release endings
+      where the session ends with some resolution. The player has done
+      something right — the world outside reflects that in the only way
+      it can.
+    asset_path: "assets/audio/rain-heavy-window-warm.mp3"
+    generation_prompt: "Heavy rain on glass windows, warm filtered, mid-heavy EQ, intimate, resolved, less harsh than cold variant, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.55
+    loop: true
+    spatial:
+      pan: -0.3
+    used_in_endings: [integration, release]
+    tag: null
+
+  rain_cold:
+    name: "Rain — cold EQ variant"
+    description: >
+      The same rain recording with EQ shifted toward the high end (highs
+      boosted 3dB at 8kHz+, mids slightly scooped). The rain sounds harder,
+      more percussive, indifferent. Used for consumption and dissolution endings
+      where the session ends in loss. The world outside has not softened.
+      The contrast with rain_warm is the entire emotional argument of the ending.
+    asset_path: "assets/audio/rain-heavy-window-cold.mp3"
+    generation_prompt: "Heavy rain on glass windows, cold filtered, bright harsh high-end, percussive, unresolved, indifferent, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.65   # Slightly louder — the indifference is also relentless
+    loop: true
+    spatial:
+      pan: -0.3
+    used_in_endings: [consumption, dissolution]
+    tag: null
+
+  piano_motif:
+    name: "Elara's 3-note piano motif"
+    description: >
+      A three-note descending piano figure — simple, spare, played once
+      (or twice) without variation. This is Elara's theme. It has been
+      hinted at throughout (the narrator can reference it in narration)
+      but this is the first and only time it is heard as music. For the
+      integration ending, it signals that Elara is still here, still human
+      enough to have a melody. It should feel like remembering something
+      you didn't know you'd forgotten.
+    asset_path: "assets/audio/piano-motif-elara.mp3"
+    generation_prompt: "Three-note descending piano motif, sparse, intimate, slightly reverberant, melancholic but resolved, psychological horror denouement"
+    generation_tool: stable_audio_2
+    volume: 0.45
+    loop: false
+    spatial:
+      pan: 0.1   # Slightly right — Elara's chair is to the right
+    used_in_endings: [integration]
+    tag: "[piano_motif]"  # LLM can embed to time with specific narration beat
+
+  clock_restart:
+    name: "Clock tick resuming"
+    description: >
+      The wall clock begins ticking again. This uses the same asset as
+      the baseline clock loop, but its context makes it entirely different.
+      The clock stopped at 7:00 with a hard stop. Now, at 10:00 in the
+      consumption ending, it starts again — instantly, no fade-in.
+      The message: the session is beginning again. The loop has restarted.
+      You are back at the start. Elara is still waiting.
+    asset_path: "assets/audio/clock-tick-wall.mp3"  # Same asset as baseline clock
+    generation_prompt: null  # Reuses existing asset
+    volume: 0.3   # Slightly louder than baseline (0.25) — more present, more wrong
+    loop: true
+    spatial:
+      pan: 0.2
+    fade_in_seconds: 0  # Instant restart mirrors the instant stop at 7:00
+    used_in_endings: [consumption]
+    design_note: >
+      The restart being instantaneous (zero fade) echoes the hard stop at 7:00.
+      The symmetry is the horror: what happened at 7:00 was not a malfunction.
+      It was a pause.
+    tag: null
+
+  door_knock:
+    name: "Single door knock"
+    description: >
+      A single, sharp, unhurried knock on the office door — from outside.
+      Played at 10:30 in the consumption ending, approximately 30 seconds
+      after the clock restarts. It means: someone is waiting. The session
+      is beginning again. The knock is not loud. It is not frantic. It is
+      exactly the knock you'd expect from a patient who made an appointment.
+      It is the sound of Elara, arriving. Again.
+    asset_path: "assets/audio/door-knock-single.mp3"
+    generation_prompt: "Single sharp knock on wooden door, unhurried, professional, from outside, slight room reverb"
+    generation_tool: elevenlabs_sfx
+    volume: 0.7
+    loop: false
+    spatial:
+      pan: -0.1   # Slightly behind and left — door is behind the therapist
+    used_in_endings: [consumption]
+    tag: "[door_knock]"
+
+  birdsong:
+    name: "Distant morning birdsong"
+    description: >
+      Distant, sparse bird calls — not a dawn chorus, just one or two birds.
+      It is morning. The session has ended and something outside still exists.
+      Used exclusively in the release ending. This is the only sound in the
+      entire experience that represents the world after — a world that exists
+      beyond this room, beyond this night, beyond Elara. The birds don't know
+      what happened in this office. They are indifferent in the opposite
+      direction from the cold rain: indifferent because they are simply alive.
+    asset_path: "assets/audio/birdsong-distant-morning.mp3"
+    generation_prompt: "Distant morning birdsong, sparse, one or two birds, dawn, peaceful, after rain, outdoor ambience, natural"
+    generation_tool: elevenlabs_sfx
+    volume: 0.3
+    loop: false
+    spatial:
+      pan: -0.3   # Through the window — same direction as the rain
+    used_in_endings: [release]
+    tag: null
+
+  all_sounds_return:
+    name: "All original ambient sounds simultaneous return"
+    description: >
+      In the dissolution ending at 10:00, every ambient sound that was
+      removed during Phases 2-3 returns SIMULTANEOUSLY: rain (already
+      present), hvac, clock, elevator, footsteps — all at once, at or
+      above their original volumes. After 40+ minutes of progressive
+      silence, this is overwhelming. Not violent — just full. The building
+      is alive again. But the player knows what this means: it was always
+      like this. The session never happened. Or it always happens.
+      Then, starting at 11:30, everything fades to absolute nothing over
+      30 seconds — not to silence, but to the absence of silence.
+    asset_path: null  # Orchestrated event — re-activates existing channels
+    volume: null      # Each channel returns to its baseline volume
+    loop: false       # The channels themselves loop; this is a re-activation event
+    trigger_type: restore_all_channels
+    target_channels: [rain, hvac, clock, elevator, footsteps]
+    restore_volumes:
+      rain: 0.6
+      hvac: 0.15
+      clock: 0.25
+      elevator: 0.1
+      footsteps: 0.08
+    fade_in_seconds: 2  # Fast enough to feel like a restoration, not a gradual build
+    used_in_endings: [dissolution]
+    tag: null
+
+# ---------------------------------------------------------------------------
+# MIXING — Web Audio API routing and ducking configuration.
+# These are not sound assets but runtime audio graph parameters.
+# ---------------------------------------------------------------------------
+
+mixing:
+  # TTS ducking: when Elara speaks, reduce ambient volume so narration is clear.
+  # -6dB is a gentle duck — ambient is still present, just stepped back.
+  # 300ms crossfade prevents the duck from being audible as a volume event.
+  tts_ducking:
+    ambient_reduction_db: -6
+    fade_in_duration_ms: 300   # Ambient fades down when TTS starts
+    fade_out_duration_ms: 600  # Ambient returns more slowly after TTS ends
+    design_note: >
+      The slower return (600ms vs 300ms) prevents the ambient restoration
+      from sounding like a switch. The TTS should trail off naturally into
+      the ambience, not cut back to it.
+
+  # Default crossfade for all other transitions not explicitly specified
+  crossfade_default_ms: 2000
+
+  # Spatial positioning summary (for Web Audio API PannerNode configuration)
+  # All panning values are -1.0 (full left) to +1.0 (full right)
+  spatial_map:
+    rain:
+      pan: -0.3       # Left — window wall
+      notes: "Primary spatial anchor. The window is the only connection to outside."
+    clock:
+      pan: 0.2        # Right — wall clock
+      notes: "Opposite wall from window. Creates stereo width in the room."
+    elevator:
+      pan: 0.0        # Center
+      notes: "Behind and below — use PannerNode with negative z and y position."
+    footsteps:
+      pan: 0.0
+      vertical: 0.5   # Above — requires 3D PannerNode, not simple stereoPanner
+      notes: "15th floor above. If engine only supports stereo pan, use center + reverb send."
+    cello_drone:
+      pan: 0.0        # Diffuse — comes from the room itself
+    sub_bass:
+      pan: 0.0        # Omnidirectional by nature at 20-30Hz
+    low_tone:
+      pan: 0.0        # Center — sourceless, ethereal
+
+  # Preload priority: load these during visual onboarding screen, before game starts.
+  # Order is priority (first = most critical to have ready).
+  preload_order:
+    - assets/audio/rain-heavy-window.mp3         # Needed at second 0
+    - assets/audio/hvac-hum-low.mp3              # Needed at second 0
+    - assets/audio/clock-tick-wall.mp3           # Needed at second 0
+    - assets/audio/elevator-distant.mp3          # Needed at second 15
+    - assets/audio/footsteps-above-office.mp3    # Needed at second 15
+    - assets/audio/cello-drone-low.mp3           # Needed by minute 6
+    - assets/audio/sub-bass-rumble.mp3           # Needed by minute 6
+    - assets/audio/low-tone-revelation.mp3       # Needed by minute 8
+    - assets/audio/rain-heavy-window-warm.mp3    # Needed by minute 10
+    - assets/audio/rain-heavy-window-cold.mp3    # Needed by minute 10
+    - assets/audio/piano-motif-elara.mp3         # Needed by minute 10
+    - assets/audio/birdsong-distant-morning.mp3  # Needed by minute 11
+    - assets/audio/door-knock-single.mp3         # Needed by minute 10:30
+    # clock-tick-wall.mp3 already loaded — clock_restart reuses it

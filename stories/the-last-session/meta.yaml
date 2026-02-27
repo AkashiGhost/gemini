@@ -1,0 +1,31 @@
+id: the-last-session
+title: "The Last Session"
+genre: psychological-horror
+subgenre: mystery-thriller
+tone:
+  - unsettling
+  - intimate
+  - cerebral
+setting_summary: "Late-night therapy office, 14th floor. You are the therapist. Your last patient, Elara, arrives for an emergency session. She knows too much."
+duration_target_minutes: 12
+word_budget: 1800
+choice_points: 3
+ending_variants: 4
+revelation_variants: 4
+characters_count: 1
+player_role: therapist
+narrator: elara  # Elara IS the narrator — no separate narrator voice
+content_rating: mature
+tags:
+  - horror
+  - therapy
+  - psychological
+  - voice-only
+  - single-npc
+  - eyes-closed
+tropes_as_foundation:
+  - "Sixth Sense: patient who isn't what they seem"
+  - "Shutter Island: therapist discovers truth about themselves"
+  - "Ten Candles: lights/sounds going out one by one"
+  - "House of Leaves: building is geometrically wrong"
+  - "Appointment in Samarra: can't escape fate"

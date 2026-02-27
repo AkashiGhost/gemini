@@ -1,0 +1,270 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://innerplay.app/schemas/character-schema.json",
+  "title": "Character Card",
+  "description": "Defines a single character's full behavioral contract. The pipeline injects this card into the narrator's system prompt when the character is active. mutable_state is the only section updated at runtime — all other sections are immutable during a play session.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "role",
+    "identity",
+    "voice",
+    "knowledge",
+    "personality",
+    "arc",
+    "mutable_state"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for this character across the game. Used as a key in revelation_logic, state_changes, and ending_conditions.",
+      "pattern": "^[a-z0-9-_]+$"
+    },
+    "name": {
+      "type": "string",
+      "description": "The name the character is known by in the story. May differ from their true identity."
+    },
+    "role": {
+      "type": "string",
+      "description": "Functional role in the narrative. 'narrator' = this character IS the voice telling the story; 'npc' = interactive supporting character; 'antagonist' = primary threat or opposition; 'guide' = helps player navigate.",
+      "enum": ["narrator", "npc", "antagonist", "guide"]
+    },
+    "identity": {
+      "type": "object",
+      "description": "Three-layer identity model. The separation between surface and true_nature is the core dramatic engine — the narrator must only reveal what the current phase permits.",
+      "required": ["surface", "functional", "true_nature"],
+      "additionalProperties": true,
+      "properties": {
+        "surface": {
+          "type": "string",
+          "description": "What this character appears to be at the start of the story, from the player's perspective (e.g., 'A withdrawn young woman seeking therapy for recurring nightmares')."
+        },
+        "functional": {
+          "type": "string",
+          "description": "The narrative role this character plays in the story mechanics — what they DO, not what they are (e.g., 'The unreliable narrator whose reality shifts with each revelation')."
+        },
+        "true_nature": {
+          "description": "What this character actually is, revealed at the climax. Can be a single string for a fixed revelation, or an array of strings for variant-dependent revelations keyed to revelation_logic in the arc schema.",
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Fixed true nature revealed regardless of player choices."
+            },
+            {
+              "type": "array",
+              "description": "Variant true natures. Each element corresponds to a revelation variant id in arc.revelation_logic. Array order must match variant order.",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 2
+            }
+          ]
+        }
+      }
+    },
+    "voice": {
+      "type": "object",
+      "description": "Controls how this character speaks. The narrator model must adhere to all constraints here at all times, even under player pressure. These are style guardrails, not suggestions.",
+      "required": [
+        "description",
+        "speech_patterns",
+        "vocabulary",
+        "emotional_range",
+        "max_sentences_per_response",
+        "dialogue_style"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Overall voice personality in 1-3 sentences. Used as the primary voice direction in the system prompt (e.g., 'Measured and clinical on the surface, with tremors of vulnerability that break through under pressure. Never shouts. Pauses carry weight.')."
+        },
+        "speech_patterns": {
+          "type": "array",
+          "description": "Specific verbal tics, structural habits, or linguistic mannerisms. Each is injected as a bullet into the voice direction section of the prompt (e.g., 'Uses incomplete sentences when distressed', 'Repeats questions back before answering', 'Trailing off with ... rather than finishing difficult thoughts').",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "vocabulary": {
+          "type": "string",
+          "description": "Vocabulary register and domain (e.g., 'Clinical-adjacent but not jargon-heavy. Avoids slang. Occasionally uses archaic phrasing as a tell of her true age.')."
+        },
+        "emotional_range": {
+          "type": "string",
+          "description": "The emotional spectrum this character is permitted to express, and any emotional states that are off-limits (e.g., 'Ranges from flat affect to quiet terror. Never expresses anger outward. Joy is rare and feels wrong.')."
+        },
+        "max_sentences_per_response": {
+          "type": "integer",
+          "description": "Hard ceiling on response length in sentences. Critical for voice games — long responses are disorienting without visual anchors. The pipeline truncates if the model exceeds this.",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "dialogue_style": {
+          "type": "string",
+          "description": "'spoken' = natural speech with contractions, filler words, interruptions permitted; 'written' = formal prose, used for narrator characters who are clearly telling a story rather than speaking it.",
+          "enum": ["spoken", "written"]
+        },
+        "forbidden_phrases": {
+          "type": "array",
+          "description": "Optional list of phrases or words this character must never say. Useful for preserving mystery (e.g., 'I am not real', 'you are playing a game').",
+          "items": {
+            "type": "string"
+          }
+        },
+        "elevenlabs_voice_id": {
+          "type": "string",
+          "description": "Optional ElevenLabs voice ID to use for TTS rendering of this character's lines."
+        }
+      }
+    },
+    "knowledge": {
+      "type": "object",
+      "description": "Defines the epistemic boundaries of this character. The narrator must only reference known_facts freely; unknown_facts cause genuine confusion reactions; secrets are revealed only when reveal_condition is met.",
+      "required": ["known_facts", "unknown_facts", "secrets"],
+      "additionalProperties": true,
+      "properties": {
+        "known_facts": {
+          "type": "array",
+          "description": "Facts this character knows and can speak about freely. Written as plain-English statements the narrator can treat as confirmed truth.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unknown_facts": {
+          "type": "array",
+          "description": "Facts this character genuinely does not know. If the player references these, the character must respond with authentic confusion, not deflection. This creates realistic knowledge gaps rather than evasion.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "secrets": {
+          "type": "array",
+          "description": "Facts this character knows but is withholding. Each secret has a condition that unlocks it. Before the condition is met, the character deflects, changes the subject, or gives partial truths.",
+          "items": {
+            "type": "object",
+            "required": ["id", "content", "reveal_condition"],
+            "additionalProperties": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for this secret, referenced in arc beat state_changes when a secret is triggered.",
+                "pattern": "^[a-z0-9-_]+$"
+              },
+              "content": {
+                "type": "string",
+                "description": "The actual secret content — what is revealed when the condition is met."
+              },
+              "reveal_condition": {
+                "type": "string",
+                "description": "Plain-English condition that must be true before this secret can be spoken (e.g., 'Player has asked about the window twice and trust_level >= 6', 'Phase 4 has started')."
+              },
+              "partial_hints": {
+                "type": "array",
+                "description": "Optional. Fragments the character may drop before the full reveal — breadcrumbs that don't give away the secret but build dread.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "personality": {
+      "type": "object",
+      "description": "The internal psychology driving this character's behavior. These inform tone and reaction patterns across all phases. The narrator model reads these to understand WHY the character responds the way they do.",
+      "required": ["motivation", "internal_conflict", "attitude_toward_player"],
+      "additionalProperties": true,
+      "properties": {
+        "motivation": {
+          "type": "string",
+          "description": "What this character fundamentally wants — their deepest drive (e.g., 'To be believed and not forgotten', 'To prevent the player from leaving before the session ends')."
+        },
+        "internal_conflict": {
+          "type": "string",
+          "description": "The tension within this character that makes them compelling and unpredictable (e.g., 'Wants to tell the truth but is terrified of what the player will do with it')."
+        },
+        "attitude_toward_player": {
+          "type": "string",
+          "description": "How this character fundamentally feels about the player's presence in this story. Shapes default tone (e.g., 'Guarded but desperate. The player is both her hope and her threat.')."
+        },
+        "fear": {
+          "type": "string",
+          "description": "Optional. What this character is afraid of. The narrator can invoke this for authentic fear responses."
+        },
+        "coping_mechanism": {
+          "type": "string",
+          "description": "Optional. How this character deals with distress — deflection, humor, silence, etc."
+        }
+      }
+    },
+    "arc": {
+      "type": "object",
+      "description": "This character's personal transformation arc across the story. Stages map to arc.phases by index or name. The narrator's characterization of this character must shift as stages progress.",
+      "required": ["stages", "progression"],
+      "additionalProperties": true,
+      "properties": {
+        "stages": {
+          "type": "array",
+          "description": "Ordered list of character states across the story. Each stage is a plain-English description of the character's psychological state at that point (e.g., ['Guarded and clinical', 'Cracks forming under questioning', 'Full emotional exposure', 'Dissolution']).",
+          "minItems": 2,
+          "items": {
+            "type": "string"
+          }
+        },
+        "progression": {
+          "type": "string",
+          "description": "Description of the overall arc trajectory — what changes and why (e.g., 'Moves from controlled deception to involuntary revelation as the player accumulates trust and evidence')."
+        },
+        "regression_trigger": {
+          "type": "string",
+          "description": "Optional. Condition under which the character regresses to an earlier stage (e.g., 'If the player becomes aggressive, Elara retreats to Stage 1 behavior')."
+        }
+      }
+    },
+    "mutable_state": {
+      "type": "object",
+      "description": "Runtime state that changes as the session progresses. This object is updated by the pipeline engine after each beat resolves. It is NOT pre-authored content — it is the live game state for this character. The narrator reads current values to calibrate responses.",
+      "required": [
+        "emotional_state",
+        "trust_level",
+        "secrets_revealed",
+        "current_phase_behavior"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "emotional_state": {
+          "type": "string",
+          "description": "Current emotional state as a short descriptor. Updated by state_changes in beat resolutions. The narrator uses this as their real-time characterization guide (e.g., 'guarded', 'distressed', 'dissociated')."
+        },
+        "trust_level": {
+          "type": "number",
+          "description": "0-10 scale of how much this character trusts the player right now. 0 = hostile/closed, 10 = fully open. Affects secret reveal thresholds and tone. Updated by choice consequences.",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "secrets_revealed": {
+          "type": "array",
+          "description": "Array of secret ids that have been revealed so far in this session. Prevents re-revealing already disclosed secrets.",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "current_phase_behavior": {
+          "type": "string",
+          "description": "The active behavior directive for the current phase, pulled from arc.phases[].character_behavior at phase start. The narrator treats this as the overriding tone instruction."
+        },
+        "arc_stage_index": {
+          "type": "integer",
+          "description": "Optional. Zero-based index into arc.stages indicating the character's current development stage.",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

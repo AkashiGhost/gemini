@@ -1,0 +1,299 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://innerplay.app/schemas/game-schema.json",
+  "title": "Complete Game Definition",
+  "description": "Top-level schema that assembles all story components into a single validated game package. A pipeline can load one game file and have everything it needs to run a full session. The world, characters, and arc are validated against their individual schemas via $ref. This is the file the runtime engine consumes at game start.",
+  "type": "object",
+  "required": [
+    "meta",
+    "world",
+    "characters",
+    "arc",
+    "prompts",
+    "sounds",
+    "evaluation"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "meta": {
+      "type": "object",
+      "description": "Top-level game metadata. Used for discovery, versioning, and display. None of these fields affect runtime behavior directly, but the pipeline reads duration_target_minutes to calibrate word budgets globally.",
+      "required": [
+        "id",
+        "title",
+        "genre",
+        "duration_target_minutes",
+        "player_role"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Globally unique game identifier. Must match story_id in arc and any cross-file references. Use kebab-case.",
+          "pattern": "^[a-z0-9-_]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Display title shown in the game selection UI (e.g., 'The Last Session')."
+        },
+        "tagline": {
+          "type": "string",
+          "description": "Optional one-line marketing copy shown under the title."
+        },
+        "genre": {
+          "type": "string",
+          "description": "Primary genre label (e.g., 'horror', 'mystery', 'sci-fi', 'drama'). Used for filtering and setting default narrator tone priors."
+        },
+        "content_warnings": {
+          "type": "array",
+          "description": "Optional list of content warning tags displayed before the player starts (e.g., ['psychological horror', 'themes of death', 'implied violence']).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "duration_target_minutes": {
+          "type": "number",
+          "description": "Intended total play duration in minutes. Must match world.duration_target_minutes. The pipeline uses this to validate that total beat word budgets are within range.",
+          "minimum": 1,
+          "maximum": 120
+        },
+        "player_role": {
+          "type": "string",
+          "description": "How the player is framed within the story — the role they inhabit (e.g., 'You are a therapist. You are Dr. Mercer. You are a detective'). Injected directly into the opening system prompt."
+        },
+        "version": {
+          "type": "string",
+          "description": "Optional semantic version string for this game file (e.g., '1.0.0').",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "author": {
+          "type": "string",
+          "description": "Optional author or team name."
+        },
+        "created_at": {
+          "type": "string",
+          "description": "Optional ISO 8601 creation timestamp.",
+          "format": "date-time"
+        },
+        "language": {
+          "type": "string",
+          "description": "BCP-47 language code for this game's content (e.g., 'en', 'en-US'). Defaults to 'en' if omitted.",
+          "default": "en"
+        }
+      }
+    },
+    "world": {
+      "description": "The world definition for this game. Must conform to world-schema.json. The world.id should be consistent with meta.id, but they can differ if the world is reused across games.",
+      "$ref": "world-schema.json"
+    },
+    "characters": {
+      "type": "array",
+      "description": "All characters that appear in this game. Must contain at least one character. The pipeline builds a character registry from this array keyed by character.id. At minimum, one character must have role='narrator' to provide the story voice.",
+      "minItems": 1,
+      "items": {
+        "$ref": "character-schema.json"
+      }
+    },
+    "arc": {
+      "description": "The story arc for this game. Must conform to arc-schema.json. arc.story_id must match meta.id.",
+      "$ref": "arc-schema.json"
+    },
+    "prompts": {
+      "type": "object",
+      "description": "The LLM prompt layer. Contains the base system prompt and optional per-phase overrides. The pipeline assembles the active system prompt by combining: system base + active character card + current phase override (if any) + current beat purpose + world physics rules.",
+      "required": ["system"],
+      "additionalProperties": true,
+      "properties": {
+        "system": {
+          "type": "string",
+          "description": "The base system prompt injected at the start of every API call. Should define the narrator's fundamental role, voice, and constraints that apply across all phases. Character-specific and phase-specific directives are appended on top of this. Keep under 500 tokens — it is injected every call."
+        },
+        "phase_overrides": {
+          "type": "object",
+          "description": "Optional map of phase.id to an additional prompt string appended to the system prompt only when that phase is active. Use for phase-specific framing that does not belong in character_behavior (e.g., structural constraints, tonal shifts the narrator model needs explicit instruction for).",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "intent_classifier_prompt": {
+          "type": "string",
+          "description": "Optional system prompt for the intent classification model (e.g., Mistral Small). If omitted, the pipeline uses a default intent classifier prompt with the world.player_can list injected."
+        },
+        "fallback_response": {
+          "type": "string",
+          "description": "Optional fallback narrator line if the LLM call fails or times out. Should be in-character and non-committal (e.g., '... I'm sorry. I lost my train of thought. What were you asking?')."
+        }
+      }
+    },
+    "sounds": {
+      "type": "object",
+      "description": "The complete sound asset registry for this game. The pipeline reads this at init time to preload all required audio assets. cue_map covers one-shot reactive sounds; timeline covers deterministic timed sounds.",
+      "required": ["cue_map", "timeline"],
+      "additionalProperties": true,
+      "properties": {
+        "cue_map": {
+          "type": "object",
+          "description": "Registry of all one-shot sound effects that can be triggered reactively during gameplay. Keys are sound ids (referenced in arc beat sound_cues). Values are cue definitions.",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["name", "asset_path"],
+            "additionalProperties": true,
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Human-readable sound name."
+              },
+              "description": {
+                "type": "string",
+                "description": "What this sound is and when it is used (e.g., 'Single sharp knock on wood. Used when Elara mentions the door')."
+              },
+              "asset_path": {
+                "type": "string",
+                "description": "Relative path to the audio file from the game assets root."
+              },
+              "volume": {
+                "type": "number",
+                "description": "Default playback volume 0-1.",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.8
+              },
+              "tag": {
+                "type": "string",
+                "description": "Optional tag the narrator can embed in its response text to trigger this cue (e.g., '[knock]'). The pipeline strips tags before TTS and fires the cue."
+              }
+            }
+          }
+        },
+        "timeline": {
+          "type": "array",
+          "description": "Deterministic timed sound events that fire at specific elapsed game times regardless of player actions. Used for atmospheric punctuation the designer wants to guarantee. The pipeline fires these in a parallel timer track.",
+          "items": {
+            "type": "object",
+            "required": ["time", "sound_id"],
+            "additionalProperties": true,
+            "properties": {
+              "time": {
+                "type": "string",
+                "description": "Elapsed game time at which to fire this event in MM:SS format.",
+                "pattern": "^\\d+:\\d{2}$"
+              },
+              "sound_id": {
+                "type": "string",
+                "description": "Sound id from cue_map to play at this time."
+              },
+              "condition": {
+                "type": "string",
+                "description": "Optional state condition that must be true for this event to fire. Allows conditional timeline sounds without authoring complex beat logic."
+              },
+              "description": {
+                "type": "string",
+                "description": "Why this timed event exists — authoring note."
+              }
+            }
+          }
+        },
+        "preload": {
+          "type": "array",
+          "description": "Optional explicit list of asset paths to preload at game init. If omitted, the pipeline preloads all assets in cue_map and ambient_baseline.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "description": "Post-game quality and analytics framework. The quality_checklist is used by the pipeline (and human reviewers) to verify a completed run met authorial intent. Metric definitions power the analytics dashboard.",
+      "required": ["quality_checklist"],
+      "additionalProperties": true,
+      "properties": {
+        "quality_checklist": {
+          "type": "array",
+          "description": "Ordered list of authorial intent statements a completed run should satisfy. Used for automated QA (LLM-as-judge), human playtest review, and regression testing. Each item is a plain-English criterion.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "criterion"],
+            "additionalProperties": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique criterion id for tracking.",
+                "pattern": "^[a-z0-9-_]+$"
+              },
+              "criterion": {
+                "type": "string",
+                "description": "The quality statement to evaluate (e.g., 'The narrator never broke character', 'At least one choice beat was reached', 'The ending matched the player style score')."
+              },
+              "evaluation_method": {
+                "type": "string",
+                "description": "Optional. How this criterion is checked: 'automatic' (pipeline checks game state), 'llm-judge' (send transcript to evaluator model), 'human' (manual review required).",
+                "enum": ["automatic", "llm-judge", "human"]
+              },
+              "priority": {
+                "type": "string",
+                "description": "Optional severity if this criterion fails: 'blocking' (breaks the experience), 'important' (degrades quality), 'minor' (nice to fix).",
+                "enum": ["blocking", "important", "minor"]
+              }
+            }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "description": "Optional runtime metrics to collect and report after each session. Keys are metric names; values define how they are computed.",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["description"],
+            "additionalProperties": true,
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "What this metric measures and why it matters."
+              },
+              "source": {
+                "type": "string",
+                "description": "Where the metric value comes from (e.g., 'game_state.elara.trust_level at end', 'count of choice beats reached', 'total elapsed seconds')."
+              },
+              "target_range": {
+                "type": "object",
+                "description": "Optional min/max target range for this metric in a healthy run.",
+                "properties": {
+                  "min": { "type": "number" },
+                  "max": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "golden_path": {
+          "type": "object",
+          "description": "Optional specification of the intended demo run — the sequence of choices that leads to the primary intended ending. Used for automated demo testing and pitch demos.",
+          "additionalProperties": true,
+          "properties": {
+            "description": {
+              "type": "string",
+              "description": "Human-readable description of the golden path (e.g., 'The compassionate playthrough that ends with Elara choosing to stay')."
+            },
+            "choice_sequence": {
+              "type": "array",
+              "description": "Ordered list of {beat_id, option_id} pairs representing the demo choice sequence.",
+              "items": {
+                "type": "object",
+                "required": ["beat_id", "option_id"],
+                "properties": {
+                  "beat_id": { "type": "string" },
+                  "option_id": { "type": "string" }
+                }
+              }
+            },
+            "expected_ending_id": {
+              "type": "string",
+              "description": "The ending_condition id that should fire after following this choice sequence."
+            }
+          }
+        }
+      }
+    }
+  }
+}

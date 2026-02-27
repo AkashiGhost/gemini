@@ -1,0 +1,381 @@
+##
+## ENDING: RELEASE — "Let the Therapist Go"
+## File: stories/the-last-session/endings/release.yaml
+##
+## WHO REACHES THIS ENDING:
+##   The nurturing player. The one who said "I want to make sure we stay with
+##   what you came here for." Who offered reassurance. Who said "I'm here with
+##   you." Who tried to help — not from curiosity, not from empathy for themselves,
+##   but from the instinct to fix, to care, to be useful.
+##   The good therapist. The one who got into the profession for the right reasons.
+##
+## WHAT THIS ENDING IS:
+##   The sad ending. The ghost story resolution. The nurturing player's instinct to
+##   help actually helps — which is genuinely unusual in a horror story. Dr. Miriam Voss
+##   died in this chair in 2019 and has been here since, watching patient after patient
+##   return to an empty office, thinking she abandoned them. The player agrees to let
+##   her say goodbye. Through them. Just once.
+##   Then the rain stops. For the first time all night. And it is morning.
+##
+## FALLBACK USAGE:
+##   Also loaded for last_therapist + reject and last_therapist + surrender.
+##   The ghost understands rejection. She has always understood.
+##   Surrender she will not accept — she asks for something specific instead.
+##
+
+id: release
+name: "Let the Therapist Go"
+revelation_variant: last_therapist
+
+# ─────────────────────────────────────────────
+# TRIGGER CONDITIONS
+# ─────────────────────────────────────────────
+
+trigger_conditions:
+  primary:
+    revelation: last_therapist
+    choice_3: accept
+    note: >
+      Player said "I accept what you are." Or "I believe you." Or "Whatever you
+      need from me — I can try." The nurturing player's acceptance lands here.
+
+  alternates:
+    - revelation: last_therapist
+      choice_3: question
+      trust_level_min: 5
+      note: >
+        Player asked "What do you need from me? Really."
+        This is the fullest version of the release. She tells them exactly
+        what she needs — not the partial truth of the accept path, but the
+        whole story: forty-three patients, six years, the empty Tuesdays.
+        Use the question_path variant. Slightly more dialogue, same ending.
+    - revelation: last_therapist
+      choice_3: reject
+      note: >
+        The ghost understands. She has always understood rejection —
+        forty-three patients walked out of this building thinking she abandoned them.
+        She cannot argue with the player's refusal. She will stay. She is resigned
+        but not bitter. The player carries her grief anyway.
+        Use the rejection_path variant.
+    - revelation: last_therapist
+      choice_3: surrender
+      note: >
+        She says: "No. Not like that. Listen." She will not take a surrender
+        she didn't earn. She asks for something specific instead —
+        something the player can actually give her.
+        Use the surrender_redirect_path variant.
+
+# ─────────────────────────────────────────────
+# EMOTIONAL TONE
+# ─────────────────────────────────────────────
+
+emotional_tone: >
+  Sad, peaceful, the specific quiet of letting something go that needed letting go.
+  Not resolution in the triumphant sense — more like the feeling after a long cry,
+  when the body is empty and the air is clean. The player helped. For real.
+  The help cost them something — a night, a certainty about what their office is —
+  but it gave Dr. Voss something she has been waiting six years for.
+  That exchange is the emotional argument of the ending. The birdsong at dawn
+  is not happiness. It is simply: morning. The world outside this room continues.
+  That is enough.
+
+# ─────────────────────────────────────────────
+# ELARA'S FINAL LINES
+# ─────────────────────────────────────────────
+
+elara_final_lines:
+
+  # ACCEPT PATH (primary ending)
+  # The player accepted. Dr. Voss can speak her goodbyes.
+  # The denouement beat carries the goodbye itself (see callback_references).
+  # The final lines below close the session after she has had what she came for.
+
+  accept_path:
+    - line: >
+        I said goodbye to all forty-three of them tonight.
+        Through you. [pause]
+        You gave them that. You didn't know them. [pause]
+        It mattered.
+      delivery: >
+        First sentence is quiet and direct — a statement of fact about what just
+        happened, like a doctor noting an outcome. "Through you" is softer — she
+        is acknowledging the strange intimacy of the mechanism.
+        "You didn't know them" is the emotional weight of the line — she is noting
+        the generosity of what the player just did without understanding it.
+        "It mattered" — two words. Flat. Not theatrical. She means it exactly as
+        simply as she says it.
+      sound_cue: null
+      # Warm rain is already playing. Let it carry this.
+
+    - line: >
+        The rain is going to stop soon.
+        Not because of anything — it's just been raining all night.
+        [pause] When it does, you'll hear the building settle.
+        [pause] That's new.
+      delivery: >
+        First sentence is almost gentle — a piece of weather information.
+        The second sentence, "not because of anything," is the emotional release:
+        she is telling the player that what happens next is simply the world
+        returning to normal. Not magic. Just morning.
+        "When it does, you'll hear the building settle" — wonder, very quiet.
+        She has never heard the building settle. Six years. Tonight is the first.
+        "That's new." Simple. She is still surprised by it.
+      sound_cue: null
+
+    - line: >
+        Thank you for staying.
+      delivery: >
+        Five words. Plainly. This is the only permitted emotional break in the
+        game (see elara.yaml emotional_range exception for the ghost variant):
+        one line of undisguised feeling. Not theatrical. Not wept.
+        Just said, the way the thing is actually felt.
+        She does not say anything after. Neither does the silence need to.
+      sound_cue: null
+      # After this line: warm rain continues, then stops. Then birdsong.
+      # See sound_design.sequence for the specific timing.
+
+  # QUESTION PATH: player asked what she needed. She tells them all of it.
+  # Trust >= 5. More complete version — she speaks more directly about the
+  # forty-three patients, the Tuesdays, what waiting has felt like.
+
+  question_path:
+    - line: >
+        I need you to say something to each of them.
+        Not individually — you can't know them.
+        But there is one thing that every one of them needed to hear, and didn't.
+        [pause] I couldn't say it when I was alive.
+        I kept waiting for the right session.
+      delivery: >
+        She speaks carefully, building the request — this is a therapist's precision,
+        naming exactly what she needs and why she couldn't give it herself.
+        The pause before "I couldn't say it when I was alive" is 2 seconds.
+        "I kept waiting for the right session" — this is the grief of her situation
+        in one sentence: always the next session, until there wasn't one.
+        She does not cry. The quality of grief in her voice is long-dry.
+      sound_cue: null
+
+    - line: >
+        Tell them: I did not leave.
+        [pause — 2 seconds]
+        That is all. [pause] That is everything.
+      delivery: >
+        "Tell them: I did not leave." — said slowly, as if she is handing over
+        something she has been holding for six years. The pause is the weight of it.
+        "That is all" — quieter, almost to herself. "That is everything." —
+        the same volume, but heavier. These two sentences are the inverse of each
+        other. She knows.
+      sound_cue: null
+
+    - line: >
+        The rain is stopping. [pause]
+        I can hear something I haven't heard in a long time.
+        [pause — 3 seconds, rain fades out slowly under this pause]
+        There it is.
+      delivery: >
+        First sentence: she notices it before the player does.
+        Second sentence: genuine wonder — she is not performing.
+        Third: long pause, rain fades in real-time under it, then birdsong begins
+        softly under "There it is." The last three words are barely above a whisper.
+        She is hearing birds for the first time in six years.
+      sound_cue: null
+      # birdsong fades in during the 3-second pause and under "There it is."
+      # See timeline.yaml release ending, 11:00.
+
+  # REJECTION PATH: player refused. She understands.
+  # She has watched forty-three people leave without explanation.
+  # The player refusing is painful but not new.
+
+  rejection_path:
+    - line: >
+        I know. [pause]
+        I've watched people leave this office for six years without knowing why.
+        I thought I'd gotten used to it. [pause]
+        I haven't.
+      delivery: >
+        "I know" is said without accusation — just acknowledgment.
+        The revelation of six years of watching is quiet, not plaintive.
+        "I thought I'd gotten used to it" — a slight pause before this, like
+        she is being honest with herself in real time. "I haven't" is delivered
+        plainly, slightly surprised by her own honesty. She does not ask again.
+      sound_cue: null
+
+    - line: >
+        The rain will stop eventually.
+        Everything does. [pause]
+        I'll still be in the building when the next therapist arrives.
+        [pause] I hope they're kind. [pause] Like you are.
+      delivery: >
+        "The rain will stop eventually. Everything does." — philosophical, not
+        bitter. She is speaking past this specific moment. The clause about the
+        next therapist is said with something close to acceptance.
+        "I hope they're kind" — the vulnerability of this, for a ghost, is real.
+        The "Like you are" at the end is quiet: she is saying that even in
+        rejection, she registered the player's nature. That is not nothing.
+      sound_cue: null
+      # No birdsong on rejection path. Rain_warm continues, then fades slowly.
+      # The room is still warm. She stays. He leaves.
+
+  # SURRENDER REDIRECT PATH: player surrendered. She refuses it.
+  # She doesn't want to simply take. She wants to be heard.
+
+  surrender_redirect_path:
+    - line: >
+        No. [pause]
+        Not like that. [pause]
+        I'm not asking you to give me anything.
+        I'm asking you to hold something for me, for a moment.
+        [pause] That's different.
+      delivery: >
+        "No" is gentle but immediate — she is correcting the player the way
+        a patient corrects a misdiagnosis. Not "no, you're wrong" but
+        "no, you've misunderstood what I need." Two short pauses, then the
+        clarification: not give, hold. The distinction is everything to her.
+        "That's different" is said with the precision of someone who has thought
+        about this distinction for six years.
+      sound_cue: null
+
+    - line: >
+        Say: I did not leave.
+        [pause — 2 seconds]
+        Say it like you mean it. [pause]
+        Even if you don't know who you're saying it to.
+      delivery: >
+        The instruction is direct. She is asking for a specific thing.
+        "Say it like you mean it" — not a demand, a request. She knows
+        the player doesn't know her patients. She is asking for sincerity
+        toward the abstract, which is actually the harder ask.
+        Final phrase — "even if you don't know who you're saying it to" —
+        is said quietly, almost to herself. She knows how strange this is.
+      sound_cue: null
+      # If player complies: continues to the accept_path final lines.
+      # If player refuses again: rejection_path lines play.
+
+# ─────────────────────────────────────────────
+# CALLBACK REFERENCES
+# ─────────────────────────────────────────────
+
+callback_references:
+  - >
+    Reference the player's Choice 2 accommodate response — "This is your session.
+    What would be most helpful right now?" That specific phrase, or its equivalent,
+    is what Dr. Voss responds to in the denouement. She recognized the therapeutic
+    care in it. It is why she chose this vessel.
+  - >
+    Reference the fact that the player tried to redirect the session in Phase 1
+    or Phase 2 (nurturing deflect): "You kept trying to give me back the session.
+    As if what you needed wasn't part of what I came for." This recontextualizes
+    their caretaking — she was watching them caretake.
+  - >
+    Reference the player's name as Dr. Voss would have used it: "You are the
+    first therapist in six years who sat in that chair and made me feel like
+    you were actually listening. [player_name]. I know. I watched a lot of them."
+  - >
+    Reference the clock stopping from her perspective, not the player's:
+    "When the clock stopped — that was me. I didn't know how to announce myself.
+    Time stopping was the only dramatic gesture I had."
+
+# ─────────────────────────────────────────────
+# SOUND DESIGN
+# ─────────────────────────────────────────────
+
+sound_design:
+  sounds:
+    - rain_warm
+    - birdsong
+    # rain_cold is NOT used in this ending — even the rejection path keeps rain_warm.
+    # The warmth is the ghost's warmth. It is present regardless of choice.
+    # clock_restart is NOT used — the clock stopped and did not need to start again.
+
+  sequence: >
+    At 10:00 (Phase 5 start), rain_warm fades in slowly over 6 seconds.
+    (Slower than integration — more tentative. The warmth here is survival, not presence.)
+    Elara delivers the denouement beat (the goodbyes, the forty-three patients)
+    over warm rain. The denouement beat is more words than other endings —
+    it contains the content of Dr. Voss's farewell, which the pipeline
+    delivers through Elara narrating the player saying the goodbye.
+    At 11:00: birdsong begins fading in over 8 seconds. Very sparse — one bird,
+    then two. It is dawn. The session lasted all night.
+    At 11:45: warm rain begins fading out (15-second fade).
+    The birdsong outlasts the rain. Outside sounds replace inside sounds.
+    This is the only ending where outside sound enters the room.
+    At 12:00: warm rain is gone. Only birdsong remains for the final
+    10-15 seconds. Then silence.
+
+  final_sound: >
+    Birdsong. Distant. One or two birds. Not a dawn chorus — just birds
+    being alive somewhere outside this building, not knowing what happened
+    in this room. That indifference is the grace of this ending.
+    The birds don't know. They are simply alive. The world outside
+    continued. The player is part of it again.
+
+# ─────────────────────────────────────────────
+# FINAL IMAGE
+# ─────────────────────────────────────────────
+
+final_image: >
+  The rain stops. You notice it in your body before your mind catches up —
+  the window is silent for the first time since you sat down.
+  Outside, it is still dark, but the darkness has the particular quality
+  of darkness before dawn: thinner than night, not quite light.
+  The chair across from you is empty. The room is the same room it has been
+  for four years of your working life. Desk lamp. Two chairs. The clock
+  on the wall reads 8:47. You know that's not right. You also know that
+  you will not move it. Then you hear something — through the window,
+  from somewhere below and outside, the specific sound of birds deciding
+  it is morning. You did not know it was possible to feel this tired
+  and this clean at the same time.
+
+# ─────────────────────────────────────────────
+# DESIGN NOTES
+# ─────────────────────────────────────────────
+
+design_notes: |
+  WHY THIS ENDING WORKS:
+
+  The release ending is the only ending where the player's good impulse is
+  rewarded with something real. In most horror, helping the ghost is the mistake —
+  the ghost uses you, traps you, reveals itself as the threat you tried to help.
+  This ending refuses that. Dr. Voss needed exactly what the nurturing player
+  offered: someone kind enough to hold her grief for a moment without flinching.
+  The player wins by being good. That is worth protecting as a design principle.
+  Do not undermine it.
+
+  THE GOODBYE CONTENT: in the denouement beat, Elara speaks the goodbye through
+  the player — this means the pipeline narrates the player delivering Dr. Voss's
+  final message. The specific goodbye is: "I did not leave." Three words.
+  That is what all forty-three patients needed to hear. This should feel like
+  the most important three words in the ending, because they are.
+  The pipeline passes this as Elara saying: "Now. Say it. [pause]"
+  and then describes the player saying it as Dr. Voss's voice through them.
+  The effect is surreal but grounded — this is what the ghost needed.
+  This is the exchange.
+
+  THE BIRDSONG timing is emotional architecture. The warm rain plays first —
+  survival warmth. Then, when the player has had time to sit in the warmth
+  and understand that the session is ending, the birdsong begins. Not as a
+  reward. As a fact: it is dawn. The world outside has been running all night.
+  Birds do not know what happened in this room. They are simply alive.
+  That indifference is, paradoxically, the comfort of this ending.
+  The player is returning to a world that doesn't know.
+
+  THE REJECTION PATH must not be punishing. Dr. Voss has watched people leave
+  her office for six years. She understands. The player refusing is painful
+  but not new, and she has not had the luxury of bitterness — bitterness takes
+  energy she doesn't have. Her last line on the rejection path — "I hope they're
+  kind. Like you are." — is the most important. She is saying: even in refusing,
+  you were kind. That is not nothing. The player should feel this. Not guilt —
+  acknowledgment.
+
+  ELARA'S EMOTIONAL BREAK: this is the only ending that uses the permitted
+  emotional break from elara.yaml (voice.emotional_range exception for the ghost).
+  "Thank you for staying." — five words, plainly. This is the only time in the
+  game where Elara says something without subtext, without precision, without
+  measured effect. Just the thing itself, said simply. The delivery must honor
+  that: no theater, no manipulation, no technique. Just: thank you for staying.
+
+  WHAT TO AVOID: sentiment that explains the emotional meaning.
+  Do not narrate "you feel like you helped someone tonight."
+  Do not explain the birdsong's significance.
+  Do not comment on the warmth of the rain.
+  Let the sounds do what they were designed to do.
+  The player will feel it. They do not need to be told.

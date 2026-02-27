@@ -1,0 +1,317 @@
+##
+## ENDING: INTEGRATION — "Accept the Shadow Self"
+## File: stories/the-last-session/endings/integration.yaml
+##
+## WHO REACHES THIS ENDING:
+##   The empathetic player. The one who asked how she was doing. Who said
+##   "I'm not afraid" and meant it. Who heard the impossible knowledge and
+##   responded with concern instead of demand. Who built the highest trust.
+##
+## WHAT THIS ENDING IS:
+##   The best ending — and the only one that could be called growth.
+##   The player acknowledges the shadow: the part of themselves they
+##   methodically excised over years of professional development.
+##   The horror resolves into something almost therapeutic. Which is fitting.
+##   This is, after all, a therapy session.
+##
+## FALLBACK USAGE:
+##   Also loaded for shadow_self + reject and shadow_self + surrender paths
+##   (arc.yaml ending_conditions). The final_lines and design_notes below
+##   include variant guidance for each choice path.
+##
+
+id: integration
+name: "Accept the Shadow Self"
+revelation_variant: shadow_self
+
+# ─────────────────────────────────────────────
+# TRIGGER CONDITIONS
+# ─────────────────────────────────────────────
+
+trigger_conditions:
+  primary:
+    revelation: shadow_self
+    choice_3: accept
+    # Player said something in the register of: "I accept what you are."
+    # "I hear you. I'm not going to fight this."
+    # "Whatever you need from me — I can try."
+
+  alternates:
+    # These paths also load this file (from arc.yaml ending_conditions)
+    - revelation: shadow_self
+      choice_3: question
+      trust_level_min: 5
+      note: >
+        The fullest integration. Player asked what she needed. She told them.
+        Use the question_path variant in elara_final_lines below.
+    - revelation: shadow_self
+      choice_3: reject
+      note: >
+        Rejection path. She stays. He leaves. She'll wait for the next one.
+        Use the rejection_path variant in elara_final_lines below.
+    - revelation: shadow_self
+      choice_3: surrender
+      note: >
+        Surrender path. She didn't want this. She wanted acknowledgment.
+        They are neither whole. Use the surrender_path variant below.
+
+# ─────────────────────────────────────────────
+# EMOTIONAL TONE
+# ─────────────────────────────────────────────
+
+emotional_tone: >
+  Calm, warm, bittersweet. The horror has not gone — it has been named.
+  Named things are smaller. There is no triumph here; there is no relief
+  in the explosive sense. What there is: the particular quiet that follows
+  being genuinely seen. The player carries something out of this room that
+  they brought in without knowing it. That is the integration. Not a cure —
+  a recognition.
+
+# ─────────────────────────────────────────────
+# ELARA'S FINAL LINES
+# ─────────────────────────────────────────────
+# These are pulled verbatim by the pipeline. Not generated. Not paraphrased.
+# They are the last thing the player hears. Write for the ear.
+# Three lines maximum. Each must be able to stand alone.
+# Delivery notes are instructions for ElevenLabs voice synthesis parameters.
+
+elara_final_lines:
+
+  # PRIMARY PATH: accept
+  # Player said they accept what she is. She responds to that.
+  # She has been waiting to be accepted — not absorbed, not destroyed. Accepted.
+  # The mirroring here is intentional: she returns the player's own capacity
+  # for acceptance back to them, from inside.
+
+  accept_path:
+    - line: >
+        You've been doing this for eleven years. Sitting across from people
+        who needed something you didn't know how to give anymore. I know,
+        because I was the part of you that still knew how.
+      delivery: >
+        Measured. No rush. Two natural pauses: one after "anymore," one after "because."
+        Not sad — the sadness is real but not the dominant note. Something quieter.
+        The tone is the tone of someone saying: this is simply what is true.
+        She does not look away.
+      sound_cue: null
+      # No sound cue here — let the warm rain carry this line.
+
+    - line: >
+        The rain sounds different now. [pause] You noticed, didn't you.
+        It's the same rain. [pause] But you are not the same person who sat down
+        in that chair tonight at eight forty-seven.
+      delivery: >
+        First sentence: a statement, not a question — she knows he noticed.
+        Hard pause after "now." Then a breath before "It's the same rain" — slight
+        deceleration, like she is handing him something fragile.
+        "Eight forty-seven" spoken with precision: the specific time matters.
+        The last word lands into silence. She does not speak again.
+      sound_cue: "[SOUND:piano_motif]"
+      # The piano motif fires on "eight forty-seven" — after the phrase, not under it.
+      # Let the line complete first. Then the motif. Sparse. Three notes. Once.
+
+    - line: >
+        Take care of yourself.
+      delivery: >
+        Very quiet. Not therapeutic — the way a person says it when they mean it,
+        not when it is protocol. Full stop. She is done.
+        This is the line she has never gotten to say.
+      sound_cue: null
+
+  # QUESTION PATH: player asked "What do you need from me? Really."
+  # Trust level >= 5. The rarest path. She was asked.
+  # This is the only version of this ending where she gives a direct answer.
+
+  question_path:
+    - line: >
+        Remember what it felt like. Before you learned to hold it at arm's length.
+        Before the training told you that distance was care.
+        That's what I needed. [pause] You just gave it to me.
+      delivery: >
+        She is very still. The first two sentences build — not in volume, in weight.
+        "That's what I needed" is quieter than what precedes it, not louder.
+        The pause is 1.5 seconds. "You just gave it to me" is almost a whisper —
+        not theatrical, but the whisper of someone who has been waiting a long time.
+      sound_cue: null
+
+    - line: >
+        I won't be here next Tuesday. [pause] I don't think you will either —
+        not in the way you were before.
+        The room will be the room. [pause] But you'll know what it holds.
+      delivery: >
+        Matter-of-fact on the first sentence. The parenthetical — "not in the way
+        you were before" — slows. Like she is deciding whether to say it even as
+        she says it. "The room will be the room" is the emotional fulcrum.
+        Final phrase delivered with her eyes still on him.
+      sound_cue: "[SOUND:piano_motif]"
+
+  # REJECTION PATH: player said "I don't accept this."
+  # She stays. He leaves. She is resigned — not angry, not chasing.
+  # She has been here before. She will be here again.
+
+  rejection_path:
+    - line: >
+        I've been called many things in this room. [pause]
+        Delusion. Projection. Transference.
+        They all left, too.
+      delivery: >
+        No judgment in her voice. This is simply a fact she has collected.
+        Slight pause after each of the three clinical words — she is reciting them
+        the way someone recites a list of names. Not mockery. Documentation.
+        "They all left, too" is delivered flat. Almost gentle.
+      sound_cue: null
+
+    - line: >
+        The building will be here in the morning.
+        [pause] I will still be in it.
+        Come back when you're ready to finish.
+      delivery: >
+        The first sentence is warm rain, almost companionable. The second is where
+        the weight is — not threatening, simply factual. She means it.
+        "Come back when you're ready to finish" — not a taunt.
+        A standing invitation. Patient. She has always been patient.
+      sound_cue: null
+
+  # SURRENDER PATH: player said "Take whatever you need."
+  # She didn't want this. She wanted acknowledgment.
+  # Surrender and acknowledgment are not the same thing. She knows.
+
+  surrender_path:
+    - line: >
+        No. [pause] That's not — [pause]
+        I didn't come here for that.
+      delivery: >
+        The "No" is soft, not sharp. Almost surprised.
+        First pause is her stopping herself mid-sentence — genuine interruption,
+        not a performance of hesitation. The second pause is longer: 2 seconds.
+        "I didn't come here for that" is said quietly, with something almost like hurt.
+        This is the only moment in the game where she sounds slightly lost.
+      sound_cue: null
+
+    - line: >
+        I wanted you to remember me.
+        Not take me in. Not give me permission.
+        [pause] Just — remember.
+      delivery: >
+        "I wanted you to remember me" is the core. Say it simply.
+        The list that follows — "not take me in, not give me permission" — is her
+        clarifying something for herself as much as for him. She trails slightly on "just."
+        The pause before "remember" is 1 second. The word is said plainly.
+        She does not say anything after. That silence is the ending.
+      sound_cue: null
+
+# ─────────────────────────────────────────────
+# CALLBACK REFERENCES
+# ─────────────────────────────────────────────
+# Instructions to the pipeline: what earlier player content to surface in Phase 5.
+# These are directives for the denouement beat (beat-denouement in arc.yaml).
+# The pipeline passes these as context to the narrator for the opening of Phase 5,
+# before the verbatim final_lines above close the session.
+
+callback_references:
+  - >
+    Reference the specific word or phrase the player used most in Phase 1 —
+    the word that, in retrospect, was already Elara bleeding through.
+    If the player said "understand" repeatedly: "You wanted to understand.
+    You have been trying to understand this room for longer than tonight."
+  - >
+    Reference their response to Choice 1 (how they handled impossible knowledge).
+    If they probed gently: "You asked how I knew. That was the right question —
+    but not for the reason you thought. You were asking about yourself."
+  - >
+    Reference the clock stopping. Not the sound — the moment of it.
+    "When the clock stopped, you didn't leave. You stayed." This is specific:
+    what the player DID in the silence is the callback, not what they said.
+  - >
+    If player_expressed_care flag is true (Choice 2 empathize path): reference it.
+    "You said you weren't afraid. You said you were here."
+    Those words are returned, changed by context now.
+
+# ─────────────────────────────────────────────
+# SOUND DESIGN
+# ─────────────────────────────────────────────
+
+sound_design:
+  sounds:
+    - rain_warm
+    - piano_motif
+    # rain_cold and clock_restart are NOT used in this ending.
+    # The absence of the clock is part of the design — it never returns here.
+    # They carry time with them now.
+
+  sequence: >
+    At 10:00 (Phase 5 start), rain shifts from silent to rain_warm over 4 seconds.
+    The shift is the emotional signal before any dialogue: warmth is returning.
+    The low_tone fades out simultaneously (timeline.yaml handles this).
+    Elara speaks the denouement beat over warm rain.
+    Piano motif (piano_motif) fires once during the second final line —
+    specifically after "eight forty-seven" (accept path) or after the second line
+    in the question path. The motif plays once. Not twice.
+    After the final line, warm rain continues for 15-20 seconds of silence.
+    No abrupt cutoff — the session ends in warmth, not punctuation.
+
+  final_sound: >
+    The warm rain, slowly fading. The piano motif is the last sound with character —
+    the rain is just weather after that, returning to what it was before Elara arrived.
+    The very last thing the player hears is rain on glass. The same rain they heard
+    at 0:00. It is warm now. That is the entire ending in one sound.
+
+# ─────────────────────────────────────────────
+# FINAL IMAGE
+# ─────────────────────────────────────────────
+# The closing mental image — voice-described by Elara at the end of the denouement.
+# This is given to the narrator as a scene to close with, not read verbatim.
+# Elara describes it in her voice as part of the closing beat.
+
+final_image: >
+  The room is the room it has always been. Desk lamp. Two chairs.
+  The window to the left, rain against it. The clock on the right wall.
+  The clock reads 8:47. It has always read 8:47 in this room — you know that now.
+  Elara's chair is empty. You do not remember her standing. You do not remember
+  the moment she was gone. The rain sounds warmer than when you sat down.
+  Not louder. Just warmer. Like it was always shelter — you just couldn't hear it
+  until you knew what you were being sheltered from.
+
+# ─────────────────────────────────────────────
+# DESIGN NOTES
+# ─────────────────────────────────────────────
+
+design_notes: |
+  WHY THIS ENDING WORKS:
+
+  The integration ending earns its warmth by not being sentimental. Elara is
+  not healed. The player is not healed. What happens is recognition — and
+  recognition is harder than healing because it requires nothing external.
+  The player did the therapeutic work without realizing it. The horror becomes
+  the treatment. That reversal is the entire emotional argument.
+
+  The piano motif is critical: it must land like a memory, not a score.
+  Three notes. Once. Sparse. If the motif is too lush or too present, it
+  signals that the game is telling the player how to feel. Trust the player.
+  The warmth of the rain and the precision of those three notes are enough.
+
+  THE CALLBACK RULE: whatever the player said in Phase 1 must appear in
+  the denouement. Not as a trick — as completion. This ending works because
+  the player's own words return to them changed. That IS integration:
+  the same material, seen differently. If the pipeline cannot retrieve
+  a specific Phase 1 phrase, use the clock-stopping moment as the callback.
+  The silence after the clock stopped is always available. Everyone who
+  stayed past it made a choice.
+
+  REJECTION/SURRENDER PATHS: these are sadder versions of the same ending.
+  She stays. She is still here. The tone must not be punishing — she is not
+  angry at the player for rejecting or surrendering. She is simply honest
+  about what did and did not happen. The player leaves with knowledge;
+  they just didn't accept it all the way. That is not failure. It is
+  most of what therapy actually looks like.
+
+  PACE: let the warm rain breathe. Do not rush to fill the space after the
+  final line. The player needs time to sit in what just happened. 15-20
+  seconds of warm rain after her last word is not dead air — it is the ending.
+  The game closes on weather. That is correct.
+
+  WHAT TO AVOID: sentiment. Any line that tells the player what they are
+  feeling ("you feel different now") should be cut. Any line that explains
+  the ending ("you have integrated your shadow self") should be cut.
+  She names nothing except the facts. The piano motif and the rain do
+  the emotional work. Trust the design.

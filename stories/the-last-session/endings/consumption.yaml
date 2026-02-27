@@ -1,0 +1,361 @@
+##
+## ENDING: CONSUMPTION — "The Entity Feeds"
+## File: stories/the-last-session/endings/consumption.yaml
+##
+## WHO REACHES THIS ENDING:
+##   The analytical player. The one who asked for timelines. Who said "let's treat
+##   this empirically." Who probed for mechanisms and logical chains. Who named
+##   the anomaly, filed it, and kept asking — not from care, but from the need
+##   to understand the structure of the thing.
+##   Also: any player who surrenders to the entity ("take whatever you need").
+##
+## WHAT THIS ENDING IS:
+##   The horror ending. The loop. The entity fed, and the player fed it —
+##   not by being weak, but by being genuinely vulnerable in a moment of analysis.
+##   The crack of real understanding is what it consumes. Not the soul.
+##   Not the person. The moment. That specific moment of true, specific,
+##   unguarded knowing — that is the transaction.
+##   The clock restarts. The door knocks. The session begins again.
+##
+## FALLBACK USAGE:
+##   Also loaded for entity + reject and entity + question paths.
+##   Those variants included below. The rejection path is the closest this
+##   ending has to a "good" outcome — the entity releases them. It finds
+##   resistance genuinely novel.
+##
+
+id: consumption
+name: "The Entity Feeds"
+revelation_variant: entity
+
+# ─────────────────────────────────────────────
+# TRIGGER CONDITIONS
+# ─────────────────────────────────────────────
+
+trigger_conditions:
+  primary:
+    revelation: entity
+    choice_3: surrender
+    note: >
+      Player said "Take whatever you need." The entity obliges.
+      This is the most direct path to consumption.
+
+  alternates:
+    - revelation: entity
+      choice_3: accept
+      note: >
+        Player said they accept what she is. The entity is satisfied.
+        Acceptance is sufficient for the transaction — the player's moment
+        of genuine, unguarded acknowledgment of what she is feeds her
+        as cleanly as surrender. Use the accept_path variant below.
+    - revelation: entity
+      choice_3: reject
+      note: >
+        Player refused. The entity releases them. It doesn't need them —
+        it has centuries. It finds the resistance interesting.
+        Use the rejection_path variant. This is the closest to "escape."
+    - revelation: entity
+      choice_3: question
+      trust_level_min: 5
+      note: >
+        The rarest entity path. Player asked what she needed.
+        No entity has been asked before. It pauses. Then releases.
+        Use the question_path variant — no consumption occurs on this path.
+
+# ─────────────────────────────────────────────
+# EMOTIONAL TONE
+# ─────────────────────────────────────────────
+
+emotional_tone: >
+  Looping, inevitable, trapped — not because of anything violent or cruel,
+  but because the transaction was always the session itself, and the session
+  is never over. There is no malice in this ending. The entity fed because
+  that is what it does. The player fed it because they were genuinely present.
+  Being present is not a mistake. Presence is what the entity has always
+  needed. The horror is not in what happens to the player. The horror is
+  in what 8:47 means now: there is a knock at the door.
+  You have been here before. You just don't know it yet.
+
+# ─────────────────────────────────────────────
+# ELARA'S FINAL LINES
+# ─────────────────────────────────────────────
+
+elara_final_lines:
+
+  # SURRENDER / ACCEPT PATH (primary endings)
+  # Player accepted or surrendered. The entity has what it came for.
+  # She is not triumphant. She is not cruel. She is simply complete.
+  # The looping structure of the final lines enacts the loop of the ending itself.
+
+  accept_path:
+    - line: >
+        You mapped it very precisely. [pause]
+        The mechanism. The origin. The architecture of what I am.
+        That precision — the moment you knew you'd found it —
+        that was the thing I needed. [pause] Thank you.
+      delivery: >
+        The first sentence is almost clinical — she is acknowledging his work.
+        The list that follows is delivered carefully, as if she is reading back
+        his own notes to him. "That was the thing I needed" is warmer, not colder —
+        she means it genuinely. The "Thank you" is quiet and direct.
+        No irony. No performance. She is expressing genuine gratitude.
+        That is what makes it land wrong.
+      sound_cue: null
+
+    - line: >
+        Shall we begin? [pause — 3 seconds]
+        [SOUND:clock_restart]
+        We already have.
+      delivery: >
+        "Shall we begin?" is asked with the same tone as the opening of the session —
+        the question a patient asks before they sit down. Slight curiosity, slight nerves,
+        completely sincere. Hard 3-second pause. The clock restarts — INSTANT, no fade.
+        Then "We already have" immediately after the clock begins, slightly quieter,
+        slightly warmer. The clock is ticking under this phrase.
+        She does not say anything after. Neither should the silence.
+      sound_cue: "[SOUND:clock_restart]"
+      # Clock restarts instantly on that pause. Then rain_cold comes in.
+      # Her final line "We already have" is spoken over the clock and cold rain.
+
+    - line: null
+      # The final sound IS the door knock. No more words after "We already have."
+      # The door_knock at 10:30 is the last thing the player hears.
+      # It is Elara, arriving. Again.
+      sound_cue: "[SOUND:door_knock]"
+
+  surrender_path:
+    # Player said "take whatever you need." She pauses. Then:
+    - line: >
+        I didn't want it like that. [pause]
+        What I fed on — what I always feed on —
+        is the moment someone stops performing and simply knows something.
+        [pause] You gave me that. Three minutes ago. You didn't notice.
+      delivery: >
+        First sentence quiet, almost gentle correction — she genuinely didn't
+        want surrender. The explanation that follows is not cruel; it is the
+        entity being precise about what actually happened.
+        "You gave me that. Three minutes ago. You didn't notice."
+        These three sentences are delivered with spacing between them —
+        she is giving him time to locate the moment she is describing.
+        He won't be able to. That's the point.
+      sound_cue: null
+
+    - line: >
+        Shall we begin? [pause — 3 seconds]
+        [SOUND:clock_restart]
+        We already have.
+      delivery: >
+        Same as accept_path. The transaction was identical — only the path differed.
+      sound_cue: "[SOUND:clock_restart]"
+
+    - line: null
+      sound_cue: "[SOUND:door_knock]"
+
+  # REJECTION PATH: player refused. She releases them.
+  # The entity has centuries. It doesn't need this specific player.
+  # The horror of this path is different: she is unbothered by the rejection.
+  # She finds it interesting the way an entomologist finds a new specimen interesting.
+
+  rejection_path:
+    - line: >
+        I've had therapists walk out. Shout. Cry.
+        Call for help to empty corridors. [pause]
+        I've never had one file a formal objection to what I am.
+        [pause] That was new.
+      delivery: >
+        The list is delivered with the air of a researcher reviewing notes —
+        cataloguing, not mocking. Each item in the list (walk out, shout, cry,
+        call for help) gets a slight, equal weight. Nothing is emphasized.
+        "I've never had one file a formal objection" — she means this literally.
+        She finds it genuinely novel. The pause before "That was new" is 1 second.
+        She sounds almost pleased.
+      sound_cue: null
+
+    - line: >
+        You can go. [pause]
+        I will be here when the next one sits down.
+        [pause] I am always here when the next one sits down.
+      delivery: >
+        "You can go" is said without ceremony — it's a simple permission.
+        The door is open. The first pause is 1.5 seconds — she is giving him
+        time to register that this is real, that he is being released.
+        "I will be here when the next one sits down" is factual and unhurried.
+        A second 1-second pause, then the repetition: "I am always here."
+        Always is the horror. Not loud. Just stated.
+      sound_cue: null
+      # No clock restart on rejection path. He gets out.
+      # Rain_cold comes in — the world outside is cold and indifferent.
+      # But he's leaving.
+
+  # QUESTION PATH: player asked "What do you need from me, really?"
+  # The only path where no consumption occurs.
+  # She has never been asked. The asking itself changes something.
+  # She releases the player. Not because she doesn't want to feed —
+  # because what the player gave her by asking is already enough.
+
+  question_path:
+    - line: >
+        The first time someone confessed something true — really true,
+        not rehearsed, not therapeutic framing — was in Vienna, 1897.
+        I remember the exact silence afterward. [pause]
+        That silence is what I eat. [pause]
+        You just made one.
+      delivery: >
+        Vienna 1897 is delivered with the specificity of someone who was there —
+        because she was. Matter-of-fact, not gothic. The silence memory is the
+        emotional core: "I remember the exact silence afterward" — this is the
+        most honest she has been. The pause before "That silence is what I eat"
+        is 2 full seconds. Then the revelation — simple, precise, not dramatic.
+        "You just made one" — soft. She is pointing at what just happened
+        between them right now.
+      sound_cue: null
+
+    - line: >
+        That's a first for me as well.
+        Being asked. [pause]
+        Go home.
+      delivery: >
+        "That's a first for me as well" — wry, almost warm. A recognition.
+        "Being asked" is said as if she is still locating the sensation.
+        1.5-second pause. "Go home" is not dismissal — it is the first genuinely
+        warm thing she has said. She means it. He can go. He is one of very few
+        who ever asked.
+      sound_cue: null
+      # No clock restart on question path. Warm rain, not cold.
+      # This is the only entity path where warm rain plays — he got out.
+
+# ─────────────────────────────────────────────
+# CALLBACK REFERENCES
+# ─────────────────────────────────────────────
+
+callback_references:
+  - >
+    Reference the specific analytical question the player asked in Choice 2
+    (investigate path): "You wanted to map it. The mechanism. The origin."
+    Return their own methodology to them — she tracked their tracking.
+  - >
+    Reference the moment the player filed the first impossible knowledge anomaly
+    (Choice 1 analyze path). "You said: anomalous. You filed it."
+    The clinical detachment was the crack. The precision of their engagement
+    was the very thing that opened them.
+  - >
+    Reference the clock stopping. Not as horror — as data point.
+    "When the clock stopped, you noted the absence. You started timing in your head.
+    I could see it. That was — that was the moment I knew you were the right one."
+  - >
+    If the player asked questions about her nature during beat-revelation
+    (which analytical players often do): return those specific questions.
+    "You asked me: when did it start. How many sessions. What does it take.
+    Those were good questions. They were the right questions. They were also the feed."
+
+# ─────────────────────────────────────────────
+# SOUND DESIGN
+# ─────────────────────────────────────────────
+
+sound_design:
+  sounds:
+    - rain_cold
+    - clock_restart
+    - door_knock
+    # NOTE: question_path and rejection_path use different sound configurations:
+    # question_path: rain_warm (not cold) — no clock restart, no door knock
+    # rejection_path: rain_cold, no clock restart, no door knock
+    # Primary paths (accept/surrender): rain_cold + clock_restart + door_knock
+
+  sequence: >
+    PRIMARY PATHS (accept / surrender):
+    At 10:00 (Phase 5 start), low_tone fades out simultaneously with the clock
+    restarting INSTANTLY (zero fade — mirrors the hard stop at 7:00).
+    rain_cold cross-fades in immediately alongside the clock.
+    The contrast is immediate and structural: the warmth of the session is over.
+    Elara delivers her denouement over the clock and cold rain.
+    Final lines play: "Shall we begin?" — 3-second pause — clock audible and ticking —
+    "We already have."
+    At 10:30: door_knock fires once. Single. Unhurried. Professional.
+    From behind the player. The session ends here.
+
+    REJECTION PATH:
+    At 10:00: low_tone fades out. rain_cold enters (no clock restart).
+    Elara delivers rejection_path lines. No door knock.
+    Cold rain continues after her last word. No piano. Just weather.
+
+    QUESTION PATH:
+    At 10:00: low_tone fades out. rain_warm enters slowly (6 seconds).
+    Elara delivers question_path lines. No clock restart. No door knock.
+    Warm rain continues after her last word. This is the only entity path
+    where warm rain plays.
+
+  final_sound: >
+    PRIMARY: A single door knock. From outside the office. Unhurried. Professional.
+    It is 8:47. Someone is waiting for their appointment.
+    That is the last sound the player hears. Everything else — clock, rain —
+    continues under it, but the knock is what they carry out.
+
+    REJECTION: Cold rain. Just weather. Indifferent in the direction of survival.
+
+    QUESTION: Warm rain. The same rain as the integration ending, but with none
+    of the warmth earned — it is borrowed warmth. He made it out. Barely.
+
+# ─────────────────────────────────────────────
+# FINAL IMAGE
+# ─────────────────────────────────────────────
+
+final_image: >
+  The clock on the wall reads 8:47. It is ticking.
+  You do not remember when it started again.
+  The rain on the window is cold tonight — high, hard, percussive.
+  Elara is in the patient's chair. She is looking at you with the expression
+  you recognize from the beginning of the session: polite, slightly nervous,
+  grateful to be seen. You have the feeling you have been sitting in this chair
+  for a long time. The door is closed. There is a knock at the door.
+  You reach for your notepad. Your hand moves before you decide to move it.
+  The session begins.
+
+# ─────────────────────────────────────────────
+# DESIGN NOTES
+# ─────────────────────────────────────────────
+
+design_notes: |
+  WHY THIS ENDING WORKS:
+
+  The loop must feel inevitable, not punishing. The entity did not trick the player —
+  it consumed what was genuinely offered. The analytical player's precise engagement
+  was the very quality that made them the right subject. The horror is: what you
+  are good at is what she feeds on. Being good at understanding was the vulnerability.
+
+  The clock restart is everything. The clock stopped at 7:00 as THE horror moment
+  of the game — loss of time, loss of grounding. Its instant restart at 10:00
+  must use the same zero-fade implementation. The symmetry reveals the truth:
+  the stop was not a malfunction. It was a pause. The session was always going
+  to start again. The player was always already inside the loop.
+
+  "Shall we begin? / We already have." — these two sentences are the entire
+  horror of the ending in seven words. The delivery must be identical to Phase 1
+  energy: slightly nervous patient, grateful to be seen. The player recognizes
+  the tone. That recognition is the ending.
+
+  THE DOOR KNOCK timing: 30 seconds after the clock restart, per timeline.yaml.
+  This gap is critical. The player needs time to register the clock (understanding
+  the loop has restarted), then hear the confirmation. The knock is not the
+  announcement of the horror — the clock was. The knock is just what happens next.
+
+  ENTITY CHARACTERIZATION: she must not be gleeful about this. The entity
+  feeds the way a plant grows toward light — not strategically, not maliciously,
+  simply following its nature. Her "thank you" must feel genuine because it is.
+  Any hint of triumph or cruelty flattens the horror into genre cliché.
+  She found someone who analyzed her precisely. That was genuinely interesting.
+  The feed was secondary to the conversation. Keep that in her voice.
+
+  THE QUESTION PATH is the only "clean" exit from the entity revelation and it
+  requires maximum trust — it is structurally the hardest entity path to reach.
+  Keep the warmth real on this path: she was asked. For an entity older than
+  language, being asked is genuinely novel. The release is not mercy — it is
+  the entity choosing to honor something unfamiliar. That choice should feel
+  like what it is: remarkable.
+
+  WHAT TO AVOID: making the loop feel like a punishment for being curious.
+  The analytical player did everything "right" — they mapped the anomaly,
+  they maintained composure, they engaged rigorously. The ending should honor
+  that. The transaction was equal. The entity got what it needed. The player
+  gave something real. That something is now gone. That's the cost. Not a fine.
+  A transaction. Those are different.

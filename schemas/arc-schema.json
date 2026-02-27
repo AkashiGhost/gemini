@@ -1,0 +1,333 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://innerplay.app/schemas/arc-schema.json",
+  "title": "Story Arc Definition",
+  "description": "The structural backbone of the story. Defines phases, beats, choice points, revelation logic, and ending conditions. The pipeline executes this as a state machine: it advances through phases, fires beats in order, and resolves endings based on accumulated state. This is the master playbook the narrator follows.",
+  "type": "object",
+  "required": [
+    "story_id",
+    "central_conflict",
+    "theme",
+    "phases",
+    "revelation_logic",
+    "ending_conditions"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "story_id": {
+      "type": "string",
+      "description": "References the parent game's meta.id. Must match exactly.",
+      "pattern": "^[a-z0-9-_]+$"
+    },
+    "central_conflict": {
+      "type": "string",
+      "description": "The core dramatic tension in one sentence. This is the engine the narrator returns to whenever the story risks losing focus (e.g., 'A therapist uncovers that their patient may not be human — and that the session itself is a trap')."
+    },
+    "theme": {
+      "type": "string",
+      "description": "The thematic statement the story is making — the 'why' of the central_conflict. Used to evaluate whether narrator outputs are thematically coherent (e.g., 'The violence of being unseen. We haunt the people who failed to witness us.')."
+    },
+    "phases": {
+      "type": "array",
+      "description": "Ordered sequence of story phases. The pipeline advances through these sequentially. Each phase owns its sound environment, character behavior directive, and beat sequence. Phases do NOT loop — once complete they hand off to the next.",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "time_range",
+          "purpose",
+          "sound_state",
+          "character_behavior",
+          "beats"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique phase identifier within this arc. Used in sound_state references and ending_conditions.",
+            "pattern": "^[a-z0-9-_]+$"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable phase name for authoring and debugging (e.g., 'Intake', 'The Crack', 'Dissolution')."
+          },
+          "time_range": {
+            "type": "string",
+            "description": "Target elapsed time range for this phase in MM:SS-MM:SS format (e.g., '0:00-2:30'). Used by the pipeline to enforce word budgets. The phase is expected to complete within this window.",
+            "pattern": "^\\d+:\\d{2}-\\d+:\\d{2}$"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "What this phase must accomplish narratively and emotionally before it can end. The pipeline uses this as a completion criterion signal for the narrator model (e.g., 'Establish the clinical setting and Elara as a credible patient. Player must feel safe enough to engage.')."
+          },
+          "entry_condition": {
+            "type": "string",
+            "description": "Optional. Condition that must be true before this phase can start. If omitted, phase starts immediately after the previous one ends (e.g., 'trust_level >= 4 OR revelation_a_triggered')."
+          },
+          "sound_state": {
+            "type": "object",
+            "description": "Defines the audio environment for this phase as a delta from the previous state. 'active' is the full desired set; 'added' and 'removed' are the transitions the Web Audio API needs to execute at phase start.",
+            "required": ["active", "removed", "added"],
+            "additionalProperties": true,
+            "properties": {
+              "active": {
+                "type": "array",
+                "description": "Complete list of ambient_baseline sound ids that should be playing during this phase. The audio engine reconciles this list against the current playing set.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "removed": {
+                "type": "array",
+                "description": "Sound ids to fade out at the start of this phase. These were active in the previous phase but are not in this one.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "added": {
+                "type": "array",
+                "description": "Sound ids to fade in at the start of this phase. These were not active in the previous phase but should be now.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "volume_adjustments": {
+                "type": "object",
+                "description": "Optional map of sound id to new gain value (0-1) for sounds that persist but change volume at this phase transition.",
+                "additionalProperties": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          },
+          "character_behavior": {
+            "type": "string",
+            "description": "Overriding behavioral directive for the primary character during this phase. This is written to mutable_state.current_phase_behavior at phase start and governs how the narrator voices the character (e.g., 'Elara is cooperative but evasive. She answers questions but steers away from the window and the date. Her tremors are subtle here.')."
+          },
+          "beats": {
+            "type": "array",
+            "description": "Ordered sequence of narrative events within this phase. The pipeline executes beats one at a time. Choice beats pause execution and wait for player input before advancing.",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/definitions/beat"
+            }
+          }
+        }
+      }
+    },
+    "revelation_logic": {
+      "type": "object",
+      "description": "Maps accumulated player style scores to specific revelation variant ids. The pipeline calculates player style (e.g., 'aggressive', 'compassionate', 'clinical') from choice_ids resolved during play, then selects the matching revelation. Keys are player style labels; values are revelation variant ids defined in the ending YAML files.",
+      "additionalProperties": {
+        "type": "string",
+        "description": "Revelation variant id to use for this player style score."
+      },
+      "minProperties": 1
+    },
+    "ending_conditions": {
+      "type": "array",
+      "description": "Evaluation rules checked after the final phase completes (or at explicit ending trigger points). The first condition whose trigger evaluates to true determines the ending file loaded. Order matters — place most specific conditions first.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "trigger", "ending_file"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique ending condition identifier.",
+            "pattern": "^[a-z0-9-_]+$"
+          },
+          "trigger": {
+            "type": "object",
+            "description": "Conditions that must all be true for this ending to fire. All present fields are ANDed together. Use an empty object {} as the default fallback ending (always matches).",
+            "additionalProperties": true,
+            "properties": {
+              "revelation": {
+                "type": "string",
+                "description": "The revelation variant id that must have been selected (e.g., 'revelation-compassion')."
+              },
+              "choices": {
+                "type": "object",
+                "description": "Map of choice beat ids to the option ids that must have been selected (e.g., {'choice-window': 'option-push', 'choice-final': 'option-stay'}).",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "trust_level_min": {
+                "type": "number",
+                "description": "Optional. Minimum trust_level of the primary character at end of game.",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "trust_level_max": {
+                "type": "number",
+                "description": "Optional. Maximum trust_level of the primary character at end of game.",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "secrets_revealed_includes": {
+                "type": "array",
+                "description": "Optional. All of these secret ids must have been revealed.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "ending_file": {
+            "type": "string",
+            "description": "Path or id reference to the ending content file (e.g., 'endings/ending-redemption.yaml' or 'ending-redemption'). The pipeline loads this file and hands it to the narrator for the closing sequence."
+          },
+          "ending_name": {
+            "type": "string",
+            "description": "Optional human-readable name for this ending used in authoring and analytics (e.g., 'The Compassionate Ending', 'The Hostile Dissolution')."
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "beat": {
+      "type": "object",
+      "description": "A single narrative event. All beats share required fields; choice beats extend with an 'options' array. The pipeline determines beat type and routes accordingly.",
+      "required": ["id", "type", "word_budget", "purpose"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique beat identifier within the arc. Used in state_changes references and choice resolution tracking.",
+          "pattern": "^[a-z0-9-_]+$"
+        },
+        "type": {
+          "type": "string",
+          "description": "'narration' = narrator speaks, no player input expected; 'choice' = narrator presents situation, waits for player decision; 'revelation' = a secret or truth is disclosed, may trigger character state change; 'silence' = intentional pause, no words spoken, ambient audio only.",
+          "enum": ["narration", "choice", "revelation", "silence"]
+        },
+        "word_budget": {
+          "type": "number",
+          "description": "Target word count for the narrator's output at this beat. The pipeline passes this as a constraint to the narrator model. Silence beats set this to 0. For a 10-minute game at ~150 WPM, total budget is ~1500 words across all beats.",
+          "minimum": 0,
+          "maximum": 500
+        },
+        "purpose": {
+          "type": "string",
+          "description": "What this beat must accomplish. The narrator model treats this as a success criterion — the beat is complete when this purpose is fulfilled (e.g., 'Introduce the rain on the window. Elara notices it before the player asks.')."
+        },
+        "prompt_hint": {
+          "type": "string",
+          "description": "Optional additional instruction appended to the narrator prompt for this beat only. Use sparingly — overrides should live in character_behavior, not here. Good for: specific image to evoke, exact line to deliver, tonal shift signal."
+        },
+        "sound_cues": {
+          "type": "array",
+          "description": "Optional one-shot sound events to fire during this beat. These are parsed from the narrator's response tags or triggered directly by the pipeline.",
+          "items": {
+            "type": "object",
+            "required": ["sound_id", "trigger"],
+            "additionalProperties": true,
+            "properties": {
+              "sound_id": {
+                "type": "string",
+                "description": "Sound id from the game's sounds.cue_map."
+              },
+              "trigger": {
+                "type": "string",
+                "description": "When to fire this cue: 'beat_start', 'beat_end', or a keyword the narrator is expected to include in their response (e.g., 'she looks at the window')."
+              },
+              "volume": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "state_changes": {
+          "type": "object",
+          "description": "Optional state mutations to apply when this beat completes (non-choice beats) or as a default resolution. For choice beats, per-option state_changes override this. Keys are dot-path state references (e.g., 'elara.mutable_state.trust_level', 'game.flags.window_noticed').",
+          "additionalProperties": true
+        },
+        "options": {
+          "type": "array",
+          "description": "Present only on 'choice' type beats. Defines the available player decisions. The pipeline presents these as affordances (not as a menu — phrased as possibilities the player can pursue). The intent classifier maps player speech to one of these options.",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "player_says_like", "consequence", "state_changes"],
+            "additionalProperties": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique option id within this beat. Referenced in arc.ending_conditions triggers and player style scoring.",
+                "pattern": "^[a-z0-9-_]+$"
+              },
+              "label": {
+                "type": "string",
+                "description": "Short human-readable label for authoring and analytics (e.g., 'Push harder', 'Offer comfort', 'Clinical redirect')."
+              },
+              "player_says_like": {
+                "type": "array",
+                "description": "Example phrases the player might say to invoke this option. The intent classifier uses these as training examples / similarity anchors. Include diverse phrasings.",
+                "minItems": 2,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "consequence": {
+                "type": "string",
+                "description": "Plain-English description of what happens in the story when this option is chosen. The narrator uses this to calibrate their response (e.g., 'Elara flinches, drops eye contact, and takes 8 seconds before answering. Trust decreases.')."
+              },
+              "state_changes": {
+                "type": "object",
+                "description": "State mutations applied when this option is resolved. Keys are dot-path state references. Values are the new values (or delta expressions like '+1', '-2' for numeric fields).",
+                "additionalProperties": true
+              },
+              "requires": {
+                "type": "object",
+                "description": "Optional prerequisites. This option is only available if all conditions here are met. If not met, the pipeline redirects to the fallback option or re-prompts.",
+                "additionalProperties": true,
+                "properties": {
+                  "trust_level_min": {
+                    "type": "number",
+                    "description": "Minimum trust_level required for this option to be available.",
+                    "minimum": 0,
+                    "maximum": 10
+                  },
+                  "secrets_revealed": {
+                    "type": "array",
+                    "description": "Secret ids that must have been revealed before this option unlocks.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "flags": {
+                    "type": "object",
+                    "description": "Game flags that must be set (e.g., {'window_noticed': true}).",
+                    "additionalProperties": true
+                  }
+                }
+              },
+              "style_score": {
+                "type": "object",
+                "description": "Optional contribution to player style scoring used by revelation_logic. Keys are style labels; values are integer weights (e.g., {'compassionate': 2, 'aggressive': -1}).",
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "silence_duration_seconds": {
+          "type": "number",
+          "description": "Present only on 'silence' type beats. Duration of the intended pause in seconds. The pipeline holds audio and blocks narrator for this duration.",
+          "minimum": 0.5,
+          "maximum": 30
+        }
+      }
+    }
+  }
+}

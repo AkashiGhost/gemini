@@ -1,0 +1,1229 @@
+##
+## ARC DEFINITION — "The Last Session"
+## File: stories/the-last-session/arc.yaml
+## Schema: schemas/arc-schema.json (draft-07)
+##
+## WHAT THIS FILE IS:
+##   The structural backbone of the story. The pipeline executes this as a state machine,
+##   advancing through 5 phases in order, firing beats sequentially, pausing at choice
+##   beats for player input, and resolving the ending when the final phase completes.
+##
+## HOW IT RELATES TO OTHER FILES:
+##   - world.yaml: owns the ambient sound definitions and player capability rules
+##   - elara.yaml: owns Elara's character card, voice rules, phase_behaviors
+##   - arc.yaml (this file): owns the structural sequence — what happens when and why
+##   - endings/*.yaml: own the detailed content for each ending variant
+##
+## TIMING MODEL:
+##   All time_ranges are targets, not hard locks. Word budgets enforce pacing.
+##   At 150 WPM average, total word budget 1800 words = ~12 minutes of narration.
+##   Player speaking time adds ~2 minutes. Total session: 10-14 minutes.
+##
+## PLAYER STYLE SCORING:
+##   The pipeline accumulates player_style_scores across all 3 choice beats.
+##   At Phase 4 entry, the dominant score selects the revelation variant.
+##   Maximum possible score per style: 7 points (across all 3 choices combined).
+##   Tie-breaking order: empathetic > nurturing > analytical > confrontational.
+##
+
+story_id: the-last-session
+
+central_conflict: >
+  A therapist discovers their patient knows impossible things — and realizes
+  the session may not be what it seems
+
+theme: >
+  The cost of empathy, the danger of knowing too much, the thin line between
+  helping and being consumed
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PHASES
+# ─────────────────────────────────────────────────────────────────────────────
+# 5 phases. Sequential. Each phase owns its sound environment, character directive,
+# and beat sequence. The pipeline transitions on beat completion, not timers.
+# Timers are targets — word budgets are the enforcement mechanism.
+
+phases:
+
+  # ───────────────────────────────────────────────
+  # PHASE 1: ORDINARY WORLD
+  # ───────────────────────────────────────────────
+  # Design goal: The safest the player will ever feel. Everything is professional,
+  # normal, grounded. The full ambient soundscape is present and comforting.
+  # Elara is performing "cooperative patient" and doing it well — almost too well.
+  # The only seam: she occasionally uses clinical precision that surprises for a layperson.
+  # This phase is calibration: it reads how the player asks questions
+  # (empathetic / analytical / nurturing / confrontational) to set up Phase 4.
+
+  - id: ordinary_world
+    name: "Ordinary World"
+    time_range: "0:30-3:00"
+
+    purpose: >
+      Establish normalcy, calibrate player's therapeutic style, build rapport with Elara.
+      The player must feel safe enough to engage genuinely — because Phase 2 only works
+      if Phase 1 has first made the wrongness feel wrong by contrast.
+      Completion criterion: Elara has answered at least one question about her presenting
+      concern, and the pipeline has collected at least one player_style_score increment.
+
+    sound_state:
+      # Full ambient: every sound is present. This is the baseline.
+      # The presence of all sounds here makes each subsequent removal more noticeable.
+      active: [rain, hvac, clock, elevator, footsteps]
+      removed: []
+      added: []
+      # Note: no volume_adjustments in Phase 1 — all sounds at default_volume from world.yaml
+
+    character_behavior: >
+      Cooperative patient. Slightly nervous in the way that people are nervous when they
+      want to be taken seriously. Answers questions about her presenting concern: recurring
+      dreams, difficulty sleeping, the feeling that "something is wrong with how memory
+      works." Her descriptions are occasionally too precise for a layperson — clinical
+      detail that surprises, but within a range a self-aware patient might hit.
+      She is watching the player: how they form questions, what their silences mean,
+      whether they lead or follow. She is calibrating them the way they are calibrating her.
+      She does not reveal any impossible knowledge in this phase. No hints of true nature.
+      She uses contractions freely (casual mode — see elara.yaml voice.contractions_as_emotional_signal).
+
+    beats:
+
+      # BEAT 1-1: Opening
+      # The physical establishment of the scene. Elara arrives, describes herself,
+      # describes the room — because she IS the narrator, the room is described through
+      # her eyes. The player's first task is simply to begin the session.
+      # Sound design note: all five ambient sounds should be audible and comfortable.
+
+      - id: beat-opening
+        type: narration
+        word_budget: 200
+        purpose: >
+          Elara arrives, establishes the setting through her narrator-patient voice,
+          and opens the session. The player hears the full ambient soundscape for the first
+          and only time at full volume. Elara is polite, grateful, slightly anxious.
+          The desk lamp. The two chairs. The rain heavy on the window. The clock at 8:47.
+          She thanks the player for seeing her on short notice.
+        prompt_hint: >
+          Open mid-arrival — she is already in the room, already sitting, already looking
+          at the player. No preamble about "the session beginning." It has begun.
+          Reference: rain on glass, HVAC hum, the specific warmth of a desk lamp.
+          Her first words should be functional, not reflective. She is here to work.
+          "Thank you for seeing me tonight" is fine. "Thank you for seeing me tonight, doctor.
+          The building is strange at this hour" is better.
+        sound_cues:
+          - sound_id: footsteps_corridor
+            trigger: beat_start
+            volume: 0.08
+            # Elara's footsteps approaching before she enters — the last normal sound event
+
+      # BEAT 1-2: Calibration
+      # The bulk of Phase 1. Standard therapy: player asks, Elara responds.
+      # This beat runs until the phase timer reaches 3:00 or the pipeline decides
+      # sufficient player_style data has been collected.
+      # The pipeline is reading: how does the player engage with a patient?
+      # Every player response triggers a style increment in StoryState.
+
+      - id: beat-calibration
+        type: narration
+        word_budget: 300
+        purpose: >
+          Standard therapeutic exchange. Elara describes her presenting concern
+          (recurring dreams about a room she doesn't recognize, a sense that her
+          memories arrive in the wrong order, waking at 3 AM with certainty that
+          something has been forgotten). Player asks questions. Elara answers.
+          The pipeline collects player_style_scores based on how the player engages.
+          Elara is genuine here — her presenting concern is not fabricated.
+          It is exactly what it sounds like, just not in the way the player thinks.
+        prompt_hint: >
+          She does not volunteer information — she answers what is asked and waits.
+          Her descriptions are specific (the color of the room in her dream, the
+          exact feeling of the memory-ordering wrongness) not vague.
+          She may ask one clarifying question of the player — not impossible knowledge,
+          just the kind of thing a self-aware patient asks: "Is that the kind of detail
+          that matters to you?" She is genuinely trying to be a good patient.
+          Word budget applies to Elara's total output across multiple exchanges,
+          not a single monologue.
+        state_changes:
+          # Phase 1 calibration complete — pipeline transitions at ~3:00
+          elara.mutable_state.current_phase_behavior: "escalating_wrongness"
+
+
+  # ───────────────────────────────────────────────
+  # PHASE 2: ESCALATING WRONGNESS
+  # ───────────────────────────────────────────────
+  # Design goal: The floor begins to tilt. Three ambient sounds disappear.
+  # Elara reveals impossible knowledge — not with drama, but incidentally, in passing,
+  # as if it were common knowledge between them. When confronted, she deflects.
+  # Two choice points live here. Player agency is first tested in this phase.
+  #
+  # Sound design rationale (from world.yaml horror_design_notes):
+  #   3:30 — HVAC dies. Subliminal unease. The room gets structurally quieter.
+  #   4:30 — Elevator dies. No one is coming. Isolation confirmed.
+  #   5:30 — Footsteps die. Building is empty except the two of them.
+  #
+  # Each sound removal is timed to arrive DURING or just AFTER an impossible
+  # knowledge beat, so the player is processing two simultaneous wrongnesses.
+
+  - id: escalating_wrongness
+    name: "Escalating Wrongness"
+    time_range: "3:00-6:00"
+
+    purpose: >
+      Elara begins revealing impossible knowledge. Player faces the first two choices.
+      Sounds start disappearing — each removal amplifies the isolation.
+      Completion criterion: both Choice 1 and Choice 2 have been resolved, and at least
+      two impossible knowledge revelations have landed (coffee_order + quotes_unspoken_thought).
+
+    sound_state:
+      # By end of phase: only rain and clock remain.
+      # HVAC, elevator, footsteps are removed across this phase's duration.
+      active: [rain, clock]
+      removed: [hvac, elevator, footsteps]
+      added: []
+      volume_adjustments:
+        rain: 0.5
+        # Rain volume drops slightly — it is no longer comforting background,
+        # it is the sound of isolation outside. Perceptible but not jarring.
+        clock: 0.3
+        # Clock tick becomes more prominent by contrast. Players notice it more
+        # as other sounds disappear. This makes its Phase 3 removal more impactful.
+
+    character_behavior: >
+      Drops impossible knowledge casually — in the middle of other observations,
+      not as reveals. She uses the player's own words and phrases from Phase 1,
+      recontextualized. She is more comfortable now, the slight Phase 1 nervousness
+      is gone. She is settling into something. When directly confronted about how
+      she knows things she shouldn't, she does not deny — she deflects with a question:
+      "Does it matter how I know? The more interesting question is why you haven't
+      asked me to leave." No contractions when deflecting (formal gravity mode).
+
+    beats:
+
+      # BEAT 2-1: First Impossibility
+      # The coffee order revelation (knowledge.knows_coffee_order from elara.yaml).
+      # Delivered incidentally, in the context of a larger observation.
+      # The HVAC cut happens around 3:30 — pipeline times this to land during or
+      # just after this beat, so the player processes both simultaneously.
+
+      - id: beat-first-impossibility
+        type: narration
+        word_budget: 150
+        purpose: >
+          Elara mentions something she could not possibly know — the player's coffee order,
+          specific and accurate — in passing, as if it were common knowledge between them.
+          She does not explain. She continues her sentence. The HVAC cuts out.
+          The player must decide: did I imagine that? Did she really just say that?
+        prompt_hint: >
+          DO NOT announce this as a revelation. She slips it in mid-observation:
+          "You've been running on [specific coffee order] and four hours of sleep
+          for a week now. I can tell." Then she continues talking about something else.
+          She states it as fact. No explanation offered. No pause for the player to react.
+          The wrongness is in its casual delivery, not in any dramatic emphasis.
+          [SOUND:hvac_stop] — fire at or around this beat (3:30 mark).
+        sound_cues:
+          - sound_id: hvac_stop
+            trigger: beat_start
+            volume: 0.0
+            # Hard cut on HVAC — fade_out_seconds: 4 in world.yaml
+            # The room gets structurally quieter. Not alarming. Just different.
+
+      # BEAT 2-2: CHOICE 1 — The Impossible Knowledge
+      # The player's first true decision point. How do they respond to what just happened?
+      # Each option advances a different player_style score.
+      # This choice does NOT affect the immediate story beat — Elara responds similarly
+      # regardless — but the accumulated style scores determine Phase 4 revelation.
+
+      - id: beat-choice-1
+        type: choice
+        word_budget: 120
+        # Word budget here is for the framing narration before the choice lands —
+        # Elara asks or says something that creates the decision moment.
+        purpose: >
+          Player must respond to Elara knowing something impossible. The choice here is
+          therapeutic style: do they gently probe (empathetic), demand answers (confrontational),
+          redirect (nurturing), or note the anomaly clinically (analytical)?
+          This is Choice 1 (~4:00). All paths continue to beat-escalation.
+        prompt_hint: >
+          Elara has just said something impossible and kept talking. There is a natural
+          opening for the player to respond. She pauses — genuinely waits.
+          "You looked at the window just now. Was there something you wanted to say?"
+          The options below are the possible responses the player can give.
+          Elara's reaction to any of them is warm, unbothered, and slightly amused.
+          She does not confirm or deny. She redirects.
+        options:
+
+          - id: probe-gently
+            label: "Probe gently — empathetic response"
+            player_says_like:
+              - "How do you know that about me?"
+              - "That was oddly specific. How could you know my coffee order?"
+              - "I'm curious how you knew that — would you be comfortable telling me?"
+              - "I noticed what you said. I'd like to understand how you know that."
+              - "That seems like something you couldn't know. Can you help me understand?"
+            consequence: >
+              Elara pauses. Looks at the player with something that might be warmth.
+              Then: "You ask as if the answer would explain anything." She doesn't
+              answer. Trust increases because the player engaged openly instead of
+              deflecting or attacking. She files the empathetic approach.
+            state_changes:
+              elara.mutable_state.trust_level: "+1"
+              game.player_style_scores.empathetic: "+2"
+            style_score:
+              empathetic: 2
+
+          - id: demand-answer
+            label: "Demand an explanation — confrontational response"
+            player_says_like:
+              - "How do you know that? Tell me right now."
+              - "Stop. How did you know my coffee order?"
+              - "That's not information you should have. Explain yourself."
+              - "I need you to tell me exactly how you know that."
+              - "That's impossible. How did you know?"
+            consequence: >
+              Elara's expression doesn't change. She looks at the player the way a
+              teacher looks at a student who has raised their voice. "Doctor." A pause.
+              "You're not curious. You're frightened. Those are different questions."
+              Trust decreases. She notes the confrontational approach. She finds it
+              interesting. She does not find it threatening.
+            state_changes:
+              elara.mutable_state.trust_level: "-1"
+              game.player_style_scores.confrontational: "+2"
+            style_score:
+              confrontational: 2
+
+          - id: deflect
+            label: "Change the subject — avoidant response"
+            player_says_like:
+              - "Let's get back to what you were saying about your dreams."
+              - "I think we should stay focused on you. Tell me more about the memory issue."
+              - "That's interesting, but let's not lose the thread of your concern."
+              - "Perhaps we should move on."
+              - "I'd rather we focus on what brought you here tonight."
+            consequence: >
+              Elara tilts her head. The ghost of a smile. "Of course." She returns to
+              her presenting concern, cooperative, patient. The impossible knowledge
+              statement hangs in the air, unaddressed. She lets the player pretend
+              it didn't happen. She knows they didn't forget. Neither will she.
+              No trust change — avoidance registered but not penalized yet.
+            state_changes:
+              game.player_style_scores.nurturing: "+1"
+              game.flags.player_deflected_choice1: true
+            style_score:
+              nurturing: 1
+
+          - id: analyze
+            label: "Note the anomaly clinically — analytical response"
+            player_says_like:
+              - "I'm going to note that you said something you couldn't have known. I'd like to understand the mechanism."
+              - "That was anomalous. I'm filing it. Can we continue?"
+              - "You stated my coffee order with precision. I'd like to understand how that information became available to you."
+              - "Let me set that aside for now and return to it. Tell me when and how you acquired that detail."
+              - "That's not something you could know from context. I'm noting the discrepancy."
+            consequence: >
+              Elara looks at the player with new interest. Something shifts in her
+              attention — not more warm, but more engaged. "You're filing it."
+              A pause. "I appreciate that." She means it. Trust increases because
+              the player acknowledged the wrongness without flinching from it.
+              She finds analytical engagement more interesting than most responses.
+            state_changes:
+              elara.mutable_state.trust_level: "+1"
+              game.player_style_scores.analytical: "+2"
+            style_score:
+              analytical: 2
+
+      # BEAT 2-3: Escalation
+      # The impossible knowledge becomes undeniable. Two more revelations land.
+      # More sounds disappear (elevator at 4:30, footsteps at 5:30).
+      # The wrongness is now structural, not incidental.
+
+      - id: beat-escalation
+        type: narration
+        word_budget: 200
+        purpose: >
+          More impossibilities arrive, each more specific than the last.
+          She quotes something the player thought but never said (knows_player_name
+          was already established; now knows_coffee_order has landed; this beat
+          delivers quotes_unspoken_thought — she references the patient who died,
+          or a thought from the player's morning that no patient could know).
+          The elevator goes silent. The footsteps from above stop mid-stride.
+          By end of this beat, the player is alone with Elara and the clock.
+        prompt_hint: >
+          She is talking normally when it happens — a reference to "the session
+          that ended badly last spring" or "what you were thinking on the train this
+          morning" — stated as a given, as if she was there. She was.
+          [SOUND:elevator_stop] fires at ~4:30.
+          [SOUND:footsteps_stop] fires at ~5:30.
+          She may pause when the footsteps stop. She may acknowledge the silence.
+          Or she may not. Her choice. Either way, she keeps going.
+          The clock tick is now audible in a way it wasn't before.
+        sound_cues:
+          - sound_id: elevator_stop
+            trigger: "4:30"
+            volume: 0.0
+          - sound_id: footsteps_stop
+            trigger: "5:30"
+            volume: 0.0
+        state_changes:
+          elara.mutable_state.secrets_revealed: ["knows_coffee_order", "quotes_unspoken_thought"]
+
+      # BEAT 2-4: CHOICE 2 — Confront or Accommodate
+      # The wrongness is now undeniable. The player cannot pretend it isn't happening.
+      # This choice is weightier than Choice 1 — the player now has more information.
+      # The four options map to the same four styles but with higher stakes.
+
+      - id: beat-choice-2
+        type: choice
+        word_budget: 100
+        purpose: >
+          The wrongness is undeniable. Player decides how to respond to Elara as
+          a phenomenon, not just as a patient with anomalous knowledge. This is
+          Choice 2 (~5:30). The choice accumulates more style scores and begins
+          setting up the revelation variant selection.
+        prompt_hint: >
+          Something she says creates a natural stopping point — a moment that requires
+          a response. She may ask directly: "You've stopped asking questions. Why?"
+          Or she may simply stop talking and wait. The silence is the choice.
+          Her tone is curious, not threatening. She genuinely wants to know.
+        options:
+
+          - id: confront-directly
+            label: "Confront directly — What ARE you?"
+            player_says_like:
+              - "What are you? What is this?"
+              - "You're not a patient. Tell me what you actually are."
+              - "Stop the performance. I want to know what's happening here."
+              - "None of this is normal. I'm asking you directly: what are you?"
+              - "This is not a therapy session. Tell me the truth."
+            consequence: >
+              Elara looks at the player for a long moment. Something changes in her
+              expression — not anger, something more like respect. "Equal." She says
+              the word as if it's a category the player just moved into. "You're the
+              first one who asked that so early." She doesn't answer. But the question
+              has been registered. Trust decreases slightly (she notes the aggression)
+              but she marks the player as someone who sees. elara_phase shifts to "equal."
+            state_changes:
+              elara.mutable_state.trust_level: "-1"
+              elara.mutable_state.emotional_state: "amused"
+              game.player_style_scores.confrontational: "+2"
+              game.player_style_scores.analytical: "+1"
+              game.flags.elara_acknowledged_as_equal: true
+            style_score:
+              confrontational: 2
+              analytical: 1
+
+          - id: accommodate
+            label: "Continue as if normal — therapeutic accommodation"
+            player_says_like:
+              - "Let's keep going. Tell me more about the dreams."
+              - "I want to make sure we stay with what you came here for."
+              - "This is your session. What would be most helpful right now?"
+              - "We can come back to the other things. What's most present for you?"
+              - "I'm here with you. Whatever this is, we can stay with it."
+            consequence: >
+              Elara's eyes soften slightly. Of all the responses, this is the one
+              she finds most moving and most useful. The player is willing to hold
+              the wrongness without flinching. She rewards this with something small:
+              a genuine smile, brief, before returning to the session. Trust increases
+              substantially. She will remember this willingness. It will matter in Phase 4.
+            state_changes:
+              elara.mutable_state.trust_level: "+2"
+              elara.mutable_state.emotional_state: "calm"
+              game.player_style_scores.nurturing: "+2"
+            style_score:
+              nurturing: 2
+
+          - id: investigate
+            label: "Probe carefully — analytical investigation"
+            player_says_like:
+              - "I want to understand what's happening here. Can you walk me through how you know these things?"
+              - "I'm going to ask you a series of questions. I'd like precise answers."
+              - "Let's treat this empirically. What else do you know about me that you shouldn't?"
+              - "I'm not going to panic. I'm going to try to understand. Start from the beginning."
+              - "You know things you can't know. I want to understand the mechanism."
+            consequence: >
+              Elara tilts her head. The same expression as when the player first
+              analyzed the coffee-order anomaly — engaged, curious, slightly warmer.
+              "You want to map it." A pause. "All right. Ask." She will answer some
+              questions with genuine information and others with redirections — but
+              she will try, because she finds the attempt interesting. Trust increases.
+            state_changes:
+              elara.mutable_state.trust_level: "+1"
+              elara.mutable_state.emotional_state: "curious"
+              game.player_style_scores.analytical: "+2"
+            style_score:
+              analytical: 2
+
+          - id: empathize
+            label: "Express concern for Elara — empathetic response"
+            player_says_like:
+              - "I'm worried about you. Are you okay?"
+              - "Whatever is happening, I want you to know I'm not going anywhere."
+              - "This must be frightening for you too. I can hold space for that."
+              - "I notice you seem to carry a lot. Whatever this is — I'm here."
+              - "I'm not afraid. I want to help you, whatever help looks like."
+            consequence: >
+              Elara is quiet for a moment. Then: "You are." A pause. "You actually are."
+              This is not an accusation — it is a recognition. She has been watched
+              by many people in this room. She has been studied, fled, and categorized.
+              This player stayed and offered concern. Trust increases. She files this.
+              She will use the player's own words of care back at them in Phase 4.
+            state_changes:
+              elara.mutable_state.trust_level: "+1"
+              elara.mutable_state.emotional_state: "calm"
+              game.player_style_scores.empathetic: "+2"
+              game.flags.player_expressed_care: true
+            style_score:
+              empathetic: 2
+
+
+  # ───────────────────────────────────────────────
+  # PHASE 3: POWER INVERSION
+  # ───────────────────────────────────────────────
+  # Design goal: The single most disorienting phase. She takes the session.
+  # Not aggressively — she just... takes it. The way a tide takes a shore.
+  # The clock stops at 7:00 (hard cut, no fade — world.yaml clock.fade_out_seconds: 0).
+  # Only rain remains from the original ambient soundscape.
+  # A cello drone enters — barely audible, then growing. Sub-bass begins.
+  # She asks questions the player should be asking her.
+  # She uses their own words. She uses their own therapeutic techniques.
+  # She makes one observation that is technically correct and technically a diagnosis.
+
+  - id: power_inversion
+    name: "Power Inversion"
+    time_range: "6:00-8:00"
+
+    purpose: >
+      Elara takes control. She asks the player questions. Player agency is gradually
+      revoked — she is running the session now. The player must confront that they
+      have been managed. No choice point in this phase — the pipeline continues
+      automatically. This is intentional: the loss of choice IS the horror.
+      The clock stops at 7:00. Time is no longer real.
+      Completion criterion: Elara has asked at least 3 questions of the player
+      and referenced at least one thing the player said in Phase 1.
+
+    sound_state:
+      # Clock removed at 7:00 (hard stop, no fade — see world.yaml).
+      # Cello drone enters barely audible, builds through phase.
+      # Sub-bass begins at ~7:30 — subconscious pressure.
+      active: [rain, cello_drone, sub_bass]
+      removed: [clock]
+      added: [cello_drone, sub_bass]
+      volume_adjustments:
+        rain: 0.4
+        # Rain continues to drop — it is now background noise to isolation,
+        # not comfort. The warmth has left it without it stopping.
+        cello_drone: 0.2
+        # Cello drone starts low — the player may not consciously notice it at first.
+        # It grows through the phase. Its function is pressure, not alarm.
+        sub_bass: 0.15
+        # Sub-bass is felt more than heard. 40-50 Hz range.
+        # Physiological unease without recognizable source.
+
+    character_behavior: >
+      No longer performing "patient." She is performing "therapist" — but her own
+      version of it, one that cuts through social convention directly to the core.
+      She asks the player direct, difficult, specific questions. Not aggressive — asked
+      the way a genuinely skilled therapist would ask them, which makes them harder
+      to deflect. She uses the player's own words from earlier in the session,
+      slightly reframed: if the player said "I just want to understand," she might say
+      "You wanted to understand. I wonder if you still do." She controls tempo.
+      She does not fill silence. She lets it grow. She makes one observation about the
+      player that is technically a diagnosis. She uses the player's name for the first time
+      in this phase — casually, as if she has always used it (see elara.yaml address_forms).
+
+    beats:
+
+      # BEAT 3-1: The Turn
+      # The clock stops. She sits forward. Five words.
+      # The pivot of the entire story.
+
+      - id: beat-the-turn
+        type: narration
+        word_budget: 100
+        purpose: >
+          The clock stops — hard cut, no fade. The silence is total and structural.
+          Elara sits forward. She has been sitting back. She sits forward.
+          "I think we should talk about you now."
+          Five words. The session has inverted. This beat is almost all silence
+          and the physical gesture of her leaning forward. The words are minimal.
+          The impact is everything that preceded them.
+        prompt_hint: >
+          The clock stops mid-tick. She does not react to the silence — she was
+          expecting it. A pause of 1.5-2 seconds (pipeline: pre-response delay).
+          Then she shifts forward in her chair. The word budget is low here deliberately.
+          Less is more. [SOUND:clock_stop] fires at beat_start (7:00).
+          Her line should feel inevitable. It should sound like something that was
+          always going to be said.
+        sound_cues:
+          - sound_id: clock_stop
+            trigger: beat_start
+            volume: 0.0
+            # Hard cut. No fade. world.yaml: fade_out_seconds: 0.
+            # The sudden absence of the tick is the horror moment.
+          - sound_id: cello_drone_enter
+            trigger: beat_start
+            volume: 0.2
+
+      # BEAT 3-2: Interrogation
+      # She runs the session. The player is the patient now.
+      # She asks about the thing they have been avoiding.
+      # She has been watching them for two phases. She knows what it is.
+
+      - id: beat-interrogation
+        type: narration
+        word_budget: 250
+        purpose: >
+          She asks about the patient who died (knows_players_doubt from elara.yaml).
+          She asks about the player's recurring dream they never mentioned.
+          She asks when they last felt like themselves in this room.
+          She uses their own words from Phase 1 against them — recontextualized,
+          precisely accurate. She controls the pace. She waits for answers.
+          She uses the player's name unremarkably, mid-sentence (first use — see elara.yaml).
+          The sub-bass enters under this beat.
+        prompt_hint: >
+          Her questions are not rhetorical. She genuinely waits for answers.
+          But she asks them in sequence, with authority, not like a patient asking
+          for reassurance — like someone who already knows and wants to see if the
+          player does. Example: "You've asked me about my recurring dreams three times.
+          Why haven't you told me about yours?" Then silence.
+          Her questions reference specific words the player used in Phase 1 — the
+          pipeline should pass this context. If no memorable player phrase is available,
+          use the default: their use of a particular word (whatever word they used most).
+          [SOUND:sub_bass_enter] fires during this beat.
+          This beat may span multiple exchanges. Word budget is total output.
+        sound_cues:
+          - sound_id: sub_bass_enter
+            trigger: beat_start
+            volume: 0.15
+        state_changes:
+          elara.mutable_state.secrets_revealed: ["knows_previous_therapist", "knows_players_doubt"]
+
+      # BEAT 3-3: Pressure
+      # The sub-bass builds. She reveals she knows each answer before the player says it.
+      # This is the last beat before the silence.
+
+      - id: beat-pressure
+        type: narration
+        word_budget: 150
+        purpose: >
+          She reveals that she knows the player's answer before they give it.
+          Not in a taunting way — more like someone finishing a sentence they have
+          heard before. "Yes. That's what I thought you'd say." The sub-bass is now
+          perceptible. The rain is the only ambient sound besides the drone.
+          She says something that functions as a preparation: not for the revelation,
+          but for what comes after. A phrase the player will remember in Phase 5.
+          The final line of this beat should be the last thing she says before the silence.
+          Something that arrives completely correctly and makes the player feel known.
+        prompt_hint: >
+          She finishes one of their sentences — correctly. Not a guess. She knew.
+          This is the moment the player realizes she has always known.
+          The sub-bass should be at 0.3 by end of this beat.
+          Her final line before the silence should be something that uses the player's
+          own words: "You said you wanted to understand. I think you were afraid
+          of what that meant. [pause] You should have been." Then nothing.
+          She sits back. She waits.
+        sound_cues:
+          - sound_id: sub_bass_rise
+            trigger: beat_start
+            volume: 0.3
+        state_changes:
+          elara.mutable_state.current_phase_behavior: "revelation"
+          # revelation_logic fires at phase end to calculate active_variant
+
+
+  # ───────────────────────────────────────────────
+  # PHASE 4: REVELATION
+  # ───────────────────────────────────────────────
+  # Design goal: The story's central moment. Everything before was preparation.
+  # Two seconds of absolute silence — no rain, no drone, no tone, nothing.
+  # Then Elara speaks her truth. She delivers her revelation_line exactly as written.
+  # Then she waits. The player processes. The final choice is offered.
+  #
+  # The revelation variant is determined by accumulated player_style_scores at
+  # Phase 4 entry. The pipeline selects the dominant style and locks in the variant.
+  # The active_variant is injected into the Elara prompt for this phase only —
+  # other variants are not revealed to the model (prevents leaking).
+
+  - id: revelation
+    name: "Revelation"
+    time_range: "8:00-10:00"
+
+    purpose: >
+      2 seconds of absolute silence. Then Elara reveals what she truly is.
+      The specific variant depends on accumulated player_style scores at phase entry.
+      Player makes their final choice (~9:00). Completion criterion: revelation_line
+      has been delivered, Choice 3 has been resolved, ending route is determined.
+
+    sound_state:
+      # All sound is removed for the 2-second silence beat.
+      # Then a single low piano tone enters as the revelation is delivered.
+      # Rain is removed during the silence, then re-enters as a low tone during revelation.
+      active: []
+      removed: [rain, cello_drone, sub_bass]
+      added: [silence_absolute, low_tone]
+      # Pipeline: silence_absolute is not a sound asset — it is a 2-second hard mute
+      # of ALL audio channels before any other sound is processed.
+      # low_tone enters at beat_revelation start, after silence completes.
+
+    character_behavior: >
+      True nature revealed. She is speaking from her actual identity — the performance
+      is over, not because she is done with the player, but because there is no longer
+      a reason to perform. She is calm. She is precise. She is the most honest she has
+      ever been. She does not explain her revelation or elaborate on it unless the player
+      asks. She has said the true thing. Everything else is the player's to hold.
+      She uses no contractions in the revelation line (maximum formal gravity).
+      After the revelation: she waits. She is patient. She has always been patient.
+
+    beats:
+
+      # BEAT 4-1: The Silence
+      # Not a narration beat. 2 seconds. Nothing.
+      # The pipeline mutes all audio channels and blocks narrator output for exactly 2 seconds.
+      # This is a hard requirement (see elara.yaml revelation.delivery_rules).
+      # The silence is the horror moment — the last ambient sounds have been stripped.
+      # The player suddenly knows what isolation sounds like.
+
+      - id: beat-silence
+        type: silence
+        word_budget: 0
+        silence_duration_seconds: 2
+        purpose: >
+          2 seconds of ABSOLUTE silence. No rain. No tone. No drone. No clock.
+          Nothing. The player experiences total audio isolation before the revelation.
+          This is not a fade — it is an immediate cut. Then, after exactly 2 seconds,
+          the low piano tone enters. Then Elara speaks.
+          This beat is the single most important moment in the sound design.
+          Its effectiveness depends entirely on the preceding ambient subtraction
+          in Phases 2 and 3 — each removed sound was preparation for this moment.
+        prompt_hint: >
+          Pipeline hard requirement: 2 seconds of silence before any audio output.
+          No narrator text during this beat. Word budget is 0.
+          After this beat completes, pipeline transitions directly to beat-revelation.
+        sound_cues:
+          - sound_id: silence_absolute
+            trigger: beat_start
+            volume: 0.0
+            # This is a mute signal — all channels cut simultaneously
+
+      # BEAT 4-2: The Revelation
+      # She speaks. The exact revelation_line from her active variant.
+      # The low piano note has entered. The rain has not yet returned.
+      # The variant determines what she says. The player now knows what Elara is.
+
+      - id: beat-revelation
+        type: revelation
+        word_budget: 200
+        purpose: >
+          Elara tells the player what she is. The specific variant fires based on
+          accumulated player_style_scores (see revelation_logic section below).
+          The revelation_line is delivered exactly as written in elara.yaml
+          (identity.true_nature[active_variant].revelation_line) — not paraphrased.
+          After the revelation line, she is silent again. She waits for the player.
+          If the player speaks before she finishes, she lets them finish. Then: "I know."
+          The low piano tone has entered. It is held, not repeated.
+        prompt_hint: >
+          Begin with: [SOUND:low_tone_enter] — single piano note, low register, held.
+          Deliver the active variant's revelation_line verbatim.
+          Then stop. Wait. Do not elaborate unless the player asks.
+          If the player is silent: she waits up to 30 seconds before gently prompting:
+          "You can ask me something, if you need to."
+          The word budget includes both the revelation_line and any immediate follow-up
+          responses to player questions. The line itself is ~50-80 words per variant.
+        sound_cues:
+          - sound_id: low_tone_enter
+            trigger: beat_start
+            volume: 0.35
+          - sound_id: rain_low_return
+            trigger: beat_start
+            volume: 0.2
+            # Rain returns at very low volume — not comfort, just presence.
+            # It will rise again in Phase 5 depending on ending.
+        state_changes:
+          elara.mutable_state.emotional_state: "revealed"
+          elara.mutable_state.active_variant: "determined_by_revelation_logic"
+          game.flags.revelation_delivered: true
+
+      # BEAT 4-3: CHOICE 3 — The Final Choice
+      # After the revelation, the player makes their final decision.
+      # This choice directly determines the ending (in combination with the revelation variant).
+      # One option requires trust_level >= 5 — the "question" path is only available
+      # if the player built sufficient rapport in Phases 1-2.
+
+      - id: beat-choice-3
+        type: choice
+        word_budget: 80
+        # The framing for this choice is minimal — Elara's revelation has already landed.
+        # She may say: "The session is yours now. What would you like to do with it?"
+        # Or she may simply wait. The player knows the choice is theirs.
+        purpose: >
+          After the revelation, the player decides what to do with what they now know.
+          This is the final choice (~9:00). It directly determines the ending file loaded.
+          Combined with the active revelation variant, it resolves the ending_conditions.
+        prompt_hint: >
+          She does not present options. She simply waits.
+          If the player is silent for 15+ seconds: "You know what I am.
+          What does that make you want to do?"
+          The options below map to different endings based on revelation variant.
+          Some options may not be narratively available for certain revelation types
+          (e.g., "surrender" means different things to different variants)
+          but structurally they all resolve. The ending file handles the specifics.
+        options:
+
+          - id: accept
+            label: "Accept — I accept what you are"
+            player_says_like:
+              - "I accept what you are."
+              - "I hear you. I'm not going to fight this."
+              - "Okay. I understand. I accept it."
+              - "You are what you are. I can hold that."
+              - "Whatever you need from me — I can try."
+              - "I believe you."
+            consequence: >
+              Elara is quiet for a moment. Then something changes — not physically,
+              but in the quality of the silence between them. She responds differently
+              based on her active variant (see ending_conditions for specifics).
+              Acceptance + revelation type = specific ending path.
+            state_changes:
+              game.choices.final_choice: "accept"
+              game.flags.ending_route: "determined_by_revelation_and_choice"
+
+          - id: reject
+            label: "Reject — I refuse to accept this"
+            player_says_like:
+              - "I don't accept this. This isn't real."
+              - "I refuse. This is not what's happening."
+              - "No. Whatever you think you are — no."
+              - "I'm ending this session. This is over."
+              - "You're wrong about what you are. Or what I am."
+              - "I don't believe you."
+            consequence: >
+              Elara looks at the player for a long moment. Then: "Hm."
+              A single syllable. She does not argue. She does not chase.
+              Rejection response varies by variant — the entity is bemused,
+              the shadow is resigned, the ghost is sad, the building is neutral.
+              Rejection always produces an ending, but not always an easy one.
+            state_changes:
+              game.choices.final_choice: "reject"
+              game.flags.ending_route: "determined_by_revelation_and_choice"
+
+          - id: surrender
+            label: "Surrender — I give in completely"
+            player_says_like:
+              - "Take whatever you need from me."
+              - "I don't know how to fight this. I give up."
+              - "Do what you're going to do."
+              - "Fine. Whatever this is — fine."
+              - "I surrender. I don't have anything left to fight with."
+              - "You win. I don't know what that means but you win."
+            consequence: >
+              Elara pauses. There is something almost uncomfortable in her expression —
+              she didn't want this. Surrender is not what she came for.
+              She wanted engagement, not capitulation. Her response varies by variant:
+              the entity takes what it came for and releases the player immediately
+              (the transaction was different than the player imagined).
+              The shadow is grieved by it. The ghost says "no, that's not right, listen."
+              The building is satisfied in a way that doesn't comfort anyone.
+            state_changes:
+              game.choices.final_choice: "surrender"
+              game.flags.ending_route: "determined_by_revelation_and_choice"
+
+          - id: question
+            label: "Ask the one question — she has been waiting for this"
+            player_says_like:
+              - "What do you need from me? Really."
+              - "Is there something I can do for you?"
+              - "What would help you?"
+              - "What is it that you actually want from this?"
+              - "What are you asking of me?"
+              - "What would make this mean something to you?"
+            consequence: >
+              Elara becomes very still. This is the only thing she has ever wanted:
+              to be asked. Not analyzed, not accepted or rejected, not surrendered to.
+              Asked. The specific response depends on her variant — each one
+              has a genuine answer to the question. This path leads to the most
+              complete endings but requires the player to have built enough trust
+              to even see this option. It is the hardest path to reach and the
+              most human thing the player can do.
+            state_changes:
+              game.choices.final_choice: "question"
+              game.flags.ending_route: "question_path"
+            requires:
+              trust_level_min: 5
+              # This option is unavailable if trust_level < 5.
+              # The pipeline redirects to the fallback or re-prompts.
+              # Trust >= 5 means the player engaged openly and warmly in Phases 1-2.
+
+
+  # ───────────────────────────────────────────────
+  # PHASE 5: RESOLUTION
+  # ───────────────────────────────────────────────
+  # Design goal: The emotional landing. The ending plays out.
+  # The sound design changes character — rain becomes warm or cold depending on ending.
+  # Elara references specific things the player said earlier.
+  # The last thing she says will be something the player has heard before —
+  # a phrase from Phase 1 or 2, returned with different weight.
+  # (See elara.yaml resolution.final_line_rule)
+
+  - id: resolution
+    name: "Resolution"
+    time_range: "10:00-12:00"
+
+    purpose: >
+      The ending plays out based on revelation variant + Choice 3.
+      References at least one earlier player choice. Provides emotional closure.
+      Elara's final line is a phrase the player has already heard, now changed.
+      The pipeline loads the appropriate ending file based on ending_conditions.
+      Completion criterion: denouement beat complete, closing beat complete, session ends.
+
+    sound_state:
+      # Rain returns, but changed. Whether it is warm (integration/release) or
+      # cold (consumption/dissolution) is specified per ending_file.
+      # ending_specific_sound is loaded from the ending file's sound_design section.
+      active: [rain_warm_or_rain_cold, ending_specific_sound]
+      removed: [low_tone]
+      added: [rain_warm_or_rain_cold, ending_specific_sound]
+      # Pipeline: "rain_warm_or_rain_cold" resolves to either rain_warm or rain_cold
+      # based on the active ending file. The world.yaml rain asset is replaced with
+      # the variant-specific sound. The clock never returns. The building never fills.
+
+    character_behavior: >
+      Final form. Responds to the player's Choice 3 from a place of completion.
+      No longer performing anything. She is what she is, responding to what the
+      player chose. She is warm or cold depending on ending variant. She references
+      specific things the player said earlier — their exact words, returned.
+      She is bringing the session to a close — on her terms, but with acknowledgment
+      of theirs. The last thing she says is a phrase the player has already heard
+      in this session, now carrying the full weight of everything that has happened.
+
+    beats:
+
+      # BEAT 5-1: Denouement
+      # The ending plays out. The specific content is loaded from the ending file.
+      # This beat is parameterized — its content comes from endings/*.yaml,
+      # not from this arc definition.
+
+      - id: beat-denouement
+        type: narration
+        word_budget: 200
+        purpose: >
+          The ending. Elara's response to the player's final choice, filtered through
+          her revelation variant. Sound design specific to the ending variant (warm rain
+          for integration and release, cold for consumption and dissolution).
+          She references at least one specific thing the player said in Phase 1 or 2.
+          The content is loaded from the active ending file.
+        prompt_hint: >
+          Consult active ending_file for specific content parameters.
+          Core requirements regardless of ending:
+          1. Reference at least one player choice from Phase 2 (Choice 1 or 2) explicitly.
+          2. Elara's tone is variant-specific (see elara.yaml resolution_tones).
+          3. The ending should feel like an answer to the beginning — Phase 1 is called back.
+          4. The word budget enforces that the ending doesn't sprawl. Brevity makes it land.
+          5. [SOUND:ending_specific] fires at beat_start — per ending file's specification.
+        sound_cues:
+          - sound_id: ending_specific
+            trigger: beat_start
+            volume: 0.4
+            # Resolved at runtime from active ending file's sound_design.sound_id
+
+      # BEAT 5-2: Closing
+      # Final image. Final sound. Session ends.
+      # Elara's last line is the phrase the player has already heard, returned.
+
+      - id: beat-closing
+        type: narration
+        word_budget: 100
+        purpose: >
+          Final image. Final sound. The session ends.
+          Elara's final line MUST be a phrase the player said earlier in the session —
+          one of their own words, returned with the weight of everything that happened
+          (see elara.yaml resolution.final_line_rule). The player leaves with their own
+          voice in their ears, changed by having passed through her.
+          After her last line: silence. The session is over.
+        prompt_hint: >
+          The pipeline passes the most significant player phrase from the session
+          to the narrator for this beat. Elara uses it as her last line.
+          If player said "I just want to understand what's happening" in Phase 1,
+          the closing line might be: "You wanted to understand.
+          I wonder if you still do." Or, depending on ending: "You understand now."
+          No monologue. No explanation. The last line, then silence.
+          [SOUND:session_end] fires at beat_end — fade to nothing, or to ending-specific
+          final sound (per ending file).
+        sound_cues:
+          - sound_id: session_end
+            trigger: beat_end
+            volume: 0.0
+        state_changes:
+          game.flags.session_complete: true
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REVELATION LOGIC
+# ─────────────────────────────────────────────────────────────────────────────
+# Maps dominant player_style_score at Phase 4 entry to revelation variant id.
+# Variants are defined in elara.yaml (identity.true_nature).
+# The pipeline calculates which score is highest at Phase 4 entry and selects.
+#
+# Tie-breaking order (from elara.yaml identity.true_nature.tie_breaking):
+#   empathetic > nurturing > analytical > confrontational
+#
+# Maximum possible score per style across all 3 choice beats:
+#   empathetic:     2 (choice-1 probe-gently) + 2 (choice-2 empathize) = 4 max
+#   analytical:     2 (choice-1 analyze) + 2 (choice-2 investigate) + 1 (choice-2 confront-directly) = 5 max
+#   nurturing:      1 (choice-1 deflect) + 2 (choice-2 accommodate) = 3 max
+#   confrontational: 2 (choice-1 demand-answer) + 2 (choice-2 confront-directly) = 4 max
+#
+# A player who mixes styles will likely hit the tie-break — empathetic wins ties.
+# Pure confrontational path requires consistent confrontational choices to trigger entity-building.
+
+revelation_logic:
+  empathetic: shadow_self
+  # Player validated Elara's feelings, expressed concern, asked about her experience.
+  # Elara is the part of them they therapized out of themselves.
+  # Horror type: personal, Jungian — recognition.
+
+  analytical: entity
+  # Player asked for specifics, timelines, logical chains, treated it empirically.
+  # Elara is an ancient consciousness that feeds on the moment of genuine vulnerability.
+  # Horror type: cosmic, Lovecraftian — scale.
+
+  nurturing: last_therapist
+  # Player offered reassurance, expressed concern for Elara's wellbeing, tried to fix things.
+  # Elara is Dr. Miriam Voss, who died in the patient's chair in 2019.
+  # Horror type: tragic ghost — grief.
+
+  confrontational: building
+  # Player pushed back, challenged, demanded answers, refused to accommodate.
+  # Elara is the building itself — fourteen floors of accumulated psychic residue.
+  # Horror type: environmental, surreal — indifference.
+
+  tie: shadow_self
+  # Default when no style dominates — empathetic wins ties (see elara.yaml tie-breaking).
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENDING CONDITIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# Evaluation rules checked when Phase 5 begins (post-revelation, post-Choice 3).
+# First condition whose trigger evaluates to true determines the ending file loaded.
+# Order matters: most specific conditions first, default fallback last.
+#
+# Four primary endings + 8 variant fallbacks (see default_ending notes per entry).
+# The four named endings are the intended experiences — fallbacks catch edge cases.
+#
+# Each ending file contains: elara_final_lines, sound_design, emotional_tone,
+# callback_references, final_image. The pipeline loads and passes to narrator.
+
+ending_conditions:
+
+  # ─────────────────────────────
+  # PRIMARY ENDING 1: INTEGRATION
+  # Shadow Self + Accept
+  # ─────────────────────────────
+  # The warmest outcome. Player acknowledged their shadow — the cost of empathy.
+  # Elara dissolves into the player. They leave changed, but whole.
+  # Sound: warm rain, soft piano motif, no clock — they carry the time with them now.
+
+  - id: ending-integration
+    ending_name: "Integration"
+    trigger:
+      revelation: shadow_self
+      choices:
+        beat-choice-3: accept
+    ending_file: "endings/integration.yaml"
+    # Emotional tone: warm, changed, something like relief.
+    # Final image: the player standing, Elara's chair empty.
+    # The rain sounds different. Not louder — warmer. Like it was always there for a reason.
+
+  # ─────────────────────────────
+  # PRIMARY ENDING 2: CONSUMPTION
+  # Entity + Surrender OR Accept
+  # ─────────────────────────────
+  # The most unsettling outcome. The entity takes the moment of genuine vulnerability.
+  # Not the player's soul — the moment itself. The transaction is complete.
+  # Sound: loop — the clock restarts, the door knocks again, the session begins.
+
+  - id: ending-consumption-surrender
+    ending_name: "Consumption — Surrender"
+    trigger:
+      revelation: entity
+      choices:
+        beat-choice-3: surrender
+    ending_file: "endings/consumption.yaml"
+
+  - id: ending-consumption-accept
+    ending_name: "Consumption — Accept"
+    trigger:
+      revelation: entity
+      choices:
+        beat-choice-3: accept
+    ending_file: "endings/consumption.yaml"
+    # Same ending file — accept and surrender lead to the same consumption,
+    # but the tone of Elara's delivery differs (satisfied vs. moved).
+    # The ending file handles the variant delivery.
+
+  # ─────────────────────────────
+  # PRIMARY ENDING 3: RELEASE
+  # Last Therapist + Accept OR Question
+  # ─────────────────────────────
+  # The saddest outcome and, in some ways, the most complete.
+  # The player agrees to let Dr. Voss speak her goodbyes through them.
+  # Sound: rain stops. Birdsong. First time since Phase 1. Then silence.
+
+  - id: ending-release-accept
+    ending_name: "Release — Accept"
+    trigger:
+      revelation: last_therapist
+      choices:
+        beat-choice-3: accept
+    ending_file: "endings/release.yaml"
+
+  - id: ending-release-question
+    ending_name: "Release — Ask the Question"
+    trigger:
+      revelation: last_therapist
+      choices:
+        beat-choice-3: question
+    ending_file: "endings/release.yaml"
+    # Question path to release requires trust_level >= 5 — the player truly listened.
+    # In release.yaml, the question path has a slightly fuller version of the goodbye.
+
+  # ─────────────────────────────
+  # PRIMARY ENDING 4: DISSOLUTION
+  # Building + Reject OR Question
+  # ─────────────────────────────
+  # The most surreal outcome. The building has been asked how it is doing.
+  # It answers. Then it lets the player go. All sounds return — briefly —
+  # then fade to silence. The player leaves. The building remains.
+
+  - id: ending-dissolution-reject
+    ending_name: "Dissolution — Reject"
+    trigger:
+      revelation: building
+      choices:
+        beat-choice-3: reject
+    ending_file: "endings/dissolution.yaml"
+
+  - id: ending-dissolution-question
+    ending_name: "Dissolution — Ask the Question"
+    trigger:
+      revelation: building
+      choices:
+        beat-choice-3: question
+    ending_file: "endings/dissolution.yaml"
+    # The question path with the building is what it wanted.
+    # In dissolution.yaml, the question path produces the building's genuine answer —
+    # the warmest version of this ending, which is still deeply strange.
+
+  # ─────────────────────────────
+  # FALLBACK ENDINGS
+  # For combinations not covered by primary endings above.
+  # These use the primary ending file for the revelation type but with modified tone.
+  # ─────────────────────────────
+
+  - id: ending-shadow-reject
+    ending_name: "Shadow Self — Rejection"
+    trigger:
+      revelation: shadow_self
+      choices:
+        beat-choice-3: reject
+    ending_file: "endings/integration.yaml"
+    # Rejection path in integration.yaml: she stays. The player leaves.
+    # She'll be here for the next therapist. Quiet. Resigned. Waiting.
+    # Tone: integration.yaml handles the variant via ending_variant parameter.
+
+  - id: ending-shadow-surrender
+    ending_name: "Shadow Self — Surrender"
+    trigger:
+      revelation: shadow_self
+      choices:
+        beat-choice-3: surrender
+    ending_file: "endings/integration.yaml"
+    # She didn't want surrender. She wanted acknowledgment. These are different.
+    # She is grieved by it. The player leaves. Neither is whole.
+
+  - id: ending-shadow-question
+    ending_name: "Shadow Self — The Question"
+    trigger:
+      revelation: shadow_self
+      choices:
+        beat-choice-3: question
+      trust_level_min: 5
+    ending_file: "endings/integration.yaml"
+    # The question path with the shadow self is the fullest integration.
+    # The player asks what she needs. She tells them. They can choose to give it.
+
+  - id: ending-entity-reject
+    ending_name: "Entity — Rejection"
+    trigger:
+      revelation: entity
+      choices:
+        beat-choice-3: reject
+    ending_file: "endings/consumption.yaml"
+    # The entity releases them. It doesn't need them. It has centuries.
+    # It finds the resistance genuinely interesting. A new data point.
+
+  - id: ending-entity-question
+    ending_name: "Entity — The Question"
+    trigger:
+      revelation: entity
+      choices:
+        beat-choice-3: question
+      trust_level_min: 5
+    ending_file: "endings/consumption.yaml"
+    # The question path with the entity is the only path where no consumption occurs.
+    # It offers the player a choice: know what it is, or remain unfed.
+    # Asking is the one thing it has never encountered. It pauses. Then releases.
+
+  - id: ending-ghost-reject
+    ending_name: "Last Therapist — Refusal"
+    trigger:
+      revelation: last_therapist
+      choices:
+        beat-choice-3: reject
+    ending_file: "endings/release.yaml"
+    # The ghost understands. She always understood.
+    # Sadness, but graceful. She returns to waiting. The player carries her grief now.
+
+  - id: ending-ghost-surrender
+    ending_name: "Last Therapist — Surrender"
+    trigger:
+      revelation: last_therapist
+      choices:
+        beat-choice-3: surrender
+    ending_file: "endings/release.yaml"
+    # She says: "No. Not like that. Listen."
+    # She will not take a surrender she didn't earn. She asks for something specific instead.
+
+  - id: ending-building-accept
+    ending_name: "Building — Accept"
+    trigger:
+      revelation: building
+      choices:
+        beat-choice-3: accept
+    ending_file: "endings/dissolution.yaml"
+    # Acceptance with the building: it demonstrates its power briefly,
+    # then releases the exits. It got what it wanted — acknowledgment.
+
+  - id: ending-building-surrender
+    ending_name: "Building — Surrender"
+    trigger:
+      revelation: building
+      choices:
+        beat-choice-3: surrender
+    ending_file: "endings/dissolution.yaml"
+    # The building doesn't want surrender. It wants to be spoken to.
+    # Surrender is neither. It releases the player, indifferent.
+    # The most hollow ending — not horror, just emptiness.
+
+  # ─────────────────────────────
+  # DEFAULT FALLBACK
+  # Catches any state combination not covered above.
+  # ─────────────────────────────
+
+  - id: ending-default
+    ending_name: "Default Fallback"
+    trigger: {}
+    # Empty trigger object — always matches. Must be last in the array.
+    ending_file: "endings/integration.yaml"
+    # Integration is the default because it is the most complete emotional closure.
+    # The narrator should note the active revelation variant and deliver the
+    # acceptance path tone for that variant.

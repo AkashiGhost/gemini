@@ -1,0 +1,147 @@
+id: the-last-session
+title: "The Last Session"
+
+setting:
+  description: "A therapy office on the 14th floor of a mid-century office building. Late autumn evening. The rain is heavy tonight. The building should be empty — your secretary left at 6. But Elara called. She said it was urgent."
+  time: "8:47 PM, late autumn"
+  location: "Therapy office, 14th floor, unnamed city"
+  atmosphere: "Initially professional and warm. Gradually claustrophobic. The room feels smaller as sounds disappear."
+  temperature_progression: "Comfortable → imperceptibly cooler → cold by Phase 4"
+
+locations:
+  - id: office
+    name: "Your Office"
+    description: "Leather chair, desk lamp casting warm light, rain streaking the window. Two chairs facing each other. A clock on the wall. The door is behind you."
+    connections: []  # Player cannot leave
+    notes: "This is the ONLY location. The horror is that you cannot leave."
+    danger_level: 0
+    first_visit_narration: "Your office at 8:47 PM looks exactly as it always has. Desk lamp. Two chairs. Rain against the window. The clock reads 8:47 and does not move. You have been waiting for three minutes. Then the elevator down the hall opens, and you hear a single pair of footsteps in the corridor."
+    ambient_sounds:
+      - rain
+      - hvac
+      - clock
+      - elevator
+      - footsteps
+
+physics:
+  type: realistic
+  rules:
+    - "This is the real world. No supernatural abilities for the player."
+    - "The building follows normal physics — until it doesn't."
+    - "Elara appears human. Her knowledge is the anomaly, not her physicality."
+    - "Time moves normally but the player's perception may not."
+    - "Sound design is diegetic — the player hears what the therapist would hear."
+  sensory_available:
+    - sound
+    - touch
+    - smell
+    - sight
+  # Taste excluded: voice-only experience, no object-interaction affordance for it
+
+player_can:
+  - speak to Elara
+  - ask questions
+  - listen in silence
+  - refuse to engage
+  - stand up from chair
+  - look around the room
+  - attempt to change the subject
+  - express emotions (anger, fear, concern, empathy)
+  - try to end the session
+  - attempt to call for help
+
+player_cannot:
+  - leave the room (door won't open after Phase 2)
+  - physically overpower or restrain Elara
+  - use their phone (no signal)
+  - contact anyone outside the building
+  - access supernatural abilities
+  - break the fourth wall or reference being in a game
+
+constraint_redirects:
+  leave: "You reach for the door handle. It turns, but the door doesn't move. Not locked — it's as if the frame has shifted, sealed by the building settling. Elara watches you. 'Leaving already? We haven't even started.'"
+  phone: "You pull out your phone. No signal. Not even the time display seems right — it flickers between 8:47 and a time you don't recognize. Elara tilts her head. 'Who would you call?'"
+  attack: "You stand abruptly. Elara doesn't flinch. She looks up at you with something that might be pity. 'Sit down. That won't help either of us.' Your legs feel heavy. You sit."
+  call_help: "You try to shout. The sound dies three feet from your mouth, absorbed by the walls. The rain outside seems louder now. Elara waits."
+  end_session: "You say the session is over. Elara smiles. 'Is it? You haven't asked me the question yet.' You don't know what question she means. But part of you does."
+
+ambient_baseline:
+  - id: rain
+    name: "Rain on windows"
+    description: "Heavy, steady rain against floor-to-ceiling windows. Slightly left-heavy spatially. The emotional function is grounding — familiar, safe — which makes its eventual change in Phase 5 all the more disorienting. The rain is the last sound to remain. It outlives every other ambient layer."
+    loop: true
+    default_volume: 0.6
+    spatial: "left-dominant"
+    persists_through: "all phases, changes warmth in Phase 5"
+    fade_in_seconds: 0
+    fade_out_seconds: 8
+    asset_path: "assets/audio/rain-heavy-window.mp3"
+
+  - id: hvac
+    name: "HVAC system"
+    description: "Low mechanical hum, 60-80 Hz range. Clinical. Barely noticeable until it stops. Its absence is the first signal that something is wrong — not gone with drama, just... gone. The room gets quiet in a way that feels structural."
+    loop: true
+    default_volume: 0.15
+    removes_at: "Phase 2, 3:30"
+    fade_in_seconds: 0
+    fade_out_seconds: 4
+    asset_path: "assets/audio/hvac-hum-low.mp3"
+
+  - id: clock
+    name: "Wall clock"
+    description: "Steady tick. Metronomic. Paces the player's heartbeat. Its function is temporal grounding — while it ticks, time is real and measurable. When it stops (Phase 3, ~7:00), the silence is total and the player loses their last anchor to normal time. This is the key horror moment of the experience."
+    loop: true
+    default_volume: 0.25
+    removes_at: "Phase 3, 7:00"
+    fade_in_seconds: 0
+    fade_out_seconds: 0  # Hard stop — no fade. The absence must be abrupt.
+    asset_path: "assets/audio/clock-tick-wall.mp3"
+
+  - id: elevator
+    name: "Distant elevator"
+    description: "Occasional mechanical movement 2-3 floors down — the groan of cable, the soft thud of arrival. Signals that someone else is in the building. While it persists, the player is not alone. Its removal in Phase 2 closes the last escape route in the player's mind before they consciously register it."
+    loop: false  # Plays intermittently, not continuous — see playback_interval
+    default_volume: 0.1
+    removes_at: "Phase 2, 4:30"
+    playback_interval_seconds: 45
+    playback_interval_variance_seconds: 20
+    fade_in_seconds: 1
+    fade_out_seconds: 6
+    asset_path: "assets/audio/elevator-distant.mp3"
+
+  - id: footsteps
+    name: "Footsteps above"
+    description: "Irregular footsteps from the floor above. Unhurried. Probably the cleaning crew. They represent the last human presence in the building. When they stop, the building belongs only to you and Elara. They do not run. They do not hurry. They simply stop, mid-stride, and are never heard again."
+    loop: false  # Irregular pattern, not continuous
+    default_volume: 0.08
+    removes_at: "Phase 2, 5:30"
+    playback_interval_seconds: 30
+    playback_interval_variance_seconds: 15
+    fade_in_seconds: 0
+    fade_out_seconds: 2
+    asset_path: "assets/audio/footsteps-above-office.mp3"
+
+horror_design_notes:
+  principle: "Subtractive horror — things DISAPPEAR. The building goes silent around you."
+  key_moment: "When the last ambient sound stops (clock, ~7:00), the silence is deafening. The player realizes they are completely alone with Elara."
+  sound_psychology: "Humans are wired to notice absence more than presence. Each removed sound creates unconscious dread."
+  forbidden: "No jump scares. No sudden loud sounds. No screaming. Horror is in Elara's calm."
+  removal_sequence:
+    - time: "Phase 2, 3:30"
+      sound: hvac
+      player_effect: "Subliminal unease. The room temperature seems to drop. Elara notices before you do."
+    - time: "Phase 2, 4:30"
+      sound: elevator
+      player_effect: "Isolation confirmed. No one is coming up. No one is going down."
+    - time: "Phase 2, 5:30"
+      sound: footsteps
+      player_effect: "You are the only people in the building. This becomes undeniable."
+    - time: "Phase 3, 7:00"
+      sound: clock
+      player_effect: "KEY MOMENT. Hard stop, no fade. Time is no longer real. Only rain and Elara remain."
+    - time: "Phase 5, 10:30"
+      sound: rain
+      player_effect: "The rain changes character — not louder, but different. Warmer. Like it was always there for a reason."
+  elara_as_horror: "Elara never raises her voice. She never moves suddenly. The horror is purely informational — she knows things she cannot know. The player's dread comes from updating their model of what she is."
+
+duration_target_minutes: 12
