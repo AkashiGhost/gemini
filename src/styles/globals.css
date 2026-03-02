@@ -14,24 +14,102 @@ html {
 }
 
 body {
-  font-family: var(--font-body);
-  background-color: var(--color-bg);
-  color: var(--color-text-primary);
-  line-height: var(--line-height-normal);
+  font-family: var(--font-literary);
+  background: var(--black);
+  color: var(--white);
+  line-height: 1.55;
   min-height: 100dvh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Breathing animation for game session */
+/* Hide native cursor on desktop */
+@media (hover: hover) and (pointer: fine) {
+  body {
+    cursor: none;
+  }
+}
+
+/* Links */
+a {
+  color: var(--white);
+  text-decoration: none;
+}
+
+/* Button reset */
+button {
+  min-height: var(--touch-min);
+  min-width: var(--touch-min);
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  border-radius: 0;
+}
+
+/* Focus-visible */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Breathing animation for game session — phase-aware variants */
 @keyframes breathe {
   0%, 100% { opacity: 0.3; }
   50% { opacity: 0.6; }
 }
 
+/* Phase 0-1: Calm, slow breathing (default) */
 .breathe {
   animation: breathe 4s ease-in-out infinite;
+}
+
+/* Phase 2: Slightly faster — unease creeping in */
+.breathe-phase2 {
+  animation: breathe 3.2s ease-in-out infinite;
+}
+
+/* Phase 3: Tension — noticeably faster, higher max opacity */
+@keyframes breathe-tense {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.75; }
+}
+
+.breathe-phase3 {
+  animation: breathe-tense 2.5s ease-in-out infinite;
+}
+
+/* Phase 4+: Dread — slow, deep, barely visible pulsing */
+@keyframes breathe-dread {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.4; }
+}
+
+.breathe-phase4 {
+  animation: breathe-dread 6s ease-in-out infinite;
+}
+
+/* Pulse animation for when Elara is speaking */
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.4); }
+}
+
+.pulse {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+/* AtmosphereLayer — fog drift keyframes */
+@keyframes atmosphereDrift1 {
+  0% { transform: translate(0%, 0%) rotate(0deg); }
+  100% { transform: translate(8%, -5%) rotate(2deg); }
+}
+
+@keyframes atmosphereDrift2 {
+  0% { transform: translate(0%, 0%) rotate(0deg); }
+  100% { transform: translate(-6%, 4%) rotate(-1.5deg); }
 }
 
 /* Fade transitions */
@@ -53,18 +131,51 @@ body {
   animation: fadeOut var(--transition-slow) forwards;
 }
 
-/* Mobile-first defaults */
-button {
-  min-height: var(--touch-min);
-  min-width: var(--touch-min);
-  cursor: pointer;
-  border: none;
-  background: none;
-  color: inherit;
-  font: inherit;
+/* Fog drift keyframes */
+@keyframes fog-drift-a {
+  0% { transform: translate(0%, 0%) scale(1); }
+  100% { transform: translate(5%, -3%) scale(1.02); }
 }
 
-a {
-  color: var(--color-accent);
-  text-decoration: none;
+@keyframes fog-drift-b {
+  0% { transform: translate(0%, 0%) scale(1); }
+  100% { transform: translate(-4%, 3%) scale(1.01); }
+}
+
+/* Fade up */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Skip-to-content — CSS-only focus reveal (server component safe) */
+.skip-to-content {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.skip-to-content:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--black);
+  color: var(--white);
+  z-index: 9999;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  body { cursor: auto; }
+  .cursor-dot, .cursor-circle { display: none; }
 }

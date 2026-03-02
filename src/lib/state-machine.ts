@@ -20,8 +20,8 @@ import { STYLE_TIE_BREAK_ORDER } from "./types/story-state";
 
 /** Create initial game state from config */
 export function initState(config: GameConfig): StoryState {
-  const elara = config.characters[0];
-  return {
+  const elara = config.characters.find(c => c.role === "narrator") ?? config.characters[0];
+  const state: StoryState = {
     status: "playing",
     currentPhaseIndex: 0,
     currentBeatIndex: 0,
@@ -47,6 +47,8 @@ export function initState(config: GameConfig): StoryState {
     conversationHistory: [],
     soundsRemoved: [],
   };
+  console.log(`[STATE] Init: phase=${state.currentPhaseIndex}, beat=${state.currentBeatIndex}`);
+  return state;
 }
 
 /** Get current phase from config */
@@ -67,21 +69,20 @@ export function getCurrentBeat(
   return phase.beats[state.currentBeatIndex];
 }
 
-/** Advance to the next beat within the current phase */
+/** Advance to the next beat within the current phase.
+ *  NOTE: Does NOT advance the phase — that is game-orchestrator's job via
+ *  checkPhaseTransition(). When currentBeatIndex exceeds the phase's beats,
+ *  getCurrentBeat() returns null and checkPhaseTransition() fires correctly. */
 export function advanceBeat(
-  config: GameConfig,
+  _config: GameConfig,
   state: StoryState,
 ): StoryState {
-  const phase = getCurrentPhase(config, state);
   const nextBeatIndex = state.currentBeatIndex + 1;
-
-  // Still in current phase
-  if (nextBeatIndex < phase.beats.length) {
-    return { ...state, currentBeatIndex: nextBeatIndex };
-  }
-
-  // Phase complete — advance to next phase
-  return advancePhase(config, state);
+  console.log(
+    `[STATE] Advance: phase ${state.currentPhaseIndex} → ${state.currentPhaseIndex}, ` +
+    `beat ${state.currentBeatIndex} → ${nextBeatIndex}`,
+  );
+  return { ...state, currentBeatIndex: nextBeatIndex };
 }
 
 /** Advance to the next phase */
@@ -93,20 +94,30 @@ export function advancePhase(
 
   // Game over — no more phases
   if (nextPhaseIndex >= config.arc.phases.length) {
+    console.log(
+      `[STATE] Advance: phase ${state.currentPhaseIndex} → ended (no more phases), ` +
+      `beat ${state.currentBeatIndex} → 0`,
+    );
     return { ...state, status: "ended" };
   }
 
   const nextPhase = config.arc.phases[nextPhaseIndex];
-  const nextArcStageIndex = Math.min(
-    nextPhaseIndex,
-    config.characters[0].arc.stages.length - 1,
-  );
+  // Use narrator character for arc stages (not characters[0] which may be a
+  // player avatar without an arc — e.g., the-lighthouse's keeper.yaml)
+  const narratorChar = config.characters.find(c => c.role === "narrator") ?? config.characters[0];
+  const arcStagesCount = narratorChar?.arc?.stages?.length ?? config.arc.phases.length;
+  const nextArcStageIndex = Math.min(nextPhaseIndex, arcStagesCount - 1);
 
   // Calculate revelation variant at Phase 4 entry (index 3)
   let revelationVariant = state.revelationVariant;
   if (nextPhaseIndex === 3 && !revelationVariant) {
     revelationVariant = calculateRevelationVariant(config, state);
   }
+
+  console.log(
+    `[STATE] Advance: phase ${state.currentPhaseIndex} → ${nextPhaseIndex}, ` +
+    `beat ${state.currentBeatIndex} → 0`,
+  );
 
   return {
     ...state,
@@ -145,6 +156,14 @@ export function resolveChoice(
     newState = applyStyleScore(newState, option.styleScore);
   }
 
+  const changes = {
+    ...(option.stateChanges ?? {}),
+    ...(option.styleScore ? { styleScore: option.styleScore } : {}),
+  };
+  console.log(
+    `[STATE] Choice resolved: beat=${beatId}, option=${optionId}, state changes=${JSON.stringify(changes)}`,
+  );
+
   return newState;
 }
 
@@ -176,6 +195,25 @@ function applyDotPathChange(
   // Handle known paths directly for type safety
   const path0 = parts[0];
   const path1 = parts[1];
+
+  // elara.mutableState.* — arc.yaml uses "elara.mutable_state.*" which becomes
+  // "elara.mutableState.*" after key transformation. Redirect to flat elara fields.
+  if (path0 === "elara" && path1 === "mutableState" && parts[2]) {
+    const innerPath = parts[2];
+    if (innerPath === "trustLevel") {
+      const current = state.elara.trustLevel;
+      const newVal = resolveDelta(current, value);
+      return {
+        ...state,
+        elara: { ...state.elara, trustLevel: Math.max(0, Math.min(10, newVal)) },
+      };
+    }
+    if (innerPath === "emotionalState") {
+      return { ...state, elara: { ...state.elara, emotionalState: String(value) } };
+    }
+    // Other mutableState fields fall through to flags
+    return { ...state, flags: { ...state.flags, [dotPath]: value as boolean | string | number } };
+  }
 
   // elara.trustLevel or elara.trust_level
   if (path0 === "elara" && path1 === "trustLevel") {
@@ -287,8 +325,14 @@ export function calculateRevelationVariant(
   // Find dominant style with tie-break order
   const dominant = getDominantStyle(scores);
 
-  // Map to revelation variant
-  return revelationLogic[dominant] ?? revelationLogic[STYLE_TIE_BREAK_ORDER[0]] ?? "shadow_self";
+  // Handle nested mapping format: { trigger, source, mapping: { empathetic: "last_keeper" } }
+  // vs flat format: { empathetic: "last_keeper" }
+  const nested = (revelationLogic as Record<string, unknown>).mapping as
+    | Record<string, string>
+    | undefined;
+  const lookup = nested ?? revelationLogic;
+
+  return lookup[dominant] ?? lookup[STYLE_TIE_BREAK_ORDER[0]] ?? "shadow_self";
 }
 
 /** Get the dominant player style with tie-breaking */
@@ -311,11 +355,35 @@ export function evaluateEndingCondition(
   config: GameConfig,
   state: StoryState,
 ): string | null {
-  for (const condition of config.arc.endingConditions) {
-    if (matchesEndingTrigger(condition, state)) {
-      return condition.id;
+  const raw = config.arc.endingConditions;
+
+  // Standard array format (structured EndingCondition[] with trigger objects)
+  if (Array.isArray(raw)) {
+    for (const condition of raw) {
+      if (matchesEndingTrigger(condition, state)) {
+        console.log(`[STATE] Ending check: result=${condition.id}`);
+        return condition.id;
+      }
     }
+    console.log(`[STATE] Ending check: result=none`);
+    return null;
   }
+
+  // Object/map format — story uses named endings like:
+  //   ending_conditions:
+  //     acceptance: { primary_path: "final_choice == 'accept'", ... }
+  // The final choice beat's state_changes sets flags.endingRoute to the ending name.
+  if (raw && typeof raw === "object") {
+    const endingRoute = state.flags["endingRoute"] as string | undefined;
+    if (endingRoute) {
+      console.log(`[STATE] Ending check (map format): endingRoute="${endingRoute}"`);
+      return endingRoute;
+    }
+    console.log(`[STATE] Ending check (map format): no endingRoute flag set yet`);
+    return null;
+  }
+
+  console.log(`[STATE] Ending check: result=none (no conditions)`);
   return null;
 }
 

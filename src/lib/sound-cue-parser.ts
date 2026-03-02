@@ -1,47 +1,52 @@
-// ─────────────────────────────────────────────
-// Sound Cue Parser
-// Extracts [SOUND:identifier] markers from LLM text output
-// ─────────────────────────────────────────────
+/**
+ * Sound cue parser — extracts [SOUND:xxx] inline markers from AI narration text.
+ * Returns clean text (markers stripped) and an ordered list of cue positions.
+ */
 
 export interface ParsedSoundCue {
-  /** Sound ID from cue-map.yaml */
   soundId: string;
-  /** Character position in the ORIGINAL text where the marker appeared */
+  /** Character position in the clean text where the cue was encountered */
   position: number;
 }
 
 export interface ParsedResponse {
-  /** Text with all [SOUND:x] markers removed — ready for TTS */
   cleanText: string;
-  /** Extracted sound cues in order of appearance */
   cues: ParsedSoundCue[];
 }
 
-const SOUND_CUE_REGEX = /\[SOUND:([a-z][a-z0-9_]*)\]/g;
-
 /**
- * Parse LLM response text, extracting sound cue markers and returning
- * clean text for TTS along with an ordered list of cues.
+ * Parse AI narration text for [SOUND:xxx] inline markers.
+ * Strips the markers from the text and returns both the clean text and
+ * an ordered list of cues with their positions in the clean text.
  */
 export function parseSoundCues(text: string): ParsedResponse {
   const cues: ParsedSoundCue[] = [];
+  let cleanText = "";
+  let lastIndex = 0;
+
+  const MARKER_RE = /\[SOUND:([^\]]+)\]/g;
   let match: RegExpExecArray | null;
 
-  // Create fresh regex instance per call
-  const regex = new RegExp(SOUND_CUE_REGEX.source, SOUND_CUE_REGEX.flags);
-
-  while ((match = regex.exec(text)) !== null) {
-    cues.push({
-      soundId: match[1],
-      position: match.index,
-    });
+  while ((match = MARKER_RE.exec(text)) !== null) {
+    // Append text segment before this marker
+    cleanText += text.slice(lastIndex, match.index);
+    cues.push({ soundId: match[1].trim(), position: cleanText.length });
+    lastIndex = match.index + match[0].length;
   }
 
-  // Remove all markers from text
-  const cleanText = text
-    .replace(new RegExp(SOUND_CUE_REGEX.source, "g"), "")
-    .replace(/\s{2,}/g, " ")
-    .trim();
+  // Append any remaining text after the last marker
+  cleanText += text.slice(lastIndex);
+
+  // Normalise whitespace introduced by stripped markers
+  cleanText = cleanText.replace(/  +/g, " ").trim();
 
   return { cleanText, cues };
+}
+
+/**
+ * Strip any [SOUND:xxx] markers from text without tracking positions.
+ * Convenience helper for display-only use cases.
+ */
+export function stripSoundMarkers(text: string): string {
+  return text.replace(/\[SOUND:[^\]]*\]/g, "").replace(/\s{2,}/g, " ").trim();
 }

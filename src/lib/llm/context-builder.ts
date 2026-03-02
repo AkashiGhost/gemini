@@ -94,9 +94,11 @@ function buildPhaseOverrideLayer(
   const parts: string[] = [];
 
   // Phase override from phase-overrides.yaml
-  const overrideKey = currentPhase.id;
+  // Convert snake_case phase id to camelCase to match transformed config keys
+  // e.g. "ordinary_world" → "ordinaryWorld" (transformKeys runs on load)
+  const overrideKey = currentPhase.id.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
   const phaseOverrides = config.prompts.phaseOverrides;
-  const override = phaseOverrides[overrideKey];
+  const override = phaseOverrides[overrideKey as keyof typeof phaseOverrides];
 
   if (override) {
     // Override can be a string or an object with an 'override' field

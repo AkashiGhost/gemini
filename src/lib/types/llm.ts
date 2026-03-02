@@ -12,6 +12,8 @@ export interface LLMTurn {
   audioChunks?: ArrayBuffer[];
   /** Whether this was a fallback response */
   isFallback?: boolean;
+  /** True when Gemini signals it was interrupted mid-turn (user barge-in) */
+  interrupted?: boolean;
 }
 
 /**
@@ -44,7 +46,7 @@ export interface StoryEngine {
  */
 export interface IntentParser {
   /** Parse player text into a structured intent */
-  parse(playerText: string): Promise<IntentResult>;
+  parse(playerText: string, intentClassifierPrompt?: string): Promise<IntentResult>;
 }
 
 // === WebSocket Protocol ===
@@ -63,6 +65,7 @@ export type ServerMessageType =
   | "STATE_UPDATE"
   | "PHASE_TRANSITION"
   | "GAME_OVER"
+  | "INTERRUPTED"
   | "ERROR"
   | "PONG";
 

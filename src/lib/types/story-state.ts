@@ -18,7 +18,7 @@ export const STYLE_TIE_BREAK_ORDER: PlayerStyle[] = [
   "confrontational",
 ];
 
-export interface ElaraState {
+export interface CharacterState {
   emotionalState: string;
   trustLevel: number;
   secretsRevealed: string[];
@@ -44,8 +44,8 @@ export interface StoryState {
   /** Elapsed seconds since game start */
   elapsedSeconds: number;
 
-  /** Elara's runtime state */
-  elara: ElaraState;
+  /** AI character's runtime state */
+  elara: CharacterState;
 
   /** Accumulated player style scores */
   playerStyleScores: PlayerStyleScores;

@@ -1,0 +1,309 @@
+"use client";
+
+// ─────────────────────────────────────────────
+// useSoundEngine — React hook that manages the SoundEngine lifecycle
+// Story-aware: loads appropriate sounds and timeline per storyId.
+// ─────────────────────────────────────────────
+
+import { useEffect, useRef, useCallback } from "react";
+import { SoundEngine } from "@/lib/sound-engine";
+import { generateSoundsForStory } from "@/lib/synth-sounds";
+import type { TimelineEvent as SoundTimelineEvent } from "@/lib/sound-engine";
+import { parseSoundCues } from "@/lib/sound-cue-parser";
+
+// ─────────────────────────────────────────────
+// Story-specific timelines
+// ─────────────────────────────────────────────
+
+const TIMELINES: Record<string, SoundTimelineEvent[]> = {
+  "the-last-session": [
+    // Phase 1: Full ambient
+    { time: 0, action: "start_ambient", soundIds: ["rain", "hvac", "clock"] },
+    // Phase 2: Subtractive horror — HVAC fades
+    { time: 210, action: "fade_out", soundId: "hvac", fadeDurationSeconds: 4 },
+    // Phase 2: Clock hard stop
+    { time: 420, action: "hard_stop", soundId: "clock", fadeDurationSeconds: 0 },
+    // Phase 3: Atmospheric drones
+    { time: 360, action: "fade_in", soundIds: ["cello_drone", "sub_bass"], fadeInSeconds: 8 },
+    // Phase 3: Rain volume drop
+    { time: 425, action: "volume_adjust", soundId: "rain", targetVolume: 0.4, fadeDurationSeconds: 10 },
+    // Phase 4: Mute all for revelation
+    { time: 480, action: "mute_all", fadeDurationSeconds: 0.5 },
+    // Phase 4: Revelation tone
+    { time: 482, action: "fade_in", soundIds: ["low_tone"], fadeInSeconds: 3 },
+    // Phase 5: Low tone fades
+    { time: 600, action: "fade_out", soundId: "low_tone", fadeDurationSeconds: 4 },
+  ],
+
+  "the-lighthouse": [
+    // Phase 1: Storm — ocean, wind, creaking wood
+    { time: 0, action: "start_ambient", soundIds: ["ocean", "wind", "creak"] },
+    // Phase 2: Wind intensifies
+    { time: 240, action: "volume_adjust", soundId: "wind", targetVolume: 0.8, fadeDurationSeconds: 8 },
+    // Phase 3: Creaking stops (structure groans to silence)
+    { time: 360, action: "fade_out", soundId: "creak", fadeDurationSeconds: 3 },
+    // Phase 3: Foghorn drone emerges
+    { time: 380, action: "fade_in", soundIds: ["foghorn_drone", "sub_bass"], fadeInSeconds: 6 },
+    // Phase 4: Subtractive — wind dies
+    { time: 450, action: "fade_out", soundId: "wind", fadeDurationSeconds: 8 },
+    // Phase 5: Just ocean and foghorn, fading
+    { time: 540, action: "fade_all_to_nothing", fadeDurationSeconds: 20 },
+  ],
+
+  "room-4b": [
+    // Phase 1: Hospital ambient — fluorescent hum, distant machinery
+    { time: 0, action: "start_ambient", soundIds: ["fluorescent_hum", "machinery"] },
+    // Phase 2: Metal echoes begin
+    { time: 180, action: "fade_in", soundIds: ["metal_echo"], fadeInSeconds: 4 },
+    // Phase 2: Fluorescent flickers (volume oscillation simulated by lowering)
+    { time: 240, action: "volume_adjust", soundId: "fluorescent_hum", targetVolume: 0.3, fadeDurationSeconds: 2 },
+    // Phase 3: Machinery stops abruptly
+    { time: 360, action: "hard_stop", soundId: "machinery", fadeDurationSeconds: 0 },
+    // Phase 3: Heartbeat drone emerges
+    { time: 365, action: "fade_in", soundIds: ["heartbeat_drone", "sub_bass"], fadeInSeconds: 6 },
+    // Phase 4: Fluorescent dies
+    { time: 450, action: "hard_stop", soundId: "fluorescent_hum", fadeDurationSeconds: 0 },
+    // Phase 4: Low revelation tone
+    { time: 455, action: "fade_in", soundIds: ["low_tone"], fadeInSeconds: 4 },
+    // Phase 5: Everything fades
+    { time: 540, action: "fade_all_to_nothing", fadeDurationSeconds: 15 },
+  ],
+
+  "the-call": [
+    // ── Phone ring now plays during OnboardingFlow "ringing" step ──
+    // (before ElevenLabs session starts, so ring → pickup → Alex speaks)
+
+    // Phone static starts immediately at near-inaudible volume
+    { time: 0, action: "start_ambient", soundIds: ["phone_static"] },
+    { time: 0, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.03, fadeDurationSeconds: 0 },
+
+    // ── Pickup ────────────────────────────────────────────────
+    // pickup_click is event-driven (fires when AI first speaks, see useSoundEngine)
+    // Electrical hum + static swell start immediately (call already connected)
+    { time: 0, action: "start_ambient", soundIds: ["electrical_hum"] },
+    { time: 0, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.15, fadeDurationSeconds: 2 },
+
+    // ── Mid-game tension ──────────────────────────────────────
+    // Sub bass creeps in after a couple minutes
+    { time: 120, action: "fade_in", soundIds: ["sub_bass"], fadeInSeconds: 10 },
+    // Static intensifies slightly mid-game (line degrading, situation escalating)
+    { time: 300, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.5, fadeDurationSeconds: 8 },
+
+    // ── Ending ────────────────────────────────────────────────
+    // Everything fades toward the end
+    { time: 540, action: "fade_all_to_nothing", fadeDurationSeconds: 15 },
+  ],
+};
+
+// Story-specific spatial panning
+const SPATIAL_MAPS: Record<string, Record<string, { pan: number }>> = {
+  "the-last-session": {
+    rain: { pan: -0.3 },
+    clock: { pan: 0.2 },
+    hvac: { pan: 0 },
+    cello_drone: { pan: 0 },
+    sub_bass: { pan: 0 },
+    low_tone: { pan: 0 },
+  },
+  "the-lighthouse": {
+    ocean: { pan: -0.4 },
+    wind: { pan: 0.3 },
+    creak: { pan: 0.1 },
+    foghorn_drone: { pan: -0.2 },
+    sub_bass: { pan: 0 },
+  },
+  "room-4b": {
+    fluorescent_hum: { pan: 0.1 },
+    machinery: { pan: -0.3 },
+    metal_echo: { pan: 0.4 },
+    heartbeat_drone: { pan: 0 },
+    sub_bass: { pan: 0 },
+    low_tone: { pan: 0 },
+  },
+  "the-call": {
+    phone_static: { pan: 0 },      // centered (phone audio)
+    electrical_hum: { pan: 0 },    // centered
+    sub_bass: { pan: 0 },          // centered
+    phone_ring: { pan: 0 },        // centered
+    pickup_click: { pan: 0 },      // centered
+    disconnect_tone: { pan: 0 },   // centered (all phone sounds are mono/centered)
+    footsteps: { pan: -0.2 },      // slightly left (Alex moving)
+    water_drip: { pan: 0.3 },      // off to the right (environmental)
+    door_creak: { pan: -0.1 },     // slightly left
+    keypad_beep: { pan: 0 },       // centered (close interaction)
+    metal_scrape: { pan: 0.2 },    // slight right (vent above)
+    pipe_clank: { pan: 0.4 },      // right wall (pipes on right wall per story)
+    heavy_breathing: { pan: 0 },   // centered (Alex's own breathing)
+  },
+};
+
+interface UseSoundEngineOptions {
+  storyId: string;
+  status: "idle" | "connecting" | "playing" | "ended" | "error";
+  isSpeaking: boolean;
+  isPaused: boolean;
+  hasAiSpoken: boolean;
+  lastAiText: string;
+}
+
+export function useSoundEngine({
+  storyId,
+  status,
+  isSpeaking,
+  isPaused,
+  hasAiSpoken,
+  lastAiText,
+}: UseSoundEngineOptions) {
+  const engineRef = useRef<SoundEngine | null>(null);
+  const initStartedRef = useRef(false);
+  // Tracks whether we've already fired the phone-pickup sequence for "the-call"
+  const hasPickedUpRef = useRef(false);
+  // Tracks cooldowns for keyword-triggered sound cues (soundId → timestamp)
+  const cueCooldownsRef = useRef<Map<string, number>>(new Map());
+  const CUE_COOLDOWN_MS = 30_000; // 30 seconds between same sound cue re-triggers
+
+  // ── Initialize engine when game starts playing ────────────
+  // Delayed by 3s to let ElevenLabs WebRTC audio establish first.
+  // Creating AudioContext + 13 concurrent OfflineAudioContext renders
+  // can starve the audio thread and cause ElevenLabs first audio to fail.
+  useEffect(() => {
+    if (status !== "playing" || initStartedRef.current) return;
+    initStartedRef.current = true;
+
+    const INIT_DELAY_MS = 3000; // Give ElevenLabs 3s head start
+
+    const setup = async () => {
+      try {
+        console.log(`[USE-SOUND] Initializing SoundEngine for story: ${storyId} (delayed ${INIT_DELAY_MS}ms)`);
+
+        const spatialMap = SPATIAL_MAPS[storyId] ?? SPATIAL_MAPS["the-last-session"];
+        const engine = new SoundEngine({
+          ttsDucking: {
+            reductionDb: -6,
+            fadeInMs: 300,
+            fadeOutMs: 600,
+          },
+          crossfadeDefaultMs: 2000,
+          spatialMap,
+          preloadOrder: [],
+        });
+
+        await engine.init();
+
+        // Generate and register story-specific synthetic sounds
+        const sounds = await generateSoundsForStory(storyId);
+        for (const [id, buffer] of Object.entries(sounds)) {
+          engine.registerBuffer(id, buffer);
+        }
+
+        engineRef.current = engine;
+
+        // Start the story-specific timeline
+        const timeline = TIMELINES[storyId] ?? TIMELINES["the-last-session"];
+        engine.startTimeline(timeline);
+        console.log(`[USE-SOUND] SoundEngine ready for "${storyId}", timeline started with ${timeline.length} events`);
+      } catch (err) {
+        console.error("[USE-SOUND] Failed to initialize SoundEngine:", err);
+      }
+    };
+
+    const delayTimer = setTimeout(() => void setup(), INIT_DELAY_MS);
+    return () => clearTimeout(delayTimer);
+  }, [status, storyId]);
+
+  // ── TTS Ducking ───────────────────────────────────────
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    if (isSpeaking) {
+      engine.startDucking();
+    } else {
+      engine.stopDucking();
+    }
+  }, [isSpeaking]);
+
+  // ── Phone pickup — stop ring when AI first speaks ─────
+  // Only active for "the-call" story.
+  // Fires once: when isSpeaking transitions true AND hasAiSpoken was false
+  // (i.e. this is the very first time the AI speaks).
+  useEffect(() => {
+    if (storyId !== "the-call") return;
+    if (!isSpeaking) return;
+    if (hasAiSpoken) return; // already spoken before this render — not the first time
+    if (hasPickedUpRef.current) return; // already fired
+
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    hasPickedUpRef.current = true;
+    console.log("[USE-SOUND] AI first speak detected — stopping phone_ring, playing pickup_click");
+    engine.stop("phone_ring", 0); // hard stop — ring cuts immediately
+    engine.play("pickup_click", 0.9, false); // one-shot click
+  }, [isSpeaking, hasAiSpoken, storyId]);
+
+  // ── Keyword-based reactive sound cues ─────────────────
+  // Parse AI narration text for keywords that match story sounds.
+  // Triggers one-shot cues via triggerCue() with a per-sound cooldown.
+  useEffect(() => {
+    if (!lastAiText || status !== "playing") return;
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    const { cues } = parseSoundCues(lastAiText);
+    const now = Date.now();
+    const cooldowns = cueCooldownsRef.current;
+
+    for (const cue of cues) {
+      const lastFired = cooldowns.get(cue.soundId) ?? 0;
+      if (now - lastFired < CUE_COOLDOWN_MS) {
+        console.log(`[USE-SOUND] Cue cooldown active for "${cue.soundId}" — skipping`);
+        continue;
+      }
+      cooldowns.set(cue.soundId, now);
+      console.log(`[USE-SOUND] Inline cue triggered: "${cue.soundId}"`);
+      engine.triggerCue(cue.soundId);
+    }
+  }, [lastAiText, storyId, status]);
+
+  // ── Pause / Resume ────────────────────────────────────
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    if (isPaused) {
+      engine.pauseAudio();
+    } else {
+      engine.resumeAudio();
+    }
+  }, [isPaused]);
+
+  // ── Cleanup on game end ───────────────────────────────
+  useEffect(() => {
+    if (status === "ended" || status === "error") {
+      const engine = engineRef.current;
+      if (engine) {
+        console.log("[USE-SOUND] Game ended/error — destroying SoundEngine");
+        engine.destroy();
+        engineRef.current = null;
+        initStartedRef.current = false;
+      }
+    }
+  }, [status]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      const engine = engineRef.current;
+      if (engine) {
+        console.log("[USE-SOUND] Component unmounting — destroying SoundEngine");
+        engine.destroy();
+        engineRef.current = null;
+      }
+    };
+  }, []);
+
+  const stopAll = useCallback(() => {
+    engineRef.current?.muteAll(0.5);
+  }, []);
+
+  return { stopAll };
+}

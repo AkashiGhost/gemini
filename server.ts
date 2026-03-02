@@ -3,6 +3,12 @@
 // Custom server: WebSocket upgrade + Next.js page serving
 // ─────────────────────────────────────────────
 
+// Load .env in development (Node.js 20.6+ built-in, no package needed)
+import { existsSync } from "fs";
+if (existsSync(".env")) {
+  process.loadEnvFile(".env");
+}
+
 import { createServer } from "http";
 import { parse } from "url";
 import next from "next";
@@ -13,13 +19,18 @@ import path from "path";
 import { loadStory, isLoadError } from "./src/lib/story-loader";
 import { GameOrchestrator } from "./src/lib/game-orchestrator";
 import { MockStoryEngine, MockIntentParser } from "./src/lib/llm/mock-adapter";
+import { GeminiStoryEngine, GeminiIntentParser } from "./src/lib/llm/gemini-adapter";
 import type {
   ClientMessage,
   ServerMessage,
   InitPayload,
   ChoiceSelectedPayload,
 } from "./src/lib/types/llm";
+import type { StoryEngine, IntentParser } from "./src/lib/types/llm";
 import type { GameConfig } from "./src/lib/types/game-config";
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const ELARA_VOICE = process.env.ELARA_VOICE || "Aoede";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOST || "0.0.0.0";
@@ -29,8 +40,8 @@ const port = parseInt(process.env.PORT || "3000", 10);
 // Load story config once at startup
 // ─────────────────────────────────────────────
 
-const storiesBase = process.env.STORIES_BASE_PATH || path.resolve(__dirname, "../stories");
-const schemasBase = process.env.SCHEMAS_BASE_PATH || path.resolve(__dirname, "../schemas");
+const storiesBase = process.env.STORIES_BASE_PATH || path.resolve(process.cwd(), "stories");
+const schemasBase = process.env.SCHEMAS_BASE_PATH || path.resolve(process.cwd(), "schemas");
 
 let gameConfig: GameConfig | null = null;
 
@@ -67,6 +78,10 @@ app.prepare().then(() => {
   gameConfig = loadGameConfig();
 
   const server = createServer((req, res) => {
+    if (req.url === "/health") {
+      res.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
+      return;
+    }
     const parsedUrl = parse(req.url || "/", true);
     handle(req, res, parsedUrl);
   });
@@ -129,9 +144,20 @@ app.prepare().then(() => {
           const initPayload = msg.payload as InitPayload | undefined;
           sessionId = uuidv4();
 
-          // Create engine based on provider (only mock for now)
-          const storyEngine = new MockStoryEngine();
-          const intentParser = new MockIntentParser();
+          // Create engine based on provider
+          const provider = initPayload?.provider ?? (GEMINI_API_KEY ? "gemini" : "mock");
+          let storyEngine: StoryEngine;
+          let intentParser: IntentParser;
+
+          if (provider === "gemini" && GEMINI_API_KEY) {
+            storyEngine = new GeminiStoryEngine(GEMINI_API_KEY, ELARA_VOICE);
+            intentParser = new GeminiIntentParser(GEMINI_API_KEY);
+            console.log(`[Session ${sessionId}] Using Gemini adapter`);
+          } else {
+            storyEngine = new MockStoryEngine();
+            intentParser = new MockIntentParser();
+            console.log(`[Session ${sessionId}] Using Mock adapter`);
+          }
 
           orchestrator = new GameOrchestrator(
             gameConfig,
@@ -156,7 +182,6 @@ app.prepare().then(() => {
         }
 
         case "AUDIO_CHUNK": {
-          // For text-based testing, payload may contain a 'text' field
           if (!orchestrator) {
             send({
               type: "ERROR",
@@ -166,10 +191,13 @@ app.prepare().then(() => {
           }
 
           const audioPayload = msg.payload as { text?: string; audio?: string };
-          const text = audioPayload?.text ?? "";
 
-          if (text) {
-            await orchestrator.handlePlayerInput(text);
+          if (audioPayload?.audio) {
+            // Real audio — forward to Gemini Live API
+            await orchestrator.handlePlayerAudio(audioPayload.audio);
+          } else if (audioPayload?.text) {
+            // Text fallback (for testing without mic)
+            await orchestrator.handlePlayerInput(audioPayload.text);
           }
           break;
         }

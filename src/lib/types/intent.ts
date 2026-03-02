@@ -3,18 +3,8 @@
 // Mirrors system.yaml intent_classifier_prompt output
 // ─────────────────────────────────────────────
 
-export type IntentType =
-  | "speak_to_elara"
-  | "ask_question"
-  | "express_emotion"
-  | "try_to_leave"
-  | "try_phone"
-  | "try_call_help"
-  | "try_end_session"
-  | "stand_up"
-  | "look_around"
-  | "silence"
-  | "other";
+// Flexible string type — each story defines its own intents in system.yaml
+export type IntentType = string;
 
 export type EmotionalRegister =
   | "empathetic"

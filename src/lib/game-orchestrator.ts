@@ -140,6 +140,65 @@ export class GameOrchestrator {
     await this.generateAndSendResponse(text);
   }
 
+  /** Handle raw audio from player — forward to Live API */
+  async handlePlayerAudio(audioBase64: string): Promise<void> {
+    if (this.state.status !== "playing") return;
+    if (!this.storyEngine.generateAudioResponse) {
+      // Engine doesn't support audio — ignore
+      return;
+    }
+
+    const audioBuffer = Buffer.from(audioBase64, "base64");
+    const stateSnapshot = {
+      beat_type: getCurrentBeat(this.config, this.state)?.type ?? "narration",
+      phase_id: getCurrentPhase(this.config, this.state).id,
+      trust_level: this.state.elara.trustLevel,
+      elapsed_seconds: this.state.elapsedSeconds,
+    };
+
+    try {
+      for await (const chunk of this.storyEngine.generateAudioResponse(
+        audioBuffer.buffer.slice(audioBuffer.byteOffset, audioBuffer.byteOffset + audioBuffer.byteLength),
+        stateSnapshot,
+      )) {
+        // User barged in — stop audio immediately
+        if (chunk.interrupted) {
+          this.send({ type: "INTERRUPTED", payload: {} });
+          break;
+        }
+
+        // Parse sound cues from text portions
+        if (chunk.text) {
+          const parsed = parseSoundCues(chunk.text);
+          for (const cue of parsed.cues) {
+            this.send({
+              type: "SOUND_CUE",
+              payload: { soundId: cue.soundId, position: cue.position } satisfies SoundCuePayload,
+            });
+          }
+          if (parsed.cleanText) {
+            this.addConversationTurn("elara", parsed.cleanText);
+          }
+        }
+
+        // Forward audio chunks to client
+        if (chunk.audioChunks && chunk.audioChunks.length > 0) {
+          for (const ab of chunk.audioChunks) {
+            this.send({
+              type: "AUDIO_CHUNK",
+              payload: {
+                audio: Buffer.from(ab).toString("base64"),
+                sampleRate: 24000,
+              },
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[Orchestrator] Audio stream error:", err);
+    }
+  }
+
   /** Handle player choosing an option at a choice beat */
   async handleChoiceSelected(beatId: string, optionId: string): Promise<void> {
     if (this.state.status !== "playing") return;
@@ -192,9 +251,15 @@ export class GameOrchestrator {
 
     switch (beat.type) {
       case "narration":
-      case "revelation":
-        await this.generateAndSendResponse("");
+      case "revelation": {
+        // Seed the first narration with the beat's purpose so Gemini knows what to generate
+        const beatHint = beat.promptHint ?? beat.purpose ?? "";
+        const seed = this.state.conversationHistory.length === 0
+          ? `[BEGIN SESSION. ${beatHint}]`
+          : "";
+        await this.generateAndSendResponse(seed);
         break;
+      }
 
       case "choice":
         await this.presentChoice(beat);
@@ -241,14 +306,27 @@ export class GameOrchestrator {
         });
       }
 
-      // Send audio/text response
+      // Concatenate all audio chunks into one buffer before sending.
+      // Gemini returns ~50 small chunks per response — sending them individually
+      // through React state would lose all but the last due to batching.
+      let combinedAudio: string | null = null;
+      if (response.audioChunks && response.audioChunks.length > 0) {
+        const totalBytes = response.audioChunks.reduce((n, ab) => n + ab.byteLength, 0);
+        const combined = new Uint8Array(totalBytes);
+        let offset = 0;
+        for (const ab of response.audioChunks) {
+          combined.set(new Uint8Array(ab), offset);
+          offset += ab.byteLength;
+        }
+        combinedAudio = Buffer.from(combined).toString("base64");
+      }
+
       this.send({
         type: "AUDIO_CHUNK",
         payload: {
           text: parsed.cleanText,
-          audio: response.audioChunks?.[0]
-            ? Buffer.from(response.audioChunks[0]).toString("base64")
-            : null,
+          audio: combinedAudio,
+          sampleRate: 24000,
         },
       });
 
