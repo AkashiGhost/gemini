@@ -278,56 +278,6 @@ export default function Home() {
               imagination.
             </motion.p>
 
-            <motion.a
-              href="https://youtu.be/T1T3AoJ5IuU"
-              target="_blank"
-              rel="noopener noreferrer"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.7, delay: 2.0, ease: "easeOut" }}
-              style={{
-                marginBlockStart: "var(--space-md)",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "10px",
-                fontFamily: "var(--font-display)",
-                fontSize: "var(--type-ui)",
-                color: "var(--muted)",
-                letterSpacing: "2px",
-                textDecoration: "none",
-                border: "1px solid rgba(255,255,255,0.18)",
-                padding: "0 var(--space-md)",
-                height: 44,
-                transition: "border-color 0.3s ease, color 0.3s ease",
-              }}
-              onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                e.currentTarget.style.borderColor = "var(--accent)";
-                e.currentTarget.style.color = "var(--accent)";
-              }}
-              onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)";
-                e.currentTarget.style.color = "var(--muted)";
-              }}
-            >
-              {/* Play triangle icon */}
-              <svg
-                width="12"
-                height="14"
-                viewBox="0 0 12 14"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                aria-hidden="true"
-              >
-                <path
-                  d="M1 1.5L11 7L1 12.5V1.5Z"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-              </svg>
-              WATCH DEMO
-            </motion.a>
           </div>
 
           {/* Scroll-down indicator */}
@@ -820,8 +770,8 @@ export default function Home() {
               marginBottom: "var(--space-lg)",
             }}
           >
-            Powered by Mistral AI for dynamic narration and ElevenLabs for
-            real-time voice synthesis. Built for the Mistral Worldwide Hackathon 2026.
+            Powered by Gemini Live API for real-time voice generation and three-layer
+            spatial audio. Built for the Gemini Live Agent Challenge 2026.
           </p>
           <div style={{ display: "flex", gap: "var(--space-md)", flexWrap: "wrap" }}>
             <a
@@ -842,7 +792,7 @@ export default function Home() {
               AKASH MANMOHAN — LINKEDIN ↗
             </a>
             <a
-              href="https://github.com/AkashiGhost/mistral"
+              href="https://github.com/AkashiGhost/gemini"
               target="_blank"
               rel="noopener noreferrer"
               style={{
