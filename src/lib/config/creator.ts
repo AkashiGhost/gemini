@@ -1,5 +1,5 @@
-export const CREATOR_INTERVIEW_MODEL = "gemini-2.0-flash";
-export const CREATOR_IMAGE_MODEL = "imagen-3.0-generate-001";
+export const CREATOR_INTERVIEW_MODEL = "gemini-2.5-flash";
+export const CREATOR_IMAGE_MODEL = "imagen-4.0-generate-001";
 export const CREATOR_TRACE_HEADER = "x-trace-id";
 
 export const CREATOR_IMAGE_RATE_LIMIT = {

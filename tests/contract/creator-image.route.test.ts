@@ -87,7 +87,7 @@ describe("POST /api/creator/image rate-limit contract", () => {
     expect(firstPayload).toMatchObject({
       imageBase64: "ZmFrZS1pbWFnZQ==",
       mimeType: "image/png",
-      model: "imagen-3.0-generate-001",
+      model: "imagen-4.0-generate-001",
     });
 
     expect(second.status).toBe(429);

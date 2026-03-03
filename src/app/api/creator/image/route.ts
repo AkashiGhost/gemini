@@ -224,7 +224,6 @@ export async function POST(req: NextRequest): Promise<Response> {
         numberOfImages: 1,
         aspectRatio: spec.aspectRatio ?? "1:1",
         outputMimeType: "image/png",
-        enhancePrompt: true,
       },
     });
 
