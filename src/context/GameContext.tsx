@@ -219,6 +219,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const pendingKickoffRef = useRef<PendingKickoff | null>(null);
   const micStreamingEnabledRef = useRef(true);
   const micEnableFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const safeCloseSession = useCallback((session: Session | null | undefined) => {
     if (!session) return;
@@ -236,6 +237,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (micEnableFallbackTimerRef.current !== null) {
       clearTimeout(micEnableFallbackTimerRef.current);
       micEnableFallbackTimerRef.current = null;
+    }
+  }, []);
+
+  const clearConnectTimeout = useCallback(() => {
+    if (connectTimeoutRef.current !== null) {
+      clearTimeout(connectTimeoutRef.current);
+      connectTimeoutRef.current = null;
     }
   }, []);
 
@@ -416,6 +424,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       stopTicker();
       clearSilenceTimer();
       clearMicEnableFallbackTimer();
+      clearConnectTimeout();
       micStreamingEnabledRef.current = true;
       pendingKickoffRef.current = null;
       audioCaptureRef.current?.stop();
@@ -425,7 +434,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       safeCloseSession(sessionRef.current);
       sessionRef.current = null;
     };
-  }, [stopTicker, clearMicEnableFallbackTimer, clearSilenceTimer, safeCloseSession]);
+  }, [stopTicker, clearConnectTimeout, clearMicEnableFallbackTimer, clearSilenceTimer, safeCloseSession]);
 
   const aiTextAccumRef = useRef<string>("");
 
@@ -555,6 +564,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     stopTicker();
     clearSilenceTimer();
     clearMicEnableFallbackTimer();
+    clearConnectTimeout();
     micStreamingEnabledRef.current = true;
     pendingEndGameRef.current = null;
     pendingKickoffRef.current = null;
@@ -573,7 +583,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       sessionId: stateRef.current.sessionId,
       causalChain: ["session.ended"],
     });
-  }, [clearMicEnableFallbackTimer, clearSilenceTimer, logger, safeCloseSession, stopTicker]);
+  }, [clearConnectTimeout, clearMicEnableFallbackTimer, clearSilenceTimer, logger, safeCloseSession, stopTicker]);
 
   useEffect(() => {
     if (!pendingEndGameRef.current) return;
@@ -606,6 +616,31 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
     micStreamingEnabledRef.current = false;
     clearMicEnableFallbackTimer();
+    clearConnectTimeout();
+
+    connectTimeoutRef.current = setTimeout(() => {
+      const current = stateRef.current;
+      if (current.status !== "connecting" || current.sessionId !== sessionId) return;
+
+      logger.error({
+        event: "session.connect_timeout",
+        sessionId,
+        causalChain: ["session.connect_timeout"],
+        data: { timeoutMs: LIVE_RUNTIME_CONFIG.connectTimeoutMs },
+      });
+
+      audioCaptureRef.current?.stop();
+      audioCaptureRef.current = null;
+      safeCloseSession(sessionRef.current);
+      sessionRef.current = null;
+      dispatch({
+        type: "SET_STATUS",
+        status: "error",
+        errorMessage:
+          `Session start timed out after ${Math.round(LIVE_RUNTIME_CONFIG.connectTimeoutMs / 1000)}s. ` +
+          "Check model availability, API key, and quota.",
+      });
+    }, LIVE_RUNTIME_CONFIG.connectTimeoutMs);
 
     try {
       // Prime output audio while still inside a potential user-gesture call stack.
@@ -625,7 +660,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
         throw new Error(`Failed to get ephemeral token (${tokenRes.status}): ${errorText}`);
       }
 
-      const { token } = (await tokenRes.json()) as { token: string };
+      const tokenPayload = (await tokenRes.json()) as { token: string; model?: string };
+      const token = tokenPayload.token;
+      const liveModel = typeof tokenPayload.model === "string" && tokenPayload.model.trim().length > 0
+        ? tokenPayload.model
+        : LIVE_RUNTIME_CONFIG.modelName;
 
       try {
         await audioCaptureRef.current?.stop();
@@ -639,7 +678,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       } as ConstructorParameters<typeof GoogleGenAI>[0]);
 
       const session = await ai.live.connect({
-        model: LIVE_RUNTIME_CONFIG.modelName,
+        model: liveModel,
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
@@ -664,6 +703,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         } as Record<string, unknown>,
         callbacks: {
           onopen: () => {
+            clearConnectTimeout();
             dispatch({ type: "SET_STATUS", status: "playing" });
             startTicker();
             clearMicEnableFallbackTimer();
@@ -674,7 +714,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
               event: "session.open",
               sessionId,
               causalChain: ["session.open"],
-              data: { model: LIVE_RUNTIME_CONFIG.modelName, storyId },
+              data: { model: liveModel, storyId },
             });
           },
 
@@ -747,6 +787,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           },
 
           onerror: (errorEvent: ErrorEvent) => {
+            clearConnectTimeout();
             dispatch({
               type: "SET_STATUS",
               status: "error",
@@ -765,6 +806,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           },
 
           onclose: (closeEvent: CloseEvent) => {
+            clearConnectTimeout();
             closingSessionRef.current = null;
             sessionRef.current = null;
             audioCaptureRef.current?.stop();
@@ -837,6 +879,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           causalChain: ["mic.started"],
         });
       } catch (error) {
+        clearConnectTimeout();
         dispatch({
           type: "SET_STATUS",
           status: "error",
@@ -853,6 +896,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         });
       }
     } catch (error) {
+      clearConnectTimeout();
       const message = error instanceof Error ? error.message : String(error);
       dispatch({
         type: "SET_STATUS",
@@ -866,7 +910,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         error,
       });
     }
-  }, [clearMicEnableFallbackTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logger, safeCloseSession, startTicker, stopTicker]);
+  }, [clearConnectTimeout, clearMicEnableFallbackTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logger, safeCloseSession, startTicker, stopTicker]);
 
   const togglePause = useCallback(() => {
     dispatch({ type: "TOGGLE_PAUSE" });

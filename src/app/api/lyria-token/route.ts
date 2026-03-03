@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI, Modality } from "@google/genai";
-import { LYRIA_DEFAULT_CONFIG } from "@/lib/config/lyria";
+import { LYRIA_DEFAULT_CONFIG, LYRIA_RUNTIME_CONFIG } from "@/lib/config/lyria";
 import { createLogger } from "@/lib/logging";
 
 export const runtime = "nodejs";
 const logger = createLogger("api/lyria-token");
 
 export async function POST() {
+  if (!LYRIA_RUNTIME_CONFIG.enabled) {
+    return NextResponse.json(
+      { error: "Lyria RealTime is disabled (set NEXT_PUBLIC_ENABLE_LYRIA_REALTIME=true to enable)." },
+      { status: 503 },
+    );
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(

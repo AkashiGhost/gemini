@@ -16,8 +16,27 @@ export const TENSION_PHASE_THRESHOLDS: TensionPhaseThreshold[] = [
   { minTension: 0.85, phase: 4 },
 ];
 
+function parseCsvList(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
+const liveModelFromEnv = process.env.NEXT_PUBLIC_GEMINI_LIVE_MODEL?.trim();
+const liveFallbackModelsFromEnv = parseCsvList(process.env.NEXT_PUBLIC_GEMINI_LIVE_MODEL_FALLBACKS);
+const primaryLiveModel = liveModelFromEnv && liveModelFromEnv.length > 0
+  ? liveModelFromEnv
+  : "gemini-2.5-flash-native-audio-latest";
+const defaultFallbackModels = ["gemini-2.5-flash-native-audio", "gemini-live-2.5-flash-native-audio"];
+const liveFallbackModels = (liveFallbackModelsFromEnv.length > 0 ? liveFallbackModelsFromEnv : defaultFallbackModels)
+  .filter((modelName) => modelName !== primaryLiveModel);
+
 export const LIVE_RUNTIME_CONFIG = {
-  modelName: "gemini-2.5-flash-native-audio-latest",
+  modelName: primaryLiveModel,
+  fallbackModelNames: liveFallbackModels,
+  connectTimeoutMs: 15_000,
   voiceName: "Charon",
   silenceNudgeMs: 12_000,
   realtimeInputSilenceDurationMs: 1_200,

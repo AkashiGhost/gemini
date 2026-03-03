@@ -8,14 +8,28 @@ export interface LyriaConfig {
   initialTension: number;
 }
 
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (value == null) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
+}
+
+const lyriaModelFromEnv = process.env.NEXT_PUBLIC_LYRIA_MODEL?.trim();
+
 export const LYRIA_DEFAULT_CONFIG: Readonly<LyriaConfig> = Object.freeze({
-  model: "models/lyria-realtime-exp",
+  model: lyriaModelFromEnv && lyriaModelFromEnv.length > 0 ? lyriaModelFromEnv : "models/lyria-realtime-exp",
   reconnectAttempts: 1,
   baseGain: 0.3,
   transitionSeconds: 4,
   tokenEndpoint: "/api/lyria-token",
   fallbackSampleRate: 24000,
   initialTension: 0.35,
+});
+
+export const LYRIA_RUNTIME_CONFIG = Object.freeze({
+  enabled: parseBoolean(process.env.NEXT_PUBLIC_ENABLE_LYRIA_REALTIME, false),
 });
 
 export function clampUnitValue(value: number, fallback: number): number {

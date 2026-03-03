@@ -69,70 +69,85 @@ export async function POST(req: NextRequest) {
       httpOptions: { apiVersion: "v1alpha" },
     } as ConstructorParameters<typeof GoogleGenAI>[0]);
 
-    // Create an ephemeral token for the Live API session.
-    // The system prompt is embedded in the token's live connect config
-    // so it cannot be overridden or observed client-side.
-    const tokenResponse = await ai.authTokens.create({
-      config: {
-        uses: 1, // Single-use — one session per token
-        expireTime: new Date(Date.now() + LIVE_RUNTIME_CONFIG.ephemeralTokenLifetimeMs).toISOString(),
-        // Lock the Live API config into the token
-        liveConnectConstraints: {
-          model: LIVE_RUNTIME_CONFIG.modelName,
+    const modelCandidates = [LIVE_RUNTIME_CONFIG.modelName, ...LIVE_RUNTIME_CONFIG.fallbackModelNames];
+    let token: string | undefined;
+    let selectedModel: string | undefined;
+    let lastMintError: unknown;
+
+    for (const modelName of modelCandidates) {
+      try {
+        // Create an ephemeral token for the Live API session.
+        // The system prompt is embedded in the token's live connect config
+        // so it cannot be overridden or observed client-side.
+        const tokenResponse = await ai.authTokens.create({
           config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: LIVE_RUNTIME_CONFIG.voiceName },
-              },
+            uses: 1, // Single-use — one session per token
+            expireTime: new Date(Date.now() + LIVE_RUNTIME_CONFIG.ephemeralTokenLifetimeMs).toISOString(),
+            // Lock the Live API config into the token
+            liveConnectConstraints: {
+              model: modelName,
+              config: {
+                responseModalities: [Modality.AUDIO],
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: { voiceName: LIVE_RUNTIME_CONFIG.voiceName },
+                  },
+                },
+                systemInstruction: {
+                  parts: [{ text: systemPrompt }],
+                },
+                tools: LIVE_TOOL_DECLARATIONS,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                outputAudioTranscription: {} as any,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                sessionResumption: {} as any,
+                contextWindowCompression: { slidingWindow: {} },
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                enableAffectiveDialog: true as any,
+                realtimeInputConfig: {
+                  automaticActivityDetection: {
+                    endOfSpeechSensitivity: "END_SENSITIVITY_LOW",
+                    silenceDurationMs: 1200,
+                  },
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                } as any,
+              } as Record<string, unknown>,
             },
-            systemInstruction: {
-              parts: [{ text: systemPrompt }],
-            },
-            tools: LIVE_TOOL_DECLARATIONS,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            outputAudioTranscription: {} as any,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            sessionResumption: {} as any,
-            contextWindowCompression: { slidingWindow: {} },
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            enableAffectiveDialog: true as any,
-            realtimeInputConfig: {
-              automaticActivityDetection: {
-                endOfSpeechSensitivity: "END_SENSITIVITY_LOW",
-                silenceDurationMs: 1200,
-              },
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            } as any,
-          } as Record<string, unknown>,
-        },
-      },
-    } as Parameters<typeof ai.authTokens.create>[0]);
+          },
+        } as Parameters<typeof ai.authTokens.create>[0]);
 
-    const token = (tokenResponse as Record<string, unknown>).name as string | undefined
-      ?? (tokenResponse as Record<string, unknown>).token as string | undefined;
+        token = (tokenResponse as Record<string, unknown>).name as string | undefined
+          ?? (tokenResponse as Record<string, unknown>).token as string | undefined;
+        if (!token) {
+          throw new Error("Token provider returned empty token");
+        }
+        selectedModel = modelName;
+        break;
+      } catch (mintError) {
+        lastMintError = mintError;
+        logger.warn({
+          event: "live_token.model_candidate_failed",
+          sessionId,
+          causalChain: ["live_token.request", "live_token.model_candidate_failed"],
+          data: { storyId, model: modelName },
+          error: mintError,
+        });
+      }
+    }
 
-    if (!token) {
-      logger.error({
-        event: "live_token.invalid_response",
-        sessionId,
-        causalChain: ["live_token.request", "live_token.invalid_response"],
-        data: { storyId },
-      });
-      return NextResponse.json(
-        { error: "Gemini returned an unexpected token response — check API version" },
-        { status: 502 },
-      );
+    if (!token || !selectedModel) {
+      const message = lastMintError instanceof Error ? lastMintError.message : "Unable to mint live token";
+      return NextResponse.json({ error: message }, { status: 502 });
     }
 
     logger.info({
       event: "live_token.minted",
       sessionId,
       causalChain: ["live_token.request", "live_token.minted"],
-      data: { storyId, model: LIVE_RUNTIME_CONFIG.modelName },
+      data: { storyId, model: selectedModel },
     });
 
-    return NextResponse.json({ token });
+    return NextResponse.json({ token, model: selectedModel });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error({

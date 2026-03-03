@@ -13,6 +13,7 @@ import { parseSoundCues } from "@/lib/sound-cue-parser";
 import { AUDIO_CONFIG } from "@/lib/config/audio";
 import { DEBUG_CONFIG } from "@/lib/config/debug";
 import type { LiveToolCallListener } from "@/lib/config/live-tools";
+import { LYRIA_RUNTIME_CONFIG } from "@/lib/config/lyria";
 import { createLogger, extendCausalChain } from "@/lib/logging";
 import { MusicEngine } from "@/lib/music-engine";
 import {
@@ -230,27 +231,35 @@ export function useSoundEngine({
         const timeline = TIMELINES[storyId] ?? TIMELINES["the-last-session"];
         engine.startTimeline(timeline);
 
-        // Adaptive music is optional. If it fails, we soft-fail and continue.
-        try {
-          const auxGain = engine.createAuxGain(0);
-          const musicEngine = new MusicEngine({
-            audioContext: engine.getAudioContext(),
-            gainNode: auxGain,
-          });
-          musicEngineRef.current = musicEngine;
-          const connected = await musicEngine.connect();
+        if (!LYRIA_RUNTIME_CONFIG.enabled) {
           logger.info({
-            event: connected ? "music.connected" : "music.disabled_soft_fail",
+            event: "music.disabled_by_config",
             sessionId,
-            causalChain: ["sound.init_start", "music.connect"],
+            causalChain: ["sound.init_start", "music.disabled_by_config"],
           });
-        } catch (musicError) {
-          logger.warn({
-            event: "music.disabled_soft_fail",
-            sessionId,
-            causalChain: ["sound.init_start", "music.connect_failed"],
-            error: musicError,
-          });
+        } else {
+          // Adaptive music is optional. If it fails, we soft-fail and continue.
+          try {
+            const auxGain = engine.createAuxGain(0);
+            const musicEngine = new MusicEngine({
+              audioContext: engine.getAudioContext(),
+              gainNode: auxGain,
+            });
+            musicEngineRef.current = musicEngine;
+            const connected = await musicEngine.connect();
+            logger.info({
+              event: connected ? "music.connected" : "music.disabled_soft_fail",
+              sessionId,
+              causalChain: ["sound.init_start", "music.connect"],
+            });
+          } catch (musicError) {
+            logger.warn({
+              event: "music.disabled_soft_fail",
+              sessionId,
+              causalChain: ["sound.init_start", "music.connect_failed"],
+              error: musicError,
+            });
+          }
         }
 
         logger.info({

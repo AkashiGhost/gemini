@@ -147,6 +147,10 @@ export class MusicEngine {
         },
         callbacks: {
           onopen: () => {
+            if (this.destroyed) {
+              this.session?.close();
+              return;
+            }
             this.log("info", {
               event: isReconnect ? "reconnected" : "connected",
               model: this.config.model,
@@ -222,6 +226,20 @@ export class MusicEngine {
     this.ai = null;
     this.clearActiveSources();
     this.pendingStartTime = 0;
+
+    const normalizedReason = event.reason.toLowerCase();
+    if (
+      event.code === 1008 &&
+      (normalizedReason.includes("not found") || normalizedReason.includes("not supported"))
+    ) {
+      this.shouldReconnect = false;
+      this.log("error", {
+        event: "reconnect_disabled_unsupported_model",
+        model: this.config.model,
+        reason: event.reason,
+      });
+      return;
+    }
 
     if (!this.shouldReconnect || this.destroyed) return;
     if (this.reconnectCount >= this.config.reconnectAttempts) {
