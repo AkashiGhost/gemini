@@ -9,7 +9,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import { FunctionResponseScheduling, GoogleGenAI, Modality } from "@google/genai";
+import { FunctionResponseScheduling, GoogleGenAI } from "@google/genai";
 import type { FunctionCall, Session } from "@google/genai";
 import { AudioCapture } from "@/lib/audio-capture";
 import { AudioPlayback } from "@/lib/audio-playback";
@@ -740,7 +740,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         status: "error",
         errorMessage:
           `Session start timed out after ${Math.round(LIVE_RUNTIME_CONFIG.connectTimeoutMs / 1000)}s. ` +
-          "Check model availability, API key, and quota.",
+          "Check model availability and API key.",
       });
     }, LIVE_RUNTIME_CONFIG.connectTimeoutMs);
 
@@ -779,30 +779,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
         httpOptions: { apiVersion: "v1alpha" },
       } as ConstructorParameters<typeof GoogleGenAI>[0]);
 
+      // Config (voice, tools, system prompt, VAD, etc.) is locked in the
+      // ephemeral token via liveConnectConstraints. Passing redundant config
+      // here can conflict with the BidiGenerateContentConstrained endpoint.
       const session = await ai.live.connect({
         model: liveModel,
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: LIVE_RUNTIME_CONFIG.voiceName },
-            },
-          },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          outputAudioTranscription: {} as any,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          sessionResumption: {} as any,
-          contextWindowCompression: { slidingWindow: {} },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          enableAffectiveDialog: true as any,
-          realtimeInputConfig: {
-            automaticActivityDetection: {
-              endOfSpeechSensitivity: "END_SENSITIVITY_LOW",
-              silenceDurationMs: LIVE_RUNTIME_CONFIG.realtimeInputSilenceDurationMs,
-            },
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } as any,
-        } as Record<string, unknown>,
         callbacks: {
           onopen: () => {
             clearConnectTimeout();

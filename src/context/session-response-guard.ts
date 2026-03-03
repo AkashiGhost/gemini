@@ -13,6 +13,6 @@ export function buildNoModelResponseErrorMessage(totalTimeoutMs: number): string
   const timeoutSeconds = Math.max(1, Math.round(totalTimeoutMs / 1000));
   return (
     `The session started but no response was received from Gemini after ${timeoutSeconds}s. ` +
-    "Please retry and check API quota/model availability."
+    "The model may be overloaded — please retry. If the issue persists, check model availability."
   );
 }
