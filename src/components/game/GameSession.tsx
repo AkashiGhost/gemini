@@ -8,15 +8,20 @@ import { AtmosphereLayer } from "./AtmosphereLayer";
 import { BreathingDot } from "@/components/ui/BreathingDot";
 
 // ─────────────────────────────────────────────
-// Game Session — Mistral / ElevenLabs version
-// ElevenLabs handles mic + TTS entirely.
+// Game Session — Gemini Live API version
+// Gemini Live handles mic + TTS entirely via direct WebSocket.
 // We show: AI character's text, speaking/listening state, choice overlay.
 // AtmosphereLayer renders for stories with visual atmosphere (Room 4B).
 // Breathing dot adapts animation speed to current story phase.
 // ─────────────────────────────────────────────
 
-// Character name displayed in the transcript for AI messages
-const CHARACTER_NAME = "Elara";
+// Character name displayed in the transcript per story
+const CHARACTER_NAMES: Record<string, string> = {
+  "the-call": "Alex",
+  "the-last-session": "Elara",
+  "the-lighthouse": "Sam",
+  "room-4b": "The Voice",
+};
 
 interface GameSessionProps {
   storyId: string;
@@ -284,7 +289,7 @@ export function GameSession({ storyId }: GameSessionProps) {
                     marginBottom: 2,
                   }}
                 >
-                  {isUser ? "You" : CHARACTER_NAME}
+                  {isUser ? "You" : (CHARACTER_NAMES[storyId] ?? "Alex")}
                 </span>
                 <p
                   style={{

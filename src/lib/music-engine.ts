@@ -136,8 +136,8 @@ export class MusicEngine {
     try {
       this.ai = new GoogleGenAI({
         apiKey: token,
-        apiVersion: "v1alpha",
-      });
+        httpOptions: { apiVersion: "v1alpha" },
+      } as ConstructorParameters<typeof GoogleGenAI>[0]);
 
       this.shouldReconnect = true;
       this.session = await this.ai.live.connect({

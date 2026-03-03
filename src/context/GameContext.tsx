@@ -317,12 +317,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const sendSilentToolAck = useCallback(
     (session: Session, functionCall: FunctionCall, sessionId: string | undefined, causalChain: string[]) => {
       try {
+        // end_game uses WHEN_IDLE so Gemini finishes its current sentence before closing.
+        // All other tools use SILENT to avoid interrupting voice output.
+        const scheduling = functionCall.name === "end_game"
+          ? FunctionResponseScheduling.WHEN_IDLE
+          : FunctionResponseScheduling.SILENT;
         session.sendToolResponse({
           functionResponses: [{
             id: functionCall.id,
             name: functionCall.name,
-            response: { output: { ok: true, scheduling: "SILENT" } },
-            scheduling: FunctionResponseScheduling.SILENT,
+            response: { output: { ok: true } },
+            scheduling,
           }],
         });
 

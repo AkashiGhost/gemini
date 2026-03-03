@@ -3,10 +3,10 @@
 // Each prompt guides the AI through the ENTIRE experience autonomously.
 //
 // ARCHITECTURE NOTE:
-// These prompts are injected via ElevenLabs SDK client-side prompt override.
-// The AI self-manages phase progression based on exchange count.
-// Sounds are driven by timeline + keyword detection on AI narration text.
-// The AI doesn't need explicit [SOUND:xxx] markers — natural descriptions trigger sounds automatically.
+// These prompts are locked server-side into ephemeral Gemini Live tokens
+// via /api/live-token — they cannot be observed or overridden client-side.
+// The AI self-manages phase progression and calls trigger_sound / set_tension
+// as silent tool calls that never interrupt voice output.
 // ─────────────────────────────────────────────
 
 import type { StoryId } from "@/lib/constants";
