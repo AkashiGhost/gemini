@@ -117,7 +117,7 @@
         },
         "elevenlabs_voice_id": {
           "type": "string",
-          "description": "Optional ElevenLabs voice ID to use for TTS rendering of this character's lines."
+          "description": "Optional voice profile ID used by the active TTS provider when rendering this character's lines."
         }
       }
     },

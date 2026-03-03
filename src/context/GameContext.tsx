@@ -34,12 +34,15 @@ export interface GameContextValue {
   isSpeaking: boolean;
   isPaused: boolean;
   transcript: TranscriptEntry[];
+  lastUserTranscriptText: string;
+  lastUserTranscriptSeq: number;
   hasAiSpoken: boolean;
   lastAiText: string;
   micMuted: boolean;
   elapsedSeconds: number;
   errorMessage: string | undefined;
-  startSession: (storyId: string) => Promise<void>;
+  startSession: (storyId: string, options?: { deferKickoff?: boolean }) => Promise<void>;
+  kickoffSession: (storyId: string) => void;
   endSession: () => void;
   setPhase: (phase: number, options?: { reason?: string; causalChain?: string[] }) => void;
   setPhaseFromTension: (tension: number, options?: { reason?: string; causalChain?: string[] }) => number;
@@ -55,6 +58,8 @@ type UIState = {
   isSpeaking: boolean;
   isPaused: boolean;
   transcript: TranscriptEntry[];
+  lastUserTranscriptText: string;
+  lastUserTranscriptSeq: number;
   hasAiSpoken: boolean;
   lastAiText: string;
   micMuted: boolean;
@@ -81,6 +86,8 @@ const initialState: UIState = {
   isSpeaking: false,
   isPaused: false,
   transcript: [],
+  lastUserTranscriptText: "",
+  lastUserTranscriptSeq: 0,
   hasAiSpoken: false,
   lastAiText: "",
   micMuted: false,
@@ -104,8 +111,18 @@ function uiReducer(state: UIState, action: UIAction): UIState {
     case "AI_TEXT":
       return { ...state, lastAiText: action.text, hasAiSpoken: true };
 
-    case "ADD_TRANSCRIPT":
-      return { ...state, transcript: [...state.transcript, action.entry] };
+    case "ADD_TRANSCRIPT": {
+      const transcript = [...state.transcript, action.entry];
+      if (action.entry.source !== "user") {
+        return { ...state, transcript };
+      }
+      return {
+        ...state,
+        transcript,
+        lastUserTranscriptText: action.entry.text,
+        lastUserTranscriptSeq: state.lastUserTranscriptSeq + 1,
+      };
+    }
 
     case "GAME_OVER":
       return { ...state, status: "ended", isSpeaking: false };
@@ -140,11 +157,23 @@ interface PendingEndGame {
   causalChain: string[];
 }
 
+interface PendingKickoff {
+  storyId: string;
+  causalChain: string[];
+}
+
 function createSessionId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
   return `session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function getInitialKickoffPrompt(storyId: string): string {
+  if (storyId === "the-call") {
+    return "The phone has just been answered. Speak immediately as Alex with one urgent line, then pause for the player.";
+  }
+  return "Begin the session now. Speak first in character with one short opening line, then pause for the player.";
 }
 
 export function GameProvider({ children }: { children: ReactNode }) {
@@ -184,8 +213,96 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [logger]);
 
   const sessionRef = useRef<Session | null>(null);
+  const closingSessionRef = useRef<Session | null>(null);
   const audioPlaybackRef = useRef<AudioPlayback | null>(null);
   const audioCaptureRef = useRef<AudioCapture | null>(null);
+  const pendingKickoffRef = useRef<PendingKickoff | null>(null);
+  const micStreamingEnabledRef = useRef(true);
+  const micEnableFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const safeCloseSession = useCallback((session: Session | null | undefined) => {
+    if (!session) return;
+    // StrictMode/dev can run cleanup paths multiple times; close must be idempotent.
+    if (closingSessionRef.current === session) return;
+    closingSessionRef.current = session;
+    try {
+      session.close();
+    } catch {
+      // no-op
+    }
+  }, []);
+
+  const clearMicEnableFallbackTimer = useCallback(() => {
+    if (micEnableFallbackTimerRef.current !== null) {
+      clearTimeout(micEnableFallbackTimerRef.current);
+      micEnableFallbackTimerRef.current = null;
+    }
+  }, []);
+
+  const enableMicStreaming = useCallback((sessionId: string | undefined, reason: string) => {
+    if (micStreamingEnabledRef.current) return;
+    micStreamingEnabledRef.current = true;
+    clearMicEnableFallbackTimer();
+    logger.info({
+      event: "mic.streaming_enabled",
+      sessionId,
+      causalChain: ["mic.streaming_enabled"],
+      data: { reason },
+    });
+  }, [clearMicEnableFallbackTimer, logger]);
+
+  const flushPendingKickoff = useCallback(
+    (session: Session, sessionId: string | undefined) => {
+      const pending = pendingKickoffRef.current;
+      if (!pending) return;
+      if (closingSessionRef.current === session) return;
+      if (sessionRef.current !== session) return;
+
+      const prompt = getInitialKickoffPrompt(pending.storyId);
+      try {
+        session.sendClientContent({
+          turns: prompt,
+          turnComplete: true,
+        });
+        pendingKickoffRef.current = null;
+        logger.info({
+          event: "session.kickoff_sent",
+          sessionId,
+          causalChain: extendCausalChain(pending.causalChain, "session.kickoff_sent"),
+          data: { storyId: pending.storyId },
+        });
+      } catch (error) {
+        logger.warn({
+          event: "session.kickoff_failed",
+          sessionId,
+          causalChain: extendCausalChain(pending.causalChain, "session.kickoff_failed"),
+          error,
+          data: { storyId: pending.storyId },
+        });
+      }
+    },
+    [logger],
+  );
+
+  const kickoffSession = useCallback(
+    (storyId: string) => {
+      const causalChain = ["session.kickoff_requested"];
+      pendingKickoffRef.current = { storyId, causalChain };
+
+      const session = sessionRef.current;
+      if (session) {
+        flushPendingKickoff(session, stateRef.current.sessionId);
+      } else {
+        logger.info({
+          event: "session.kickoff_queued",
+          sessionId: stateRef.current.sessionId,
+          causalChain,
+          data: { storyId },
+        });
+      }
+    },
+    [flushPendingKickoff, logger],
+  );
 
   useEffect(() => {
     audioPlaybackRef.current = new AudioPlayback();
@@ -253,6 +370,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       if (s.status !== "playing" || s.isSpeaking || s.isPaused) return;
       const session = sessionRef.current;
       if (!session) return;
+      if (closingSessionRef.current === session) return;
       logger.info({
         event: "silence_nudge.send",
         sessionId: s.sessionId,
@@ -297,20 +415,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return () => {
       stopTicker();
       clearSilenceTimer();
+      clearMicEnableFallbackTimer();
+      micStreamingEnabledRef.current = true;
+      pendingKickoffRef.current = null;
       audioCaptureRef.current?.stop();
       audioCaptureRef.current = null;
       audioPlaybackRef.current?.destroy();
       audioPlaybackRef.current = null;
-      if (sessionRef.current) {
-        try {
-          sessionRef.current.close();
-        } catch {
-          // no-op
-        }
-        sessionRef.current = null;
-      }
+      safeCloseSession(sessionRef.current);
+      sessionRef.current = null;
     };
-  }, [stopTicker, clearSilenceTimer]);
+  }, [stopTicker, clearMicEnableFallbackTimer, clearSilenceTimer, safeCloseSession]);
 
   const aiTextAccumRef = useRef<string>("");
 
@@ -439,21 +554,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const endSession = useCallback(() => {
     stopTicker();
     clearSilenceTimer();
+    clearMicEnableFallbackTimer();
+    micStreamingEnabledRef.current = true;
     pendingEndGameRef.current = null;
+    pendingKickoffRef.current = null;
 
     audioCaptureRef.current?.stop();
     audioCaptureRef.current = null;
 
     audioPlaybackRef.current?.stop();
 
-    if (sessionRef.current) {
-      try {
-        sessionRef.current.close();
-      } catch {
-        // no-op
-      }
-      sessionRef.current = null;
-    }
+    safeCloseSession(sessionRef.current);
+    sessionRef.current = null;
 
     dispatch({ type: "GAME_OVER" });
     logger.info({
@@ -461,7 +573,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       sessionId: stateRef.current.sessionId,
       causalChain: ["session.ended"],
     });
-  }, [clearSilenceTimer, logger, stopTicker]);
+  }, [clearMicEnableFallbackTimer, clearSilenceTimer, logger, safeCloseSession, stopTicker]);
 
   useEffect(() => {
     if (!pendingEndGameRef.current) return;
@@ -479,13 +591,26 @@ export function GameProvider({ children }: { children: ReactNode }) {
     endSession();
   }, [endSession, logger, state.isSpeaking, state.sessionId, state.status]);
 
-  const startSession = useCallback(async (storyId: string) => {
+  const startSession = useCallback(async (storyId: string, options?: { deferKickoff?: boolean }) => {
     const sessionId = createSessionId();
     dispatch({ type: "SET_SESSION_ID", sessionId });
     dispatch({ type: "SET_STATUS", status: "connecting" });
     dispatch({ type: "SET_PHASE", phase: 0 });
+    if (options?.deferKickoff) {
+      pendingKickoffRef.current = null;
+    } else {
+      pendingKickoffRef.current = {
+        storyId,
+        causalChain: ["session.start", "session.kickoff_requested"],
+      };
+    }
+    micStreamingEnabledRef.current = false;
+    clearMicEnableFallbackTimer();
 
     try {
+      // Prime output audio while still inside a potential user-gesture call stack.
+      await audioPlaybackRef.current?.prime();
+
       const tokenRes = await fetch("/api/live-token", {
         method: "POST",
         headers: {
@@ -541,6 +666,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
           onopen: () => {
             dispatch({ type: "SET_STATUS", status: "playing" });
             startTicker();
+            clearMicEnableFallbackTimer();
+            micEnableFallbackTimerRef.current = setTimeout(() => {
+              enableMicStreaming(sessionId, "fallback_timeout");
+            }, 8000);
             logger.info({
               event: "session.open",
               sessionId,
@@ -593,6 +722,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             }
 
             if (msg.serverContent?.generationComplete) {
+              enableMicStreaming(sessionId, "first_generation_complete");
               dispatch({ type: "SET_SPEAKING", value: false });
               const aiText = aiTextAccumRef.current.trim();
               if (aiText) {
@@ -611,6 +741,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             }
 
             if (msg.serverContent?.turnComplete) {
+              enableMicStreaming(sessionId, "turn_complete");
               dispatch({ type: "SET_SPEAKING", value: false });
             }
           },
@@ -623,6 +754,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
             });
             stopTicker();
             clearSilenceTimer();
+            clearMicEnableFallbackTimer();
+            micStreamingEnabledRef.current = true;
             logger.error({
               event: "session.error",
               sessionId,
@@ -632,11 +765,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
           },
 
           onclose: (closeEvent: CloseEvent) => {
+            closingSessionRef.current = null;
             sessionRef.current = null;
             audioCaptureRef.current?.stop();
             audioCaptureRef.current = null;
             stopTicker();
             clearSilenceTimer();
+            clearMicEnableFallbackTimer();
+            micStreamingEnabledRef.current = true;
 
             const current = stateRef.current;
             if (current.status !== "ended" && current.status !== "error") {
@@ -665,10 +801,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
       });
 
       sessionRef.current = session;
+      flushPendingKickoff(session, sessionId);
 
       const capture = new AudioCapture((base64: string) => {
         const s = stateRef.current;
         if (s.micMuted || s.isPaused || s.status !== "playing") return;
+        if (!micStreamingEnabledRef.current) return;
+        if (closingSessionRef.current === session) return;
+        if (sessionRef.current !== session) return;
 
         try {
           session.sendRealtimeInput({
@@ -702,7 +842,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           status: "error",
           errorMessage: "Microphone access denied. Please allow microphone access and retry.",
         });
-        session.close();
+        safeCloseSession(session);
         stopTicker();
 
         logger.error({
@@ -726,7 +866,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         error,
       });
     }
-  }, [clearSilenceTimer, handleLiveToolCalls, logger, startTicker, stopTicker]);
+  }, [clearMicEnableFallbackTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logger, safeCloseSession, startTicker, stopTicker]);
 
   const togglePause = useCallback(() => {
     dispatch({ type: "TOGGLE_PAUSE" });
@@ -743,12 +883,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
     isSpeaking: state.isSpeaking,
     isPaused: state.isPaused,
     transcript: state.transcript,
+    lastUserTranscriptText: state.lastUserTranscriptText,
+    lastUserTranscriptSeq: state.lastUserTranscriptSeq,
     hasAiSpoken: state.hasAiSpoken,
     lastAiText: state.lastAiText,
     micMuted: state.micMuted,
     elapsedSeconds: state.elapsedSeconds,
     errorMessage: state.errorMessage,
     startSession,
+    kickoffSession,
     endSession,
     setPhase,
     setPhaseFromTension,

@@ -65,6 +65,21 @@ export class AudioPlayback {
   }
 
   /**
+   * Prime/resume the AudioContext in response to a user gesture.
+   * This prevents autoplay policy from blocking later model audio.
+   */
+  async prime(): Promise<void> {
+    const ctx = this.ensureContext();
+    if (ctx.state === "suspended") {
+      try {
+        await ctx.resume();
+      } catch {
+        // Browser may still block until next user gesture; safe to ignore.
+      }
+    }
+  }
+
+  /**
    * Stop all playing audio and reset the playhead to now.
    * Call this when starting a new session after a reconnect so that
    * stale nextStartTime (from a previous session) doesn't delay new audio.

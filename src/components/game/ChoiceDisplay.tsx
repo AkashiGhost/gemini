@@ -2,7 +2,7 @@
 
 // ─────────────────────────────────────────────
 // ChoiceDisplay — stub (choices are now voice-only)
-// ElevenLabs / Mistral handles all choice presentation verbally.
+// The voice pipeline handles all choice presentation verbally.
 // Visual choice UI is removed. Component kept as no-op stub.
 // ─────────────────────────────────────────────
 

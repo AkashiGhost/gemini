@@ -73,7 +73,7 @@ emotional_tone: >
 # These are pulled verbatim by the pipeline. Not generated. Not paraphrased.
 # They are the last thing the player hears. Write for the ear.
 # Three lines maximum. Each must be able to stand alone.
-# Delivery notes are instructions for ElevenLabs voice synthesis parameters.
+# Delivery notes are instructions for runtime voice synthesis parameters.
 
 elara_final_lines:
 

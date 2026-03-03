@@ -5,11 +5,14 @@ import {
   type CreatorInterviewChunk,
   type CreatorInterviewRequestBody,
   type CreatorSpec,
+  CREATOR_TRACE_HEADER,
   CREATOR_INTERVIEW_MODEL,
   EMPTY_CREATOR_SPEC,
+  resolveCreatorTraceId,
   sanitizeCreatorChatMessages,
   sanitizeCreatorSpecPartial,
 } from "@/lib/config/creator";
+import { createLogger } from "@/lib/logging";
 
 export const runtime = "nodejs";
 
@@ -21,15 +24,7 @@ interface InterviewModelOutput {
 }
 
 const encoder = new TextEncoder();
-
-function logInfo(event: string, sessionId?: string, details: Record<string, unknown> = {}): void {
-  console.log(JSON.stringify({ event, sessionId, ...details }));
-}
-
-function logError(event: string, sessionId: string | undefined, error: unknown): void {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(JSON.stringify({ event, sessionId, error: message }));
-}
+const logger = createLogger("api/creator/interview");
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -144,11 +139,38 @@ function toSseChunk(chunk: CreatorInterviewChunk): Uint8Array {
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
+  const traceId = resolveCreatorTraceId(req.headers.get(CREATOR_TRACE_HEADER), "creator-interview");
+
+  const jsonWithTrace = (payload: Record<string, unknown>, status: number): Response =>
+    Response.json(payload, {
+      status,
+      headers: { [CREATOR_TRACE_HEADER]: traceId },
+    });
+
+  const logInfo = (event: string, sessionId?: string, details: Record<string, unknown> = {}): void => {
+    logger.info({
+      event,
+      sessionId,
+      causalChain: [`trace:${traceId}`, event],
+      data: { traceId, ...details },
+    });
+  };
+
+  const logError = (event: string, sessionId: string | undefined, error: unknown): void => {
+    logger.error({
+      event,
+      sessionId,
+      causalChain: [`trace:${traceId}`, event],
+      data: { traceId },
+      error,
+    });
+  };
+
   let body: CreatorInterviewRequestBody;
   try {
     body = (await req.json()) as CreatorInterviewRequestBody;
   } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    return jsonWithTrace({ error: "Invalid JSON body" }, 400);
   }
 
   const sessionId = sanitizeSessionId(body.sessionId);
@@ -156,7 +178,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const currentSpec = sanitizeCreatorSpecPartial(body.currentSpec);
 
   if (messages.length === 0) {
-    return Response.json({ error: "messages must contain at least one message" }, { status: 400 });
+    return jsonWithTrace({ error: "messages must contain at least one message" }, 400);
   }
 
   logInfo("creator.interview.request.received", sessionId, {
@@ -165,7 +187,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return Response.json({ error: "Missing GEMINI_API_KEY environment variable" }, { status: 500 });
+    return jsonWithTrace({ error: "Missing GEMINI_API_KEY environment variable" }, 500);
   }
 
   const stream = new ReadableStream<Uint8Array>({
@@ -212,7 +234,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
+      [CREATOR_TRACE_HEADER]: traceId,
     },
   });
 }
-

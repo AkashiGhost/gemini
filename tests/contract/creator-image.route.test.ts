@@ -27,10 +27,13 @@ vi.mock("@google/genai", () => ({
 
 const originalGeminiKey = process.env.GEMINI_API_KEY;
 
-function imageRequest(body: Record<string, unknown>): Request {
+function imageRequest(body: Record<string, unknown>, traceId?: string): Request {
   return new Request("http://localhost/api/creator/image", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(traceId ? { "x-trace-id": traceId } : {}),
+    },
     body: JSON.stringify(body),
   });
 }
@@ -67,19 +70,20 @@ describe("POST /api/creator/image rate-limit contract", () => {
       imageRequest({
         sessionId: "session-a",
         prompt: "An abandoned observatory in rain.",
-      }) as never,
+      }, "trace-image-a") as never,
     );
     const second = await POST(
       imageRequest({
         sessionId: "session-a",
         prompt: "An abandoned observatory in rain.",
-      }) as never,
+      }, "trace-image-a") as never,
     );
 
     const firstPayload = await first.json();
     const secondPayload = await second.json();
 
     expect(first.status).toBe(200);
+    expect(first.headers.get("x-trace-id")).toBe("trace-image-a");
     expect(firstPayload).toMatchObject({
       imageBase64: "ZmFrZS1pbWFnZQ==",
       mimeType: "image/png",
@@ -87,6 +91,7 @@ describe("POST /api/creator/image rate-limit contract", () => {
     });
 
     expect(second.status).toBe(429);
+    expect(second.headers.get("x-trace-id")).toBe("trace-image-a");
     expect(second.headers.get("Retry-After")).toBe("3");
     expect(secondPayload).toEqual({
       error: "Rate limit reached for this session",
@@ -107,18 +112,21 @@ describe("POST /api/creator/image rate-limit contract", () => {
     const { POST } = await import("../../src/app/api/creator/image/route");
 
     const sessionALive = await POST(
-      imageRequest({ sessionId: "session-a", prompt: "A storm over cliffs." }) as never,
+      imageRequest({ sessionId: "session-a", prompt: "A storm over cliffs." }, "trace-image-session-a") as never,
     );
     const sessionABlocked = await POST(
-      imageRequest({ sessionId: "session-a", prompt: "A storm over cliffs." }) as never,
+      imageRequest({ sessionId: "session-a", prompt: "A storm over cliffs." }, "trace-image-session-a") as never,
     );
     const sessionBAllowed = await POST(
-      imageRequest({ sessionId: "session-b", prompt: "A storm over cliffs." }) as never,
+      imageRequest({ sessionId: "session-b", prompt: "A storm over cliffs." }, "trace-image-session-b") as never,
     );
 
     expect(sessionALive.status).toBe(200);
     expect(sessionABlocked.status).toBe(429);
     expect(sessionBAllowed.status).toBe(200);
+    expect(sessionALive.headers.get("x-trace-id")).toBe("trace-image-session-a");
+    expect(sessionABlocked.headers.get("x-trace-id")).toBe("trace-image-session-a");
+    expect(sessionBAllowed.headers.get("x-trace-id")).toBe("trace-image-session-b");
 
     expect(mockGenerateContent).toHaveBeenCalledTimes(2);
     expect(mockGenerateImages).toHaveBeenCalledTimes(2);

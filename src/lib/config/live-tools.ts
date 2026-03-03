@@ -17,7 +17,7 @@ export const TENSION_PHASE_THRESHOLDS: TensionPhaseThreshold[] = [
 ];
 
 export const LIVE_RUNTIME_CONFIG = {
-  modelName: "gemini-live-2.5-flash-native-audio",
+  modelName: "gemini-2.5-flash-native-audio-latest",
   voiceName: "Charon",
   silenceNudgeMs: 12_000,
   realtimeInputSilenceDurationMs: 1_200,

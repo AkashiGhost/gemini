@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "lint:creator": "eslint src/app/api/creator/**/route.ts src/lib/config/creator.ts tests/contract/creator-*.route.test.ts",
     "test": "vitest run",
+    "test:creator:contract": "vitest run tests/contract/creator-interview.route.test.ts tests/contract/creator-image.route.test.ts tests/contract/creator-story-pack.route.test.ts",
     "test:watch": "vitest",
     "test:scenario": "tsx scripts/closed-loop-scenario.ts",
     "verify": "npm run lint && npm run test && npm run test:scenario"

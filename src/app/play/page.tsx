@@ -16,7 +16,8 @@ function PlayContent() {
   const storyId = searchParams.get("story") ?? DEFAULT_STORY_ID;
 
   const [onboardingDone, setOnboardingDone] = useState(false);
-  const { status, startSession, errorMessage } = useGame();
+  const [sessionPrepared, setSessionPrepared] = useState(false);
+  const { status, startSession, kickoffSession, errorMessage } = useGame();
 
   // Session ended — navigate back to stories
   useEffect(() => {
@@ -25,13 +26,30 @@ function PlayContent() {
     }
   }, [onboardingDone, status, router]);
 
+  const handleOnboardingPrepare = useCallback(() => {
+    if (sessionPrepared) return;
+    setSessionPrepared(true);
+    void startSession(storyId, { deferKickoff: true });
+  }, [sessionPrepared, startSession, storyId]);
+
   const handleOnboardingComplete = useCallback(() => {
+    if (!sessionPrepared) {
+      setSessionPrepared(true);
+      void startSession(storyId, { deferKickoff: true });
+    }
+    kickoffSession(storyId);
     setOnboardingDone(true);
-    void startSession(storyId);
-  }, [startSession, storyId]);
+  }, [kickoffSession, sessionPrepared, startSession, storyId]);
 
   if (!onboardingDone) {
-    return <OnboardingFlow storyId={storyId} onComplete={handleOnboardingComplete} />;
+    return (
+      <OnboardingFlow
+        storyId={storyId}
+        isSessionReady={status === "playing" || status === "error"}
+        onPrepare={handleOnboardingPrepare}
+        onComplete={handleOnboardingComplete}
+      />
+    );
   }
 
   // Connecting to Gemini Live

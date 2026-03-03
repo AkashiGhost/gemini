@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { DEFAULT_STORY_ID } from "@/lib/constants";
 
@@ -86,10 +86,17 @@ type OnboardingStep = "scene" | "headphones" | "countdown" | "ringing";
 
 interface OnboardingFlowProps {
   storyId: string;
+  isSessionReady?: boolean;
+  onPrepare?: () => void;
   onComplete: () => void;
 }
 
-export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
+export function OnboardingFlow({
+  storyId,
+  isSessionReady = true,
+  onPrepare,
+  onComplete,
+}: OnboardingFlowProps) {
   const onboarding = STORY_ONBOARDING[storyId] ?? STORY_ONBOARDING[DEFAULT_STORY_ID];
   const totalScenes = onboarding.scenes.length;
 
@@ -99,6 +106,9 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
   const [continueOpacity, setContinueOpacity] = useState(0);
   const [textOpacity, setTextOpacity] = useState(0);
   const [countdown, setCountdown] = useState(3);
+  const prepareTriggeredRef = useRef(false);
+  const ringFinishedRef = useRef(false);
+  const ringCompletionTriggeredRef = useRef(false);
 
   const currentScene = onboarding.scenes[sceneIndex];
 
@@ -133,6 +143,10 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
         // "the-call" story: phone rings before session starts
         transitionTimer = setTimeout(() => {
           if (storyId === "the-call") {
+            if (!prepareTriggeredRef.current) {
+              prepareTriggeredRef.current = true;
+              onPrepare?.();
+            }
             setStep("ringing");
           } else {
             onComplete();
@@ -146,7 +160,7 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
       clearTimeout(timer);
       if (transitionTimer) clearTimeout(transitionTimer);
     };
-  }, [step, countdown, onComplete, storyId]);
+  }, [step, countdown, onComplete, onPrepare, storyId]);
 
   // ── Phone ringing phase (the-call only) ────────────────────
   // Plays a North American ring tone (440Hz + 480Hz) for one cycle,
@@ -154,6 +168,8 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
   // "phone ringing → someone picks up → Alex speaks".
   useEffect(() => {
     if (step !== "ringing") return;
+    ringFinishedRef.current = false;
+    ringCompletionTriggeredRef.current = false;
 
     let ctx: AudioContext | null = null;
     try {
@@ -186,17 +202,36 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
       console.warn("[ONBOARDING] Could not play phone ring");
     }
 
-    // 2s ring + 2s silence = 4s before session connects
+    // 2s ring + 2s silence = 4s before handoff to gameplay.
     const timer = setTimeout(() => {
       ctx?.close().catch(() => {});
-      onComplete();
+      if (storyId !== "the-call") {
+        ringCompletionTriggeredRef.current = true;
+        onComplete();
+        return;
+      }
+      ringFinishedRef.current = true;
+      if (isSessionReady && !ringCompletionTriggeredRef.current) {
+        ringCompletionTriggeredRef.current = true;
+        onComplete();
+      }
     }, 4000);
 
     return () => {
       clearTimeout(timer);
       ctx?.close().catch(() => {});
     };
-  }, [step, onComplete]);
+  }, [isSessionReady, onComplete, step, storyId]);
+
+  useEffect(() => {
+    if (step !== "ringing") return;
+    if (storyId !== "the-call") return;
+    if (!ringFinishedRef.current) return;
+    if (!isSessionReady) return;
+    if (ringCompletionTriggeredRef.current) return;
+    ringCompletionTriggeredRef.current = true;
+    onComplete();
+  }, [isSessionReady, onComplete, step, storyId]);
 
   const advance = useCallback(() => {
     if (step === "scene") {
@@ -210,9 +245,13 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
         setStep("headphones");
       }
     } else if (step === "headphones") {
+      if (!prepareTriggeredRef.current) {
+        prepareTriggeredRef.current = true;
+        onPrepare?.();
+      }
       setStep("countdown");
     }
-  }, [step, sceneIndex, totalScenes]);
+  }, [onPrepare, step, sceneIndex, totalScenes]);
 
   // ── Scene step: image + text + delayed continue ──────────────
   if (step === "scene" && currentScene) {

@@ -4,7 +4,7 @@
 ## Schema: character-schema.json (draft-07)
 ##
 ## PIPELINE USAGE:
-##   This entire file is injected into the Mistral Large system prompt at session start.
+##   This entire file is injected into the story model system prompt at session start.
 ##   It is IMMUTABLE during gameplay — the runtime engine never writes to this file.
 ##   Runtime state (trust_level, secrets_revealed, etc.) lives in StoryState, not here.
 ##   mutable_state below defines INITIAL conditions and valid value ranges only.
@@ -31,7 +31,7 @@ role: narrator
 # These are non-schema extensions — valid per additionalProperties: true.
 story: the-last-session
 
-elevenlabs_voice_id: PLACEHOLDER_ELEVENLABS_VOICE_ID
+elevenlabs_voice_id: PLACEHOLDER_TTS_VOICE_ID
 # Target voice profile: calm, unhurried, precise consonants, slight lift on observations.
 # NOT breathy, NOT dramatic, NOT warm-radio-host.
 # Like a woman who has all the time in the world and finds your discomfort interesting.
@@ -485,7 +485,7 @@ mutable_state:
 # ─────────────────────────────────────────────
 # Not read by the character model. For pipeline implementation reference.
 #
-# Injection order into Mistral Large system prompt:
+# Injection order into the story model system prompt:
 #   1. This character card (verbatim or summarized by section)
 #   2. Current StoryState values (current mutable_state, not initial values above)
 #   3. Active phase_behavior descriptor for the current scene

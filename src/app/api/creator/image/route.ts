@@ -6,9 +6,12 @@ import {
   CREATOR_IMAGE_MODEL,
   CREATOR_IMAGE_RATE_LIMIT,
   CREATOR_INTERVIEW_MODEL,
+  CREATOR_TRACE_HEADER,
   EMPTY_CREATOR_SPEC,
+  resolveCreatorTraceId,
   sanitizeCreatorSpecPartial,
 } from "@/lib/config/creator";
+import { createLogger } from "@/lib/logging";
 
 export const runtime = "nodejs";
 
@@ -19,15 +22,7 @@ interface SessionRateState {
 }
 
 const sessionRateState = new Map<string, SessionRateState>();
-
-function logInfo(event: string, sessionId?: string, details: Record<string, unknown> = {}): void {
-  console.log(JSON.stringify({ event, sessionId, ...details }));
-}
-
-function logError(event: string, sessionId: string | undefined, error: unknown): void {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(JSON.stringify({ event, sessionId, error: message }));
-}
+const logger = createLogger("api/creator/image");
 
 function sanitizeSessionId(input: unknown): string {
   if (typeof input !== "string") return "anonymous";
@@ -140,11 +135,45 @@ async function enhancePrompt(
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
+  const traceId = resolveCreatorTraceId(req.headers.get(CREATOR_TRACE_HEADER), "creator-image");
+
+  const jsonWithTrace = (
+    payload: Record<string, unknown>,
+    status: number,
+    headers: Record<string, string> = {},
+  ): Response =>
+    Response.json(payload, {
+      status,
+      headers: {
+        ...headers,
+        [CREATOR_TRACE_HEADER]: traceId,
+      },
+    });
+
+  const logInfo = (event: string, sessionId?: string, details: Record<string, unknown> = {}): void => {
+    logger.info({
+      event,
+      sessionId,
+      causalChain: [`trace:${traceId}`, event],
+      data: { traceId, ...details },
+    });
+  };
+
+  const logError = (event: string, sessionId: string | undefined, error: unknown): void => {
+    logger.error({
+      event,
+      sessionId,
+      causalChain: [`trace:${traceId}`, event],
+      data: { traceId },
+      error,
+    });
+  };
+
   let body: CreatorImageRequestBody;
   try {
     body = (await req.json()) as CreatorImageRequestBody;
   } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    return jsonWithTrace({ error: "Invalid JSON body" }, 400);
   }
 
   const sessionId = sanitizeSessionId(body.sessionId ?? req.headers.get("x-session-id"));
@@ -153,7 +182,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const basePrompt = requestedPrompt ?? sanitizePrompt(spec.imagePrompt) ?? toPromptFromSpec(spec);
 
   if (!basePrompt) {
-    return Response.json({ error: "No prompt available for image generation" }, { status: 400 });
+    return jsonWithTrace({ error: "No prompt available for image generation" }, 400);
   }
 
   const limiter = checkRateLimit(sessionId);
@@ -167,14 +196,17 @@ export async function POST(req: NextRequest): Promise<Response> {
       },
       {
         status: 429,
-        headers: { "Retry-After": String(retryAfterSeconds) },
+        headers: {
+          "Retry-After": String(retryAfterSeconds),
+          [CREATOR_TRACE_HEADER]: traceId,
+        },
       },
     );
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return Response.json({ error: "Missing GEMINI_API_KEY environment variable" }, { status: 500 });
+    return jsonWithTrace({ error: "Missing GEMINI_API_KEY environment variable" }, 500);
   }
 
   logInfo("creator.image.request.received", sessionId, {
@@ -202,7 +234,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
     if (!imageBase64) {
       logInfo("creator.image.empty_response", sessionId);
-      return Response.json({ error: "No image returned from model" }, { status: 502 });
+      return jsonWithTrace({ error: "No image returned from model" }, 502);
     }
 
     logInfo("creator.image.generated", sessionId, {
@@ -210,15 +242,18 @@ export async function POST(req: NextRequest): Promise<Response> {
       promptLength: enhancedPrompt.length,
     });
 
-    return Response.json({
-      imageBase64,
-      mimeType,
-      prompt: enhancedPrompt,
-      model: CREATOR_IMAGE_MODEL,
-    });
+    return jsonWithTrace(
+      {
+        imageBase64,
+        mimeType,
+        prompt: enhancedPrompt,
+        model: CREATOR_IMAGE_MODEL,
+      },
+      200,
+    );
   } catch (error) {
     logError("creator.image.failed", sessionId, error);
     const message = error instanceof Error ? error.message : "Image generation failed";
-    return Response.json({ error: message }, { status: 500 });
+    return jsonWithTrace({ error: message }, 500);
   }
 }

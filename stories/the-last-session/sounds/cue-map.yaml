@@ -15,9 +15,9 @@
 #   normalcy (to be taken away) or marks the end of that normalcy.
 #
 # ASSET GENERATION (from sound-design-pipeline-research.md):
-#   - Ambient loops → ElevenLabs SFX (30s, native loop toggle)
-#   - Drones/sustained tones → Stable Audio 2.5 via fal.ai (up to 3 min)
-#   - Quick SFX prototyping → CassetteAI via fal.ai (~1s generation)
+#   - Ambient loops → short-form SFX model (30s, native loop toggle)
+#   - Drones/sustained tones → long-form audio model (up to 3 min)
+#   - Quick SFX prototyping → rapid-iteration SFX model (~1s generation)
 #   - All paths are relative to the game assets root
 # =============================================================================
 
@@ -41,7 +41,7 @@ ambient:
       the outside world still exists. Then it changes.
     asset_path: "assets/audio/rain-heavy-window.mp3"
     generation_prompt: "Heavy rain on glass windows, steady, atmospheric, slightly resonant, dark ambience, seamless loop"
-    generation_tool: elevenlabs_sfx
+    generation_tool: short_form_sfx_model
     volume: 0.6
     loop: true
     spatial:
@@ -64,7 +64,7 @@ ambient:
       to be subliminal, abrupt enough to be noticed in retrospect.
     asset_path: "assets/audio/hvac-hum-low.mp3"
     generation_prompt: "Low frequency air conditioning hum, building HVAC system, 60-80Hz mechanical drone, clinical interior, seamless loop"
-    generation_tool: elevenlabs_sfx
+    generation_tool: short_form_sfx_model
     volume: 0.15   # Intentionally low — below conscious threshold
     loop: true
     spatial:
@@ -88,7 +88,7 @@ ambient:
       'winding down' effect. It must stop mid-tick.
     asset_path: "assets/audio/clock-tick-wall.mp3"
     generation_prompt: "Old mechanical wall clock ticking, steady rhythm, wood resonance, precise metronomic beat, quiet room, seamless loop"
-    generation_tool: elevenlabs_sfx
+    generation_tool: short_form_sfx_model
     volume: 0.25
     loop: true
     spatial:
@@ -124,7 +124,7 @@ intermittent:
       floors and going silent, which is more unsettling than a clean stop.
     asset_path: "assets/audio/elevator-distant.mp3"
     generation_prompt: "Distant elevator machinery, cable mechanism, motor hum, building mechanical ambient, muffled through floors"
-    generation_tool: elevenlabs_sfx
+    generation_tool: short_form_sfx_model
     volume: 0.1
     loop: false
     spatial:
@@ -149,7 +149,7 @@ intermittent:
       of earshot — but there is no earshot to walk into.
     asset_path: "assets/audio/footsteps-above-office.mp3"
     generation_prompt: "Footsteps on hardwood floor above, slow walking pace, muffled through concrete ceiling, office building, irregular"
-    generation_tool: elevenlabs_sfx
+    generation_tool: short_form_sfx_model
     volume: 0.08   # Very quiet — felt more than heard
     loop: false
     spatial:
@@ -267,7 +267,7 @@ atmospheric:
       danger was always here.
     asset_path: "assets/audio/cello-drone-low.mp3"
     generation_prompt: "Low cello drone, single sustained bowed note, D2 register, resonant, slightly breathy, psychological horror atmosphere, 90 seconds"
-    generation_tool: stable_audio_2
+    generation_tool: long_form_audio_model
     volume: 0.2
     loop: true
     spatial:
@@ -288,7 +288,7 @@ atmospheric:
       honest answer is no — but their body does.
     asset_path: "assets/audio/sub-bass-rumble.mp3"
     generation_prompt: "Deep sub-bass rumble 20-30Hz, barely audible infrasound, ominous building tension, horror atmosphere, seamless loop"
-    generation_tool: stable_audio_2
+    generation_tool: long_form_audio_model
     volume: 0.08   # Below conscious threshold — felt not heard
     loop: true
     spatial:
@@ -311,7 +311,7 @@ atmospheric:
       takes over.
     asset_path: "assets/audio/low-tone-revelation.mp3"
     generation_prompt: "Single sustained low tone 80-100Hz, pure sine wave with slight organic texture, ominous, revelation moment, not melodic"
-    generation_tool: stable_audio_2
+    generation_tool: long_form_audio_model
     volume: 0.3
     loop: true
     spatial:
@@ -348,7 +348,7 @@ endings:
       it can.
     asset_path: "assets/audio/rain-heavy-window-warm.mp3"
     generation_prompt: "Heavy rain on glass windows, warm filtered, mid-heavy EQ, intimate, resolved, less harsh than cold variant, seamless loop"
-    generation_tool: elevenlabs_sfx
+    generation_tool: short_form_sfx_model
     volume: 0.55
     loop: true
     spatial:
@@ -366,7 +366,7 @@ endings:
       The contrast with rain_warm is the entire emotional argument of the ending.
     asset_path: "assets/audio/rain-heavy-window-cold.mp3"
     generation_prompt: "Heavy rain on glass windows, cold filtered, bright harsh high-end, percussive, unresolved, indifferent, seamless loop"
-    generation_tool: elevenlabs_sfx
+    generation_tool: short_form_sfx_model
     volume: 0.65   # Slightly louder — the indifference is also relentless
     loop: true
     spatial:
@@ -386,7 +386,7 @@ endings:
       you didn't know you'd forgotten.
     asset_path: "assets/audio/piano-motif-elara.mp3"
     generation_prompt: "Three-note descending piano motif, sparse, intimate, slightly reverberant, melancholic but resolved, psychological horror denouement"
-    generation_tool: stable_audio_2
+    generation_tool: long_form_audio_model
     volume: 0.45
     loop: false
     spatial:
@@ -428,7 +428,7 @@ endings:
       It is the sound of Elara, arriving. Again.
     asset_path: "assets/audio/door-knock-single.mp3"
     generation_prompt: "Single sharp knock on wooden door, unhurried, professional, from outside, slight room reverb"
-    generation_tool: elevenlabs_sfx
+    generation_tool: short_form_sfx_model
     volume: 0.7
     loop: false
     spatial:
@@ -448,7 +448,7 @@ endings:
       direction from the cold rain: indifferent because they are simply alive.
     asset_path: "assets/audio/birdsong-distant-morning.mp3"
     generation_prompt: "Distant morning birdsong, sparse, one or two birds, dawn, peaceful, after rain, outdoor ambience, natural"
-    generation_tool: elevenlabs_sfx
+    generation_tool: short_form_sfx_model
     volume: 0.3
     loop: false
     spatial:

@@ -174,6 +174,7 @@ function assembleStory(storyDir: string): RawStory {
   // Extract quality checklist items
   const checklistItems =
     (qualityChecklist as Record<string, unknown> | null)?.criteria ??
+    (qualityChecklist as Record<string, unknown> | null)?.checks ??
     (qualityChecklist as Record<string, unknown> | null)?.checklist ??
     (qualityChecklist as Record<string, unknown> | null)?.items ??
     (Array.isArray(qualityChecklist) ? qualityChecklist : []);

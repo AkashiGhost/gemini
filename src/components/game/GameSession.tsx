@@ -40,6 +40,8 @@ export function GameSession({ storyId }: GameSessionProps) {
     isSpeaking,
     isPaused,
     hasAiSpoken,
+    lastUserTranscriptText,
+    lastUserTranscriptSeq,
     transcript,
     onToolCall,
     endSession,
@@ -67,6 +69,8 @@ export function GameSession({ storyId }: GameSessionProps) {
     isPaused,
     hasAiSpoken,
     lastAiText,
+    lastUserTranscriptText,
+    lastUserTranscriptSeq,
     onToolCall,
   });
 
@@ -106,9 +110,9 @@ export function GameSession({ storyId }: GameSessionProps) {
   }, [hasAiSpoken]);
 
   // TTS fallback REMOVED — window.speechSynthesis.cancel() + speak() was
-  // disrupting Chrome's WebRTC audio routing on Windows, causing ElevenLabs
+  // disrupting Chrome's WebRTC audio routing on Windows, causing live voice
   // voice output to be completely silent. The 300ms timer also had a stale
-  // closure bug (hasAiSpoken missing from deps). ElevenLabs handles TTS
+  // closure bug (hasAiSpoken missing from deps). The active voice engine handles TTS
   // natively via WebRTC — no browser fallback needed.
 
   // ── Transcript scroll — auto-scroll to latest message ───────────────

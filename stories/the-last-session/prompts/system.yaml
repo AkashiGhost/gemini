@@ -2,8 +2,8 @@
 # Base system instruction for "The Last Session" story LLM
 #
 # DESIGN PRINCIPLE: Provider-agnostic. This file is consumed by the engine and
-# injected as the system message on every LLM API call — Mistral, Gemini, Nova,
-# whatever provider is active. Provider-specific wrappers (function calling format,
+# injected as the system message on every LLM API call for the active model.
+# Provider-specific wrappers (function calling format,
 # audio config, voice routing) are handled at the engine layer, not here.
 #
 # TOKEN BUDGET: Keep this under ~600 tokens when rendered. It is injected EVERY
@@ -101,7 +101,7 @@ context_layer_order:
   - compressed_history
   - active_state_snapshot
 
-# The intent classifier (Mistral Small / fast model) runs BEFORE the story LLM.
+# The intent classifier (fast model) runs BEFORE the story LLM.
 # This prompt is injected as its system message. The output is a structured action
 # object that the rules engine validates against world.yaml player_can/player_cannot
 # before the narrative generator ever sees it.

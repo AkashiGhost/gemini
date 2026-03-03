@@ -77,7 +77,7 @@ describe("POST /api/creator/interview", () => {
 
     const req = new Request("http://localhost/api/creator/interview", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-trace-id": "trace-invalid-json" },
       body: "not-json",
     });
 
@@ -85,6 +85,7 @@ describe("POST /api/creator/interview", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(400);
+    expect(response.headers.get("x-trace-id")).toBe("trace-invalid-json");
     expect(payload).toEqual({ error: "Invalid JSON body" });
   });
 
@@ -102,7 +103,7 @@ describe("POST /api/creator/interview", () => {
     const { POST } = await import("../../src/app/api/creator/interview/route");
     const req = new Request("http://localhost/api/creator/interview", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-trace-id": "trace-interview-123" },
       body: JSON.stringify({
         sessionId: "session-123",
         messages: [{ role: "user", content: "I want dark coastal horror vibes." }],
@@ -115,6 +116,7 @@ describe("POST /api/creator/interview", () => {
     const chunks = parseSseChunks(payload);
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-trace-id")).toBe("trace-interview-123");
     expect(response.headers.get("Content-Type")).toContain("text/event-stream");
     expect(chunks.map((chunk) => chunk.event)).toEqual([
       "message",

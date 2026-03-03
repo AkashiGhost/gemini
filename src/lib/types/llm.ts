@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────
 // LLM Adapter Interfaces — provider-agnostic
-// Implemented by GeminiAdapter, NovaAdapter, MockAdapter
+// Implemented by GeminiAdapter, MockAdapter, and other adapters
 // ─────────────────────────────────────────────
 
 import type { IntentResult } from "./intent";
@@ -42,7 +42,7 @@ export interface StoryEngine {
 
 /**
  * Intent Parser — classifies player speech into structured intent.
- * Uses a fast/cheap model (Gemini Flash Lite, Nova Lite, Mistral Small).
+ * Uses a fast/cheap model (for example, Gemini Flash Lite).
  */
 export interface IntentParser {
   /** Parse player text into a structured intent */

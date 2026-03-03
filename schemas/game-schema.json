@@ -117,7 +117,7 @@
         },
         "intent_classifier_prompt": {
           "type": "string",
-          "description": "Optional system prompt for the intent classification model (e.g., Mistral Small). If omitted, the pipeline uses a default intent classifier prompt with the world.player_can list injected."
+          "description": "Optional system prompt for the intent classification model (e.g., Gemini Flash Lite). If omitted, the pipeline uses a default intent classifier prompt with the world.player_can list injected."
         },
         "fallback_response": {
           "type": "string",

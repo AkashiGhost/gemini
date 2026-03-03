@@ -15,6 +15,11 @@ import { DEBUG_CONFIG } from "@/lib/config/debug";
 import type { LiveToolCallListener } from "@/lib/config/live-tools";
 import { createLogger, extendCausalChain } from "@/lib/logging";
 import { MusicEngine } from "@/lib/music-engine";
+import {
+  detectTranscriptIntentCueSoundIds,
+  getTranscriptIntentCueRules,
+  selectCuesOffCooldown,
+} from "@/lib/sound-intent-fallback";
 
 // ─────────────────────────────────────────────
 // Story-specific timelines
@@ -76,7 +81,7 @@ const TIMELINES: Record<string, SoundTimelineEvent[]> = {
 
   "the-call": [
     // ── Phone ring now plays during OnboardingFlow "ringing" step ──
-    // (before ElevenLabs session starts, so ring → pickup → Alex speaks)
+    // (before live voice session starts, so ring → pickup → Alex speaks)
 
     // Phone static starts immediately at near-inaudible volume
     { time: 0, action: "start_ambient", soundIds: ["phone_static"] },
@@ -145,6 +150,8 @@ const SPATIAL_MAPS: Record<string, Record<string, { pan: number }>> = {
 };
 
 const CUE_COOLDOWN_MS = AUDIO_CONFIG.cueCooldownMs;
+const TRANSCRIPT_INTENT_FALLBACK_DELAY_MS = AUDIO_CONFIG.transcriptIntentFallbackDelayMs;
+const TRANSCRIPT_TOOL_PRIORITY_WINDOW_MS = AUDIO_CONFIG.transcriptIntentToolPriorityWindowMs;
 
 interface UseSoundEngineOptions {
   storyId: string;
@@ -154,6 +161,8 @@ interface UseSoundEngineOptions {
   isPaused: boolean;
   hasAiSpoken: boolean;
   lastAiText: string;
+  lastUserTranscriptText: string;
+  lastUserTranscriptSeq: number;
   onToolCall: (listener: LiveToolCallListener) => () => void;
 }
 
@@ -165,6 +174,8 @@ export function useSoundEngine({
   isPaused,
   hasAiSpoken,
   lastAiText,
+  lastUserTranscriptText,
+  lastUserTranscriptSeq,
   onToolCall,
 }: UseSoundEngineOptions) {
   const logger = useMemo(() => createLogger("useSoundEngine"), []);
@@ -175,6 +186,8 @@ export function useSoundEngine({
   const hasPickedUpRef = useRef(false);
   // Tracks cooldowns for keyword-triggered sound cues (soundId → timestamp)
   const cueCooldownsRef = useRef<Map<string, number>>(new Map());
+  // Timestamp for latest authoritative trigger_sound tool call.
+  const lastToolSoundTriggerAtRef = useRef(0);
 
   // ── Initialize engine when game starts playing ────────────
   // Configurable delay defaults to 0. We still keep it tunable for debugging.
@@ -302,6 +315,9 @@ export function useSoundEngine({
       const musicEngine = musicEngineRef.current;
 
       if (toolCall.name === "trigger_sound" && engine) {
+        const now = Date.now();
+        lastToolSoundTriggerAtRef.current = now;
+        cueCooldownsRef.current.set(toolCall.args.soundId, now);
         engine.handleToolCall(
           toolCall.args.soundId,
           toolCall.args.volume ?? AUDIO_CONFIG.defaultCueVolume,
@@ -358,20 +374,77 @@ export function useSoundEngine({
     if (!engine) return;
 
     const { cues } = parseSoundCues(lastAiText);
-    const now = Date.now();
-    const cooldowns = cueCooldownsRef.current;
+    const selection = selectCuesOffCooldown(
+      cues.map((cue) => cue.soundId),
+      cueCooldownsRef.current,
+      { nowMs: Date.now(), cooldownMs: CUE_COOLDOWN_MS },
+    );
 
-    for (const cue of cues) {
-      const lastFired = cooldowns.get(cue.soundId) ?? 0;
-      if (now - lastFired < CUE_COOLDOWN_MS) {
-        console.log(`[USE-SOUND] Cue cooldown active for "${cue.soundId}" — skipping`);
-        continue;
-      }
-      cooldowns.set(cue.soundId, now);
-      console.log(`[USE-SOUND] Inline cue triggered: "${cue.soundId}"`);
-      engine.triggerCue(cue.soundId);
+    for (const cooledDownCueId of selection.coolingDownCueIds) {
+      console.log(`[USE-SOUND] Cue cooldown active for "${cooledDownCueId}" — skipping`);
+    }
+
+    for (const cueId of selection.readyCueIds) {
+      console.log(`[USE-SOUND] Inline cue triggered: "${cueId}"`);
+      engine.triggerCue(cueId);
     }
   }, [lastAiText, storyId, status]);
+
+  // ── Deterministic transcript intent fallback (tool-call aware) ──
+  // If no authoritative trigger_sound arrives shortly after a user turn,
+  // map transcript intent keywords to a deterministic cue list.
+  useEffect(() => {
+    if (!DEBUG_CONFIG.enableKeywordCueFallback) return;
+    if (status !== "playing") return;
+    if (!lastUserTranscriptText.trim()) return;
+    const rules = getTranscriptIntentCueRules(storyId);
+    if (rules.length === 0) return;
+
+    const timer = setTimeout(() => {
+      const engine = engineRef.current;
+      if (!engine) return;
+
+      const now = Date.now();
+      if (now - lastToolSoundTriggerAtRef.current <= TRANSCRIPT_TOOL_PRIORITY_WINDOW_MS) {
+        logger.info({
+          event: "sound.transcript_fallback.skipped_tool_priority",
+          sessionId,
+          causalChain: ["sound.transcript_fallback", "skipped_tool_priority"],
+          data: { storyId, lastUserTranscriptSeq },
+        });
+        return;
+      }
+
+      const detectedCueIds = detectTranscriptIntentCueSoundIds(lastUserTranscriptText, rules);
+      if (detectedCueIds.length === 0) return;
+
+      const selection = selectCuesOffCooldown(detectedCueIds, cueCooldownsRef.current, {
+        nowMs: now,
+        cooldownMs: CUE_COOLDOWN_MS,
+      });
+
+      for (const cooledDownCueId of selection.coolingDownCueIds) {
+        logger.info({
+          event: "sound.transcript_fallback.cooldown_skip",
+          sessionId,
+          causalChain: ["sound.transcript_fallback", "cooldown_skip"],
+          data: { soundId: cooledDownCueId, storyId, lastUserTranscriptSeq },
+        });
+      }
+
+      for (const cueId of selection.readyCueIds) {
+        logger.info({
+          event: "sound.transcript_fallback.triggered",
+          sessionId,
+          causalChain: ["sound.transcript_fallback", "triggered"],
+          data: { soundId: cueId, storyId, lastUserTranscriptSeq },
+        });
+        engine.triggerCue(cueId);
+      }
+    }, TRANSCRIPT_INTENT_FALLBACK_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, [lastUserTranscriptSeq, lastUserTranscriptText, logger, sessionId, status, storyId]);
 
   // ── Pause / Resume ────────────────────────────────────
   useEffect(() => {
