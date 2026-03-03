@@ -25,6 +25,14 @@ import { createLogger } from "@/lib/logging";
 export const runtime = "nodejs";
 const logger = createLogger("api/live-token");
 
+function hasHttpCode(message: string, code: number): boolean {
+  return new RegExp(`\\b${code}\\b`).test(message);
+}
+
+function hasUpstreamStatus(message: string, status: string): boolean {
+  return message.toUpperCase().includes(status.toUpperCase());
+}
+
 // POST /api/live-token
 // Body: { storyId: string }
 // Returns: { token: string }
@@ -159,19 +167,31 @@ export async function POST(req: NextRequest) {
     });
 
     // Surface specific errors clearly for the client-side error UI
-    if (message.includes("401") || message.includes("UNAUTHENTICATED")) {
+    if (hasHttpCode(message, 401) || hasUpstreamStatus(message, "UNAUTHENTICATED")) {
       return NextResponse.json(
         { error: `Unauthorized (401): API key is invalid or expired. ${message}` },
         { status: 401 },
       );
     }
-    if (message.includes("quota") || message.includes("429")) {
+    if (hasHttpCode(message, 429) || hasUpstreamStatus(message, "RESOURCE_EXHAUSTED")) {
       return NextResponse.json(
-        { error: `Quota exceeded. ${message}` },
+        { error: `Gemini Live token request hit rate-limit/quota (429). ${message}` },
         { status: 429 },
       );
     }
-    if (message.includes("500") || message.includes("INTERNAL")) {
+    if (hasHttpCode(message, 403) || hasUpstreamStatus(message, "PERMISSION_DENIED")) {
+      return NextResponse.json(
+        { error: `Permission denied (403): ${message}` },
+        { status: 403 },
+      );
+    }
+    if (hasHttpCode(message, 404) || hasUpstreamStatus(message, "NOT_FOUND")) {
+      return NextResponse.json(
+        { error: `Model/resource not found (404): ${message}` },
+        { status: 404 },
+      );
+    }
+    if (hasHttpCode(message, 500) || hasUpstreamStatus(message, "INTERNAL")) {
       return NextResponse.json(
         { error: `Gemini server error (500). ${message}` },
         { status: 502 },

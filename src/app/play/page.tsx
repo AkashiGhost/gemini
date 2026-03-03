@@ -90,17 +90,28 @@ function PlayContent() {
     // Categorize the error for user-friendly display
     const msg = errorMessage?.toLowerCase() ?? "";
     let title = "Connection error";
-    let detail = errorMessage ?? "The session could not start.";
+    const detail = errorMessage ?? "The session could not start.";
     let hint = "";
 
-    if (msg.includes("quota")) {
-      title = "Quota exceeded";
-      detail = "The Gemini Live API quota has been exceeded.";
-      hint = "Check your Google Cloud quotas or wait for quota reset.";
+    const has429 = /\b429\b/.test(msg) || msg.includes("resource_exhausted");
+    const has401 = /\b401\b/.test(msg) || msg.includes("unauthorized") || msg.includes("api key");
+    const has403 = /\b403\b/.test(msg) || msg.includes("permission denied");
+    const has404 = /\b404\b/.test(msg) || msg.includes("not found") || msg.includes("model");
+
+    if (has429) {
+      title = "Rate limit or quota";
+      hint =
+        "This often means per-model/session rate limits on Gemini Live token minting, not necessarily overall account spend quota.";
+    } else if (has403) {
+      title = "Permission denied";
+      hint = "API key restrictions or project permissions may block Gemini Live token minting.";
+    } else if (has404) {
+      title = "Model/resource unavailable";
+      hint = "Configured Live model may be unavailable for this key/project. Check model name and access.";
     } else if (msg.includes("500") || msg.includes("server")) {
       title = "Server error (500)";
       hint = "Check that the Gemini Live session is configured with the correct API key and model.";
-    } else if (msg.includes("401") || msg.includes("unauthorized") || msg.includes("api key")) {
+    } else if (has401) {
       title = "Authentication failed";
       hint = "The Gemini API key may be invalid or expired. Update GEMINI_API_KEY in your environment.";
     } else if (msg.includes("microphone")) {
