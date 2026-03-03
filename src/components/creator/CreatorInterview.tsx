@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import Image from "next/image";
 import {
   type CreatorChatMessage,
   type CreatorInterviewChunk,
@@ -519,10 +520,13 @@ export function CreatorInterview() {
 
           <div className="creator-image-wrap">
             {generatedImage ? (
-              <img
+              <Image
                 src={`data:${generatedImage.mimeType};base64,${generatedImage.base64}`}
                 alt="Generated creator concept"
                 className="creator-image"
+                width={1200}
+                height={675}
+                unoptimized
               />
             ) : (
               <p className="creator-muted">No image generated yet.</p>
@@ -533,4 +537,3 @@ export function CreatorInterview() {
     </main>
   );
 }
-

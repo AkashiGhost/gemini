@@ -105,7 +105,6 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
   // ── Delayed text fade-in (1s after scene loads) ──────────────
   useEffect(() => {
     if (step !== "scene") return;
-    setTextOpacity(0);
     const timer = setTimeout(() => setTextOpacity(1), 800);
     return () => clearTimeout(timer);
   }, [step, sceneIndex]);
@@ -113,9 +112,6 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
   // ── Delayed continue button (invisible 4s, fade in 1s) ──────
   useEffect(() => {
     if (step !== "scene") return;
-    setShowContinue(false);
-    setContinueOpacity(0);
-
     const showTimer = setTimeout(() => {
       setShowContinue(true);
       // Start opacity fade after showing
@@ -130,17 +126,26 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
   // ── Countdown timer ──────────────────────────────────────────
   useEffect(() => {
     if (step !== "countdown") return;
-    if (countdown <= 0) {
-      // "the-call" story: phone rings before session starts
-      if (storyId === "the-call") {
-        setStep("ringing");
-      } else {
-        onComplete();
+    let transitionTimer: ReturnType<typeof setTimeout> | null = null;
+    const timer = setTimeout(() => {
+      if (countdown <= 1) {
+        setCountdown(0);
+        // "the-call" story: phone rings before session starts
+        transitionTimer = setTimeout(() => {
+          if (storyId === "the-call") {
+            setStep("ringing");
+          } else {
+            onComplete();
+          }
+        }, 0);
+        return;
       }
-      return;
-    }
-    const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-    return () => clearTimeout(timer);
+      setCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => {
+      clearTimeout(timer);
+      if (transitionTimer) clearTimeout(transitionTimer);
+    };
   }, [step, countdown, onComplete, storyId]);
 
   // ── Phone ringing phase (the-call only) ────────────────────
@@ -196,7 +201,11 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
   const advance = useCallback(() => {
     if (step === "scene") {
       if (sceneIndex < totalScenes - 1) {
-        setSceneIndex(sceneIndex + 1);
+        // Reset scene UI state before moving to the next scene.
+        setTextOpacity(0);
+        setShowContinue(false);
+        setContinueOpacity(0);
+        setSceneIndex((prev) => prev + 1);
       } else {
         setStep("headphones");
       }

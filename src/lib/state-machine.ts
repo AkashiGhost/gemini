@@ -1,6 +1,5 @@
 import type {
   GameConfig,
-  ArcConfig,
   Phase,
   Beat,
   ChoiceOption,

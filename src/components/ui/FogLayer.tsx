@@ -1,18 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useSyncExternalStore } from "react";
 
 interface FogLayerProps {
   phase?: number;
   reduceLayers?: boolean;
 }
 
-export function FogLayer({ reduceLayers = false }: FogLayerProps) {
-  const [isMobile, setIsMobile] = useState(false);
+function subscribeToMediaQuery(query: string, onChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const mediaQuery = window.matchMedia(query);
+  mediaQuery.addEventListener("change", onChange);
+  return () => mediaQuery.removeEventListener("change", onChange);
+}
 
-  useEffect(() => {
-    setIsMobile(window.matchMedia("(hover: none)").matches);
-  }, []);
+function getMediaQuerySnapshot(query: string) {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia(query).matches;
+}
+
+export function FogLayer({ reduceLayers = false }: FogLayerProps) {
+  const isMobile = useSyncExternalStore(
+    (onChange) => subscribeToMediaQuery("(hover: none)", onChange),
+    () => getMediaQuerySnapshot("(hover: none)"),
+    () => false
+  );
+
   return (
     <div
       style={{

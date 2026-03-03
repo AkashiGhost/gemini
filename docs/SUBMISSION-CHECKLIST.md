@@ -187,6 +187,7 @@
 ## Final Verification Before Submit
 
 - [ ] Ran `tsc --noEmit` — no TypeScript errors
+- [ ] Ran `npx tsx scripts/closed-loop-scenario.ts` — tool-call closed-loop checks pass (exit code `0`)
 - [ ] Demo video is under 4 minutes
 - [ ] Video is PUBLIC on YouTube/Vimeo (not unlisted/private)
 - [ ] All links in submission are correct and functional
@@ -196,6 +197,15 @@
 - [ ] Text description has no spelling/grammar errors
 - [ ] Category correctly selected: **Live Agents**
 - [ ] Bonus materials listed (if applicable)
+
+## Closed-Loop CLI Verification
+
+- Command: `npx tsx scripts/closed-loop-scenario.ts`
+- Purpose: verifies deterministic parsing of live tool calls (`trigger_sound`, `set_tension`, `end_game`) and expected phase outcomes from tension updates.
+- Pass/Fail:
+  - `0` exit code: all scenarios passed
+  - non-zero exit code: one or more scenarios failed; inspect per-case diagnostics in terminal
+- Reference: `docs/verification/closed-loop.md`
 
 ---
 

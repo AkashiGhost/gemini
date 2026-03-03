@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { Component, type ReactNode } from "react";
 
 interface Props { children: ReactNode; }
@@ -51,7 +52,7 @@ export class ErrorBoundary extends Component<Props, State> {
           >
             Refresh
           </button>
-          <a
+          <Link
             href="/"
             style={{
               marginTop: "var(--space-sm)",
@@ -66,7 +67,7 @@ export class ErrorBoundary extends Component<Props, State> {
             }}
           >
             return home
-          </a>
+          </Link>
         </div>
       );
     }

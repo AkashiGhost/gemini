@@ -5,7 +5,7 @@
 // Story-aware: loads appropriate sounds and timeline per storyId.
 // ─────────────────────────────────────────────
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import { SoundEngine } from "@/lib/sound-engine";
 import { generateSoundsForStory } from "@/lib/synth-sounds";
 import type { TimelineEvent as SoundTimelineEvent } from "@/lib/sound-engine";
@@ -135,12 +135,16 @@ const SPATIAL_MAPS: Record<string, Record<string, { pan: number }>> = {
     footsteps: { pan: -0.2 },      // slightly left (Alex moving)
     water_drip: { pan: 0.3 },      // off to the right (environmental)
     door_creak: { pan: -0.1 },     // slightly left
+    door_slam: { pan: -0.05 },     // near-center left (heavy close-range impact)
     keypad_beep: { pan: 0 },       // centered (close interaction)
     metal_scrape: { pan: 0.2 },    // slight right (vent above)
     pipe_clank: { pan: 0.4 },      // right wall (pipes on right wall per story)
     heavy_breathing: { pan: 0 },   // centered (Alex's own breathing)
+    glass_break: { pan: 0.25 },    // right-front shard impact
   },
 };
+
+const CUE_COOLDOWN_MS = AUDIO_CONFIG.cueCooldownMs;
 
 interface UseSoundEngineOptions {
   storyId: string;
@@ -163,8 +167,7 @@ export function useSoundEngine({
   lastAiText,
   onToolCall,
 }: UseSoundEngineOptions) {
-  const loggerRef = useRef(createLogger("useSoundEngine"));
-  const logger = loggerRef.current;
+  const logger = useMemo(() => createLogger("useSoundEngine"), []);
   const engineRef = useRef<SoundEngine | null>(null);
   const musicEngineRef = useRef<MusicEngine | null>(null);
   const initStartedRef = useRef(false);
@@ -172,7 +175,6 @@ export function useSoundEngine({
   const hasPickedUpRef = useRef(false);
   // Tracks cooldowns for keyword-triggered sound cues (soundId → timestamp)
   const cueCooldownsRef = useRef<Map<string, number>>(new Map());
-  const CUE_COOLDOWN_MS = AUDIO_CONFIG.cueCooldownMs;
 
   // ── Initialize engine when game starts playing ────────────
   // Configurable delay defaults to 0. We still keep it tunable for debugging.

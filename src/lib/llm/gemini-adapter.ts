@@ -105,7 +105,6 @@ export class GeminiStoryEngine implements StoryEngine {
 
   async *generateAudioResponse(
     audioChunk: ArrayBuffer,
-    stateSnapshot: Record<string, unknown>,
   ): AsyncGenerator<LLMTurn> {
     if (!this.session) throw new Error("Gemini session not initialized");
 

@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:scenario": "tsx scripts/closed-loop-scenario.ts",
+    "verify": "npm run lint && npm run test && npm run test:scenario"
   },
   "dependencies": {
     "@google/genai": "^1.43.0",
@@ -29,6 +33,7 @@
     "@types/ws": "^8.18.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "vitest": "^3.2.4",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

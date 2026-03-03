@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────
 
 import type { GameConfig, Phase, Beat } from "../types/game-config";
-import type { StoryState, ConversationTurn } from "../types/story-state";
+import type { StoryState } from "../types/story-state";
 
 const MAX_RECENT_TURNS = 6; // Last 3 exchanges (player + elara each)
 const MAX_COMPRESSED_TURNS = 20;

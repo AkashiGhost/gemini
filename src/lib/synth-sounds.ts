@@ -237,6 +237,82 @@ async function generateDoorCreak(): Promise<AudioBuffer> {
   return offlineCtx.startRendering();
 }
 
+/** Door slam — low-heavy impact with short room tail */
+async function generateDoorSlam(): Promise<AudioBuffer> {
+  const duration = 0.9;
+  const length = SAMPLE_RATE * duration;
+  const offlineCtx = new OfflineAudioContext(1, length, SAMPLE_RATE);
+
+  const noiseBuffer = offlineCtx.createBuffer(1, length, SAMPLE_RATE);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+
+  const source = offlineCtx.createBufferSource();
+  source.buffer = noiseBuffer;
+
+  const low = offlineCtx.createBiquadFilter();
+  low.type = "lowpass";
+  low.frequency.value = 220;
+  low.Q.value = 0.9;
+
+  const band = offlineCtx.createBiquadFilter();
+  band.type = "bandpass";
+  band.frequency.value = 120;
+  band.Q.value = 1.2;
+
+  const env = offlineCtx.createGain();
+  env.gain.setValueAtTime(0, 0);
+  env.gain.linearRampToValueAtTime(0.85, 0.004);
+  env.gain.exponentialRampToValueAtTime(0.001, 0.45);
+
+  source.connect(low);
+  low.connect(band);
+  band.connect(env);
+  env.connect(offlineCtx.destination);
+  source.start(0);
+
+  return offlineCtx.startRendering();
+}
+
+/** Glass break — bright transient with decaying shards */
+async function generateGlassBreak(): Promise<AudioBuffer> {
+  const duration = 1.2;
+  const length = SAMPLE_RATE * duration;
+  const offlineCtx = new OfflineAudioContext(1, length, SAMPLE_RATE);
+
+  const noiseBuffer = offlineCtx.createBuffer(1, length, SAMPLE_RATE);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+
+  const source = offlineCtx.createBufferSource();
+  source.buffer = noiseBuffer;
+
+  const high = offlineCtx.createBiquadFilter();
+  high.type = "highpass";
+  high.frequency.value = 1600;
+  high.Q.value = 0.7;
+
+  const peaking = offlineCtx.createBiquadFilter();
+  peaking.type = "peaking";
+  peaking.frequency.value = 4200;
+  peaking.Q.value = 2.8;
+  peaking.gain.value = 9;
+
+  const env = offlineCtx.createGain();
+  env.gain.setValueAtTime(0, 0);
+  env.gain.linearRampToValueAtTime(0.65, 0.002);
+  env.gain.exponentialRampToValueAtTime(0.02, 0.25);
+  env.gain.exponentialRampToValueAtTime(0.001, duration);
+
+  source.connect(high);
+  high.connect(peaking);
+  peaking.connect(env);
+  env.connect(offlineCtx.destination);
+  source.start(0);
+
+  return offlineCtx.startRendering();
+}
+
 /** Keypad beeps — 3 short DTMF-style tones */
 async function generateKeypadBeeps(): Promise<AudioBuffer> {
   const duration = 1;
@@ -487,13 +563,16 @@ async function generateTheCallSounds(): Promise<SoundSet> {
   const footsteps = await generateFootsteps();
   const water_drip = await generateWaterDrip();
   const door_creak = await generateDoorCreak();
+  const door_slam = await generateDoorSlam();
   const keypad_beep = await generateKeypadBeeps();
   const metal_scrape = await generateMetalScrape();
   const pipe_clank = await generatePipeClank();
   const heavy_breathing = await generateHeavyBreathing();
+  const glass_break = await generateGlassBreak();
   return {
     phone_static, electrical_hum, sub_bass, phone_ring, pickup_click, disconnect_tone,
-    footsteps, water_drip, door_creak, keypad_beep, metal_scrape, pipe_clank, heavy_breathing,
+    footsteps, water_drip, door_creak, door_slam, keypad_beep, metal_scrape, pipe_clank,
+    heavy_breathing, glass_break,
   };
 }
 

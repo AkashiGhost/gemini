@@ -5,7 +5,7 @@
 //   → StoryEngine → SoundCueParser → client events
 // ─────────────────────────────────────────────
 
-import type { GameConfig, Beat, ChoiceOption } from "./types/game-config";
+import type { GameConfig, Beat } from "./types/game-config";
 import type { StoryState } from "./types/story-state";
 import type {
   StoryEngine,
@@ -275,7 +275,7 @@ export class GameOrchestrator {
   private async generateAndSendResponse(playerText: string): Promise<void> {
     const phase = getCurrentPhase(this.config, this.state);
     const beat = getCurrentBeat(this.config, this.state);
-    const { systemPrompt, userPrefix } = buildContext(
+    const { userPrefix } = buildContext(
       this.config,
       this.state,
       phase,
@@ -387,7 +387,6 @@ export class GameOrchestrator {
   }
 
   private async checkPhaseTransition(): Promise<void> {
-    const phase = getCurrentPhase(this.config, this.state);
     const beat = getCurrentBeat(this.config, this.state);
 
     // If beat is null, we've exhausted the current phase

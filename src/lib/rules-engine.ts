@@ -1,6 +1,6 @@
 import type { GameConfig, ChoiceOption } from "./types/game-config";
 import type { StoryState } from "./types/story-state";
-import type { IntentResult, IntentType } from "./types/intent";
+import type { IntentResult } from "./types/intent";
 import { BLOCKED_INTENTS } from "./types/intent";
 
 // ─────────────────────────────────────────────

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { useSoundEngine } from "@/hooks/useSoundEngine";
@@ -116,6 +117,18 @@ export function GameSession({ storyId }: GameSessionProps) {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [transcript]);
 
+  // ── Tap-to-reveal controls ──────────────────────────────────
+  const [showControls, setShowControls] = useState(false);
+  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!showControls) return;
+    controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
+    return () => {
+      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    };
+  }, [showControls]);
+
   if (status === "ended") {
     return (
       <div
@@ -143,7 +156,7 @@ export function GameSession({ storyId }: GameSessionProps) {
         >
           {lastAiText || "The session has ended."}
         </p>
-        <a
+        <Link
           href="/"
           style={{
             color: "var(--muted)",
@@ -157,22 +170,10 @@ export function GameSession({ storyId }: GameSessionProps) {
           }}
         >
           return home
-        </a>
+        </Link>
       </div>
     );
   }
-
-  // ── Tap-to-reveal controls ──────────────────────────────────
-  const [showControls, setShowControls] = useState(false);
-  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!showControls) return;
-    controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
-    return () => {
-      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-    };
-  }, [showControls]);
 
   const handleMainAreaClick = () => {
     setShowControls(true);

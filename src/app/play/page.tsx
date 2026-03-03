@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useState, useCallback, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { GameProvider, useGame } from "@/context/GameContext";
@@ -150,7 +151,7 @@ function PlayContent() {
           >
             Retry
           </button>
-          <a
+          <Link
             href="/"
             style={{
               color: "var(--muted)",
@@ -162,7 +163,7 @@ function PlayContent() {
             }}
           >
             Return home
-          </a>
+          </Link>
         </div>
       </div>
     );

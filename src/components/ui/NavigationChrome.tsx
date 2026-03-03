@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useState } from "react";
 import { motion } from "motion/react";
 import { BreathingDot } from "./BreathingDot";
 import { DEFAULT_STORY_ID } from "@/lib/constants";
@@ -16,13 +17,11 @@ export function NavigationChrome({
   menuOpen,
   variant = "landing",
 }: NavigationChromeProps) {
-  const [soundOn, setSoundOn] = useState(true);
-
-  // Persist sound preference
-  useEffect(() => {
-    const stored = localStorage.getItem("innerplay-sound");
-    if (stored !== null) setSoundOn(stored === "on");
-  }, []);
+  const [soundOn, setSoundOn] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem("innerplay-sound");
+    return stored === null ? true : stored === "on";
+  });
 
   const toggleSound = () => {
     const next = !soundOn;
@@ -36,6 +35,7 @@ export function NavigationChrome({
       : `/play?story=${DEFAULT_STORY_ID}`;
 
   const delay = variant === "landing" ? 1.8 : 0;
+  const isHashBegin = beginHref.startsWith("#");
 
   return (
     <motion.nav
@@ -67,7 +67,7 @@ export function NavigationChrome({
         }}
       >
         <BreathingDot size={10} />
-        <a
+        <Link
           href="/"
           style={{
             fontFamily: "var(--font-display)",
@@ -79,7 +79,7 @@ export function NavigationChrome({
           }}
         >
           INNERPLAY
-        </a>
+        </Link>
       </div>
 
       {/* Top-right: Menu toggle */}
@@ -134,34 +134,55 @@ export function NavigationChrome({
       </button>
 
       {/* Bottom-right: BEGIN CTA (desktop only) */}
-      <a
-        href={beginHref}
-        className="chrome-bottom"
-        onClick={(e) => {
-          if (beginHref.startsWith("#")) {
+      {isHashBegin ? (
+        <a
+          href={beginHref}
+          className="chrome-bottom"
+          onClick={(e) => {
             e.preventDefault();
             document
               .getElementById(beginHref.slice(1))
               ?.scrollIntoView({ behavior: "smooth" });
-          }
-        }}
-        style={{
-          position: "absolute",
-          bottom: "var(--space-sm)",
-          right: "var(--space-sm)",
-          pointerEvents: "auto",
-          fontFamily: "var(--font-ui)",
-          fontSize: "var(--type-ui)",
-          color: "var(--accent)",
-          textDecoration: "none",
-          letterSpacing: "3px",
-          minHeight: "var(--touch-min)",
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        BEGIN
-      </a>
+          }}
+          style={{
+            position: "absolute",
+            bottom: "var(--space-sm)",
+            right: "var(--space-sm)",
+            pointerEvents: "auto",
+            fontFamily: "var(--font-ui)",
+            fontSize: "var(--type-ui)",
+            color: "var(--accent)",
+            textDecoration: "none",
+            letterSpacing: "3px",
+            minHeight: "var(--touch-min)",
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          BEGIN
+        </a>
+      ) : (
+        <Link
+          href={beginHref}
+          className="chrome-bottom"
+          style={{
+            position: "absolute",
+            bottom: "var(--space-sm)",
+            right: "var(--space-sm)",
+            pointerEvents: "auto",
+            fontFamily: "var(--font-ui)",
+            fontSize: "var(--type-ui)",
+            color: "var(--accent)",
+            textDecoration: "none",
+            letterSpacing: "3px",
+            minHeight: "var(--touch-min)",
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          BEGIN
+        </Link>
+      )}
 
       {/* Mobile: hide bottom items */}
       <style dangerouslySetInnerHTML={{ __html: `

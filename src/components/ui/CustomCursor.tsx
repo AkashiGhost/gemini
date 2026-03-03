@@ -1,30 +1,36 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
+
+function subscribeToMediaQuery(query: string, onChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const mediaQuery = window.matchMedia(query);
+  mediaQuery.addEventListener("change", onChange);
+  return () => mediaQuery.removeEventListener("change", onChange);
+}
+
+function getMediaQuerySnapshot(query: string) {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia(query).matches;
+}
 
 export function CustomCursor() {
   const dotRef = useRef<HTMLDivElement>(null);
   const circleRef = useRef<HTMLDivElement>(null);
-  const [isDesktop, setIsDesktop] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(false);
+  const isDesktop = useSyncExternalStore(
+    (onChange) =>
+      subscribeToMediaQuery("(hover: hover) and (pointer: fine)", onChange),
+    () => getMediaQuerySnapshot("(hover: hover) and (pointer: fine)"),
+    () => false
+  );
+  const reducedMotion = useSyncExternalStore(
+    (onChange) =>
+      subscribeToMediaQuery("(prefers-reduced-motion: reduce)", onChange),
+    () => getMediaQuerySnapshot("(prefers-reduced-motion: reduce)"),
+    () => false
+  );
   const mousePos = useRef({ x: -100, y: -100 });
   const rafId = useRef<number>(0);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(hover: hover) and (pointer: fine)");
-    const rmq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setIsDesktop(mq.matches);
-    setReducedMotion(rmq.matches);
-
-    const handleMqChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    const handleRmqChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
-    mq.addEventListener("change", handleMqChange);
-    rmq.addEventListener("change", handleRmqChange);
-    return () => {
-      mq.removeEventListener("change", handleMqChange);
-      rmq.removeEventListener("change", handleRmqChange);
-    };
-  }, []);
 
   useEffect(() => {
     if (!isDesktop || reducedMotion) return;
