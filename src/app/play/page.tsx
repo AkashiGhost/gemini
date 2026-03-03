@@ -9,6 +9,7 @@ import { OnboardingFlow } from "@/components/game/OnboardingFlow";
 import { GameSession } from "@/components/game/GameSession";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BreathingDot } from "@/components/ui/BreathingDot";
+import { LYRIA_RUNTIME_CONFIG } from "@/lib/config/lyria";
 
 function PlayContent() {
   const searchParams = useSearchParams();
@@ -17,6 +18,7 @@ function PlayContent() {
 
   const [onboardingDone, setOnboardingDone] = useState(false);
   const [sessionPrepared, setSessionPrepared] = useState(false);
+  const [enableAdaptiveMusic, setEnableAdaptiveMusic] = useState(false);
   const { status, startSession, kickoffSession, errorMessage } = useGame();
 
   // Session ended — navigate back to stories
@@ -46,6 +48,9 @@ function PlayContent() {
       <OnboardingFlow
         storyId={storyId}
         isSessionReady={status === "playing" || status === "error"}
+        adaptiveMusicAvailable={LYRIA_RUNTIME_CONFIG.enabled}
+        enableAdaptiveMusic={enableAdaptiveMusic}
+        onToggleAdaptiveMusic={() => setEnableAdaptiveMusic((prev) => !prev)}
         onPrepare={handleOnboardingPrepare}
         onComplete={handleOnboardingComplete}
       />
@@ -187,7 +192,7 @@ function PlayContent() {
     );
   }
 
-  return <GameSession storyId={storyId} />;
+  return <GameSession storyId={storyId} enableAdaptiveMusic={enableAdaptiveMusic} />;
 }
 
 export default function PlayPage() {

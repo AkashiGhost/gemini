@@ -26,12 +26,13 @@ const CHARACTER_NAMES: Record<string, string> = {
 
 interface GameSessionProps {
   storyId: string;
+  enableAdaptiveMusic: boolean;
 }
 
 // Stories that show the AtmosphereLayer (fog/vignette)
 const ATMOSPHERE_STORIES = new Set(["room-4b"]);
 
-export function GameSession({ storyId }: GameSessionProps) {
+export function GameSession({ storyId, enableAdaptiveMusic }: GameSessionProps) {
   const {
     phase,
     sessionId,
@@ -63,11 +64,11 @@ export function GameSession({ storyId }: GameSessionProps) {
   // ── Sound Engine — story-aware ambient sounds, timeline, TTS ducking ──
   useSoundEngine({
     storyId,
+    enableAdaptiveMusic,
     sessionId,
     status,
     isSpeaking,
     isPaused,
-    hasAiSpoken,
     lastAiText,
     lastUserTranscriptText,
     lastUserTranscriptSeq,

@@ -21,6 +21,10 @@ import {
   type LiveToolCallListener,
 } from "@/lib/config/live-tools";
 import { createLogger, extendCausalChain } from "@/lib/logging";
+import {
+  buildNoModelResponseErrorMessage,
+  didReceiveModelResponse,
+} from "@/context/session-response-guard";
 
 export interface TranscriptEntry {
   source: "user" | "ai";
@@ -70,6 +74,7 @@ type UIState = {
 type UIAction =
   | { type: "SET_STATUS"; status: UIState["status"]; errorMessage?: string }
   | { type: "SET_SPEAKING"; value: boolean }
+  | { type: "MARK_AI_SPOKEN" }
   | { type: "AI_TEXT"; text: string }
   | { type: "ADD_TRANSCRIPT"; entry: TranscriptEntry }
   | { type: "GAME_OVER" }
@@ -107,6 +112,9 @@ function uiReducer(state: UIState, action: UIAction): UIState {
 
     case "SET_SPEAKING":
       return { ...state, isSpeaking: action.value };
+
+    case "MARK_AI_SPOKEN":
+      return state.hasAiSpoken ? state : { ...state, hasAiSpoken: true };
 
     case "AI_TEXT":
       return { ...state, lastAiText: action.text, hasAiSpoken: true };
@@ -220,6 +228,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const micStreamingEnabledRef = useRef(true);
   const micEnableFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstResponseFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstResponseFailureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const safeCloseSession = useCallback((session: Session | null | undefined) => {
     if (!session) return;
@@ -247,6 +257,88 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const clearFirstResponseWatchdog = useCallback(() => {
+    if (firstResponseFallbackTimerRef.current !== null) {
+      clearTimeout(firstResponseFallbackTimerRef.current);
+      firstResponseFallbackTimerRef.current = null;
+    }
+    if (firstResponseFailureTimerRef.current !== null) {
+      clearTimeout(firstResponseFailureTimerRef.current);
+      firstResponseFailureTimerRef.current = null;
+    }
+  }, []);
+
+  const failNoModelResponse = useCallback((sessionId: string | undefined, causalChain: string[]) => {
+    const current = stateRef.current;
+    if (current.status !== "playing" || current.sessionId !== sessionId || current.hasAiSpoken) return;
+
+    const totalTimeoutMs = LIVE_RUNTIME_CONFIG.firstResponseFallbackMs + LIVE_RUNTIME_CONFIG.firstResponseFailureMs;
+    const message = buildNoModelResponseErrorMessage(totalTimeoutMs);
+
+    audioCaptureRef.current?.stop();
+    audioCaptureRef.current = null;
+    safeCloseSession(sessionRef.current);
+    sessionRef.current = null;
+
+    dispatch({
+      type: "SET_STATUS",
+      status: "error",
+      errorMessage: message,
+    });
+
+    logger.error({
+      event: "session.first_response_timeout",
+      sessionId,
+      causalChain: extendCausalChain(causalChain, "session.first_response_timeout"),
+      data: { totalTimeoutMs },
+    });
+  }, [logger, safeCloseSession]);
+
+  const startFirstResponseWatchdog = useCallback(
+    (session: Session, sessionId: string | undefined, storyId: string, causalChain: string[]) => {
+      clearFirstResponseWatchdog();
+      firstResponseFallbackTimerRef.current = setTimeout(() => {
+        const current = stateRef.current;
+        if (current.status !== "playing" || current.sessionId !== sessionId || current.hasAiSpoken) return;
+
+        logger.warn({
+          event: "session.first_response_delayed",
+          sessionId,
+          causalChain: extendCausalChain(causalChain, "session.first_response_delayed"),
+          data: { waitMs: LIVE_RUNTIME_CONFIG.firstResponseFallbackMs },
+        });
+
+        try {
+          if (sessionRef.current === session && closingSessionRef.current !== session) {
+            session.sendClientContent({
+              turns: getInitialKickoffPrompt(storyId),
+              turnComplete: true,
+            });
+            logger.info({
+              event: "session.first_response_fallback_sent",
+              sessionId,
+              causalChain: extendCausalChain(causalChain, "session.first_response_fallback_sent"),
+              data: { storyId },
+            });
+          }
+        } catch (error) {
+          logger.warn({
+            event: "session.first_response_fallback_failed",
+            sessionId,
+            causalChain: extendCausalChain(causalChain, "session.first_response_fallback_failed"),
+            error,
+            data: { storyId },
+          });
+        }
+
+        firstResponseFailureTimerRef.current = setTimeout(() => {
+          failNoModelResponse(sessionId, causalChain);
+        }, LIVE_RUNTIME_CONFIG.firstResponseFailureMs);
+      }, LIVE_RUNTIME_CONFIG.firstResponseFallbackMs);
+    },
+    [clearFirstResponseWatchdog, failNoModelResponse, logger],
+  );
+
   const enableMicStreaming = useCallback((sessionId: string | undefined, reason: string) => {
     if (micStreamingEnabledRef.current) return;
     micStreamingEnabledRef.current = true;
@@ -273,6 +365,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
           turnComplete: true,
         });
         pendingKickoffRef.current = null;
+        startFirstResponseWatchdog(
+          session,
+          sessionId,
+          pending.storyId,
+          extendCausalChain(pending.causalChain, "session.kickoff_sent"),
+        );
         logger.info({
           event: "session.kickoff_sent",
           sessionId,
@@ -289,7 +387,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [logger],
+    [logger, startFirstResponseWatchdog],
   );
 
   const kickoffSession = useCallback(
@@ -425,6 +523,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       clearSilenceTimer();
       clearMicEnableFallbackTimer();
       clearConnectTimeout();
+      clearFirstResponseWatchdog();
       micStreamingEnabledRef.current = true;
       pendingKickoffRef.current = null;
       audioCaptureRef.current?.stop();
@@ -434,7 +533,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       safeCloseSession(sessionRef.current);
       sessionRef.current = null;
     };
-  }, [stopTicker, clearConnectTimeout, clearMicEnableFallbackTimer, clearSilenceTimer, safeCloseSession]);
+  }, [stopTicker, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearSilenceTimer, safeCloseSession]);
 
   const aiTextAccumRef = useRef<string>("");
 
@@ -565,6 +664,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     clearSilenceTimer();
     clearMicEnableFallbackTimer();
     clearConnectTimeout();
+    clearFirstResponseWatchdog();
     micStreamingEnabledRef.current = true;
     pendingEndGameRef.current = null;
     pendingKickoffRef.current = null;
@@ -583,7 +683,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       sessionId: stateRef.current.sessionId,
       causalChain: ["session.ended"],
     });
-  }, [clearConnectTimeout, clearMicEnableFallbackTimer, clearSilenceTimer, logger, safeCloseSession, stopTicker]);
+  }, [clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearSilenceTimer, logger, safeCloseSession, stopTicker]);
 
   useEffect(() => {
     if (!pendingEndGameRef.current) return;
@@ -617,6 +717,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     micStreamingEnabledRef.current = false;
     clearMicEnableFallbackTimer();
     clearConnectTimeout();
+    clearFirstResponseWatchdog();
 
     connectTimeoutRef.current = setTimeout(() => {
       const current = stateRef.current;
@@ -633,6 +734,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       audioCaptureRef.current = null;
       safeCloseSession(sessionRef.current);
       sessionRef.current = null;
+      clearFirstResponseWatchdog();
       dispatch({
         type: "SET_STATUS",
         status: "error",
@@ -707,6 +809,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
             dispatch({ type: "SET_STATUS", status: "playing" });
             startTicker();
             clearMicEnableFallbackTimer();
+            const activeSession = sessionRef.current;
+            if (activeSession) {
+              flushPendingKickoff(activeSession, sessionId);
+            }
             micEnableFallbackTimerRef.current = setTimeout(() => {
               enableMicStreaming(sessionId, "fallback_timeout");
             }, 8000);
@@ -744,6 +850,26 @@ export function GameProvider({ children }: { children: ReactNode }) {
             const outputTranscription = (
               msg.serverContent as Record<string, unknown> | undefined
             )?.outputTranscription as { text?: string } | undefined;
+
+            if (didReceiveModelResponse({
+              hasAudio: hadAudio,
+              outputTranscriptionText: outputTranscription?.text,
+            }) && !stateRef.current.hasAiSpoken) {
+              dispatch({ type: "MARK_AI_SPOKEN" });
+              clearFirstResponseWatchdog();
+              logger.info({
+                event: "session.first_response_received",
+                sessionId,
+                causalChain: ["session.first_response_received"],
+                data: {
+                  source: hadAudio && outputTranscription?.text?.trim()
+                    ? "audio_and_transcription"
+                    : hadAudio
+                      ? "audio"
+                      : "transcription",
+                },
+              });
+            }
 
             if (outputTranscription?.text) {
               aiTextAccumRef.current += outputTranscription.text;
@@ -788,6 +914,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
           onerror: (errorEvent: ErrorEvent) => {
             clearConnectTimeout();
+            clearFirstResponseWatchdog();
             dispatch({
               type: "SET_STATUS",
               status: "error",
@@ -807,6 +934,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
           onclose: (closeEvent: CloseEvent) => {
             clearConnectTimeout();
+            clearFirstResponseWatchdog();
             closingSessionRef.current = null;
             sessionRef.current = null;
             audioCaptureRef.current?.stop();
@@ -880,6 +1008,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         });
       } catch (error) {
         clearConnectTimeout();
+        clearFirstResponseWatchdog();
         dispatch({
           type: "SET_STATUS",
           status: "error",
@@ -897,6 +1026,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       clearConnectTimeout();
+      clearFirstResponseWatchdog();
       const message = error instanceof Error ? error.message : String(error);
       dispatch({
         type: "SET_STATUS",
@@ -910,7 +1040,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         error,
       });
     }
-  }, [clearConnectTimeout, clearMicEnableFallbackTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logger, safeCloseSession, startTicker, stopTicker]);
+  }, [clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logger, safeCloseSession, startTicker, stopTicker]);
 
   const togglePause = useCallback(() => {
     dispatch({ type: "TOGGLE_PAUSE" });

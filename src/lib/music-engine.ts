@@ -171,7 +171,10 @@ export class MusicEngine {
         },
       });
 
-      this.reconnectCount = 0;
+      // Only reset reconnect budget for an explicit fresh connect call.
+      if (!isReconnect) {
+        this.reconnectCount = 0;
+      }
       return true;
     } catch (error: unknown) {
       this.session = null;

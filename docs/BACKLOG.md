@@ -2,6 +2,41 @@
 
 This file tracks pending features, architectural ideas, and future work items for the InnerPlay Gemini hackathon project. Items are grouped by theme. Items marked **[POST-HACK]** are explicitly deferred after the March 16 deadline.
 
+> Canonical pending-task file: track all remaining work in this document only. Other docs may reference this file but should not keep independent pending-task lists.
+
+---
+
+## Active Priority Queue (Current)
+
+### P0 - Runtime Stability
+- Add live-session fallback telemetry (selected model, fallback used, close code distribution).
+- Add one-click runtime diagnostics endpoint for live token/model health.
+- Add bounded reconnect policy for transient close codes (`1011`, network reset) with strict cap.
+- Improve user-facing errors for model-not-found vs quota vs auth vs microphone.
+
+### P1 - Directional Sound
+- Introduce world-space audio entities (`entityId`, `x`, `y`, `velocity`, `bus`, `gain`, `pan`).
+- Add moving cue support (e.g., footsteps left-to-right over time) with interpolation.
+- Add zone/occlusion rules so off-room voices sound physically separated.
+- Add deterministic tests for pan, attenuation, and occlusion behavior.
+
+### P1 - Multi-Agent Story + Voice
+- Add orchestrator/director loop (speaker arbitration, overlap policy, pacing budget).
+- Add per-character agent roles/goals with shared blackboard world state.
+- Add per-character voice config and bus routing (`main_voice`, `npc_voice`, `ambient`, `sfx`).
+- Add background utterance mode for secondary characters (short diegetic lines).
+
+### P1 - Map and World State
+- Maintain canonical player position + character positions each turn.
+- Feed world snapshot to all character agents before action selection.
+- Add 2-5 second deterministic event scheduler for speech/SFX ordering.
+- Log every decision (`speakerId`, `position`, `reason`, `causalChain`) for replay/debug.
+
+### P1 - Closed-Loop Verification
+- Extend scenario suite for multi-speaker overlaps and positional audio assertions.
+- Add checks for tool-call vs fallback precedence invariants.
+- Add CLI verification command covering orchestrator + audio routing correctness.
+
 ---
 
 ## Multi-Agent Spatial Audio Architecture

@@ -156,11 +156,11 @@ const TRANSCRIPT_TOOL_PRIORITY_WINDOW_MS = AUDIO_CONFIG.transcriptIntentToolPrio
 
 interface UseSoundEngineOptions {
   storyId: string;
+  enableAdaptiveMusic: boolean;
   sessionId?: string;
   status: "idle" | "connecting" | "playing" | "ended" | "error";
   isSpeaking: boolean;
   isPaused: boolean;
-  hasAiSpoken: boolean;
   lastAiText: string;
   lastUserTranscriptText: string;
   lastUserTranscriptSeq: number;
@@ -169,11 +169,11 @@ interface UseSoundEngineOptions {
 
 export function useSoundEngine({
   storyId,
+  enableAdaptiveMusic,
   sessionId,
   status,
   isSpeaking,
   isPaused,
-  hasAiSpoken,
   lastAiText,
   lastUserTranscriptText,
   lastUserTranscriptSeq,
@@ -231,11 +231,12 @@ export function useSoundEngine({
         const timeline = TIMELINES[storyId] ?? TIMELINES["the-last-session"];
         engine.startTimeline(timeline);
 
-        if (!LYRIA_RUNTIME_CONFIG.enabled) {
+        if (!LYRIA_RUNTIME_CONFIG.enabled || !enableAdaptiveMusic) {
           logger.info({
             event: "music.disabled_by_config",
             sessionId,
             causalChain: ["sound.init_start", "music.disabled_by_config"],
+            data: { enableAdaptiveMusic, lyriaEnabled: LYRIA_RUNTIME_CONFIG.enabled },
           });
         } else {
           // Adaptive music is optional. If it fails, we soft-fail and continue.
@@ -285,7 +286,7 @@ export function useSoundEngine({
       cancelled = true;
       clearTimeout(delayTimer);
     };
-  }, [logger, sessionId, status, storyId]);
+  }, [enableAdaptiveMusic, logger, sessionId, status, storyId]);
 
   // ── TTS Ducking ───────────────────────────────────────
   useEffect(() => {
@@ -300,12 +301,10 @@ export function useSoundEngine({
 
   // ── Phone pickup — stop ring when AI first speaks ─────
   // Only active for "the-call" story.
-  // Fires once: when isSpeaking transitions true AND hasAiSpoken was false
-  // (i.e. this is the very first time the AI speaks).
+  // Fires once: the first time the AI is detected speaking.
   useEffect(() => {
     if (storyId !== "the-call") return;
     if (!isSpeaking) return;
-    if (hasAiSpoken) return; // already spoken before this render — not the first time
     if (hasPickedUpRef.current) return; // already fired
 
     const engine = engineRef.current;
@@ -315,7 +314,7 @@ export function useSoundEngine({
     console.log("[USE-SOUND] AI first speak detected — stopping phone_ring, playing pickup_click");
     engine.stop("phone_ring", 0); // hard stop — ring cuts immediately
     engine.play("pickup_click", 0.9, false); // one-shot click
-  }, [isSpeaking, hasAiSpoken, storyId]);
+  }, [isSpeaking, storyId]);
 
   // ── Authoritative tool-call path ───────────────────────────
   useEffect(() => {

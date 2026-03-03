@@ -37,6 +37,8 @@ export const LIVE_RUNTIME_CONFIG = {
   modelName: primaryLiveModel,
   fallbackModelNames: liveFallbackModels,
   connectTimeoutMs: 15_000,
+  firstResponseFallbackMs: 12_000,
+  firstResponseFailureMs: 10_000,
   voiceName: "Charon",
   silenceNudgeMs: 12_000,
   realtimeInputSilenceDurationMs: 1_200,

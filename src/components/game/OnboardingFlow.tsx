@@ -87,6 +87,9 @@ type OnboardingStep = "scene" | "headphones" | "countdown" | "ringing";
 interface OnboardingFlowProps {
   storyId: string;
   isSessionReady?: boolean;
+  adaptiveMusicAvailable?: boolean;
+  enableAdaptiveMusic?: boolean;
+  onToggleAdaptiveMusic?: () => void;
   onPrepare?: () => void;
   onComplete: () => void;
 }
@@ -94,6 +97,9 @@ interface OnboardingFlowProps {
 export function OnboardingFlow({
   storyId,
   isSessionReady = true,
+  adaptiveMusicAvailable = false,
+  enableAdaptiveMusic = false,
+  onToggleAdaptiveMusic,
   onPrepare,
   onComplete,
 }: OnboardingFlowProps) {
@@ -356,10 +362,11 @@ export function OnboardingFlow({
         {totalScenes > 1 && (
           <div
             style={{
-              position: "absolute",
-              bottom: "var(--space-md)",
+              marginTop: "var(--space-xs)",
               display: "flex",
               gap: "var(--space-xs)",
+              minHeight: 10,
+              alignItems: "center",
             }}
           >
             {onboarding.scenes.map((_, i) => (
@@ -447,6 +454,31 @@ export function OnboardingFlow({
           }}
         >
           BEGIN
+        </button>
+        <button
+          type="button"
+          onClick={onToggleAdaptiveMusic}
+          disabled={!adaptiveMusicAvailable}
+          style={{
+            minHeight: "var(--touch-min)",
+            marginTop: "var(--space-sm)",
+            padding: "var(--space-xs) var(--space-md)",
+            border: "1px solid var(--muted)",
+            borderRadius: 0,
+            color: "var(--muted)",
+            fontSize: "var(--type-caption)",
+            fontFamily: "var(--font-ui)",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            transition: "var(--transition-normal)",
+            backgroundColor: "transparent",
+            cursor: adaptiveMusicAvailable ? "pointer" : "not-allowed",
+            minWidth: 240,
+            opacity: adaptiveMusicAvailable ? 0.85 : 0.5,
+          }}
+          aria-pressed={enableAdaptiveMusic}
+        >
+          Adaptive Music (Experimental): {adaptiveMusicAvailable ? (enableAdaptiveMusic ? "On" : "Off") : "Unavailable"}
         </button>
       </div>
     );

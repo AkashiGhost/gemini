@@ -1791,38 +1791,13 @@ This framing is useful for the hackathon demo script — judges will immediately
 
 ---
 
-## Appendix C: Pending Tasks (Updated 2026-03-03)
+## Appendix C: Pending Tasks
 
-### P0 - Runtime Stability
-1. Add live-session fallback telemetry (selected model, fallback used, close code distribution).
-2. Add one-click runtime diagnostics endpoint for live token/model health.
-3. Add bounded reconnect policy for transient close codes (`1011`, network reset) with strict cap.
-4. Improve user-facing errors for model-not-found vs quota vs auth vs microphone.
+Pending-task tracking is centralized in [docs/BACKLOG.md](../BACKLOG.md).
 
-### P1 - Directional Sound
-1. Introduce world-space audio entities (`entityId`, `x`, `y`, `velocity`, `bus`, `gain`, `pan`).
-2. Add moving cue support (e.g., footsteps left-to-right over time) with interpolation.
-3. Add zone/occlusion rules so off-room voices sound physically separated.
-4. Add deterministic tests for pan, attenuation, and occlusion behavior.
-
-### P1 - Multi-Agent Story + Voice
-1. Add orchestrator/director loop (speaker arbitration, overlap policy, pacing budget).
-2. Add per-character agent roles/goals with shared blackboard world state.
-3. Add per-character voice config and bus routing (`main_voice`, `npc_voice`, `ambient`, `sfx`).
-4. Add background utterance mode for secondary characters (short diegetic lines).
-
-### P1 - Map and World State
-1. Maintain canonical player position + character positions each turn.
-2. Feed world snapshot to all character agents before action selection.
-3. Add 2-5 second deterministic event scheduler for speech/SFX ordering.
-4. Log every decision (`speakerId`, `position`, `reason`, `causalChain`) for replay/debug.
-
-### P1 - Closed-Loop Verification
-1. Extend scenario suite for multi-speaker overlaps and positional audio assertions.
-2. Add checks for tool-call vs fallback precedence invariants.
-3. Add CLI verification command covering orchestrator + audio routing correctness.
+To avoid drift, do not maintain independent open-task lists in this architecture document. Add new remaining work items in `docs/BACKLOG.md` only.
 
 ---
 
 *End of Architecture & Implementation Plan*
-*Document version: 1.2 — 2026-03-03 (Appendix C pending tasks added)*
+*Document version: 1.3 — 2026-03-03 (Appendix C now points to canonical backlog file)*
