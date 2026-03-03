@@ -332,7 +332,7 @@ async function generateStoryPack(
 export async function POST(req: NextRequest): Promise<Response> {
   const traceId = resolveCreatorTraceId(req.headers.get(CREATOR_TRACE_HEADER), "creator-story-pack");
 
-  const jsonWithTrace = (payload: Record<string, unknown>, status: number): Response =>
+  const jsonWithTrace = (payload: Record<string, unknown> | CreatorStoryPackResponseBody, status: number): Response =>
     Response.json(payload, {
       status,
       headers: { [CREATOR_TRACE_HEADER]: traceId },
