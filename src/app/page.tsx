@@ -683,11 +683,14 @@ export default function Home() {
               marginBottom: "var(--space-md)",
             }}
           >
-            Build your own interactive story. Coming soon.
+            Build your own interactive story with the creator interview.
           </p>
-          <button
-            onClick={() => setWaitlistOpen(true)}
+          <a
+            href="/create"
             style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
               background: "transparent",
               border: "1px solid var(--accent)",
               color: "var(--accent)",
@@ -696,12 +699,12 @@ export default function Home() {
               letterSpacing: "2px",
               height: 48,
               padding: "0 var(--space-md)",
-              cursor: "pointer",
               borderRadius: 0,
+              textDecoration: "none",
             }}
           >
-            JOIN WAITLIST
-          </button>
+            OPEN CREATOR
+          </a>
         </section>
 
         {/* Section 4: About */}

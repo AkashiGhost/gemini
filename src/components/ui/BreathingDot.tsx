@@ -8,9 +8,10 @@ interface BreathingDotProps {
 
 function getBreathingClass(phase: number): string {
   if (phase >= 4) return "breathe-phase4";
-  if (phase >= 3) return "breathe-phase3";
-  if (phase >= 2) return "breathe-phase2";
-  return "breathe";
+  if (phase === 3) return "breathe-phase3";
+  if (phase === 2) return "breathe-phase2";
+  if (phase === 1) return "breathe-phase1";
+  return "breathe-phase0";
 }
 
 export function BreathingDot({ size = 10, phase = 0, isSpeaking = false }: BreathingDotProps) {

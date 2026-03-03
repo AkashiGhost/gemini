@@ -16,13 +16,20 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import { getStoryPrompt } from "@/lib/story-prompts";
 import type { StoryId } from "@/lib/constants";
 import { STORY_IDS } from "@/lib/constants";
+import {
+  LIVE_RUNTIME_CONFIG,
+  LIVE_TOOL_DECLARATIONS,
+} from "@/lib/config/live-tools";
+import { createLogger } from "@/lib/logging";
 
 export const runtime = "nodejs";
+const logger = createLogger("api/live-token");
 
 // POST /api/live-token
 // Body: { storyId: string }
 // Returns: { token: string }
 export async function POST(req: NextRequest) {
+  const sessionId = req.headers.get("x-session-id") ?? undefined;
   // ── Validate API key ─────────────────────────────────────────
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -43,7 +50,12 @@ export async function POST(req: NextRequest) {
 
   // Fall back to default story if id is unknown
   if (!STORY_IDS.includes(storyId as StoryId)) {
-    console.warn(`[live-token] Unknown storyId "${storyId}" — falling back to the-call`);
+    logger.warn({
+      event: "live_token.unknown_story",
+      sessionId,
+      causalChain: ["live_token.request", "live_token.unknown_story"],
+      data: { storyId },
+    });
     storyId = "the-call";
   }
 
@@ -63,20 +75,21 @@ export async function POST(req: NextRequest) {
     const tokenResponse = await ai.authTokens.create({
       config: {
         uses: 1, // Single-use — one session per token
-        expireTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour from now
+        expireTime: new Date(Date.now() + LIVE_RUNTIME_CONFIG.ephemeralTokenLifetimeMs).toISOString(),
         // Lock the Live API config into the token
         liveConnectConstraints: {
-          model: "gemini-live-2.5-flash-native-audio",
+          model: LIVE_RUNTIME_CONFIG.modelName,
           config: {
             responseModalities: [Modality.AUDIO],
             speechConfig: {
               voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: "Charon" },
+                prebuiltVoiceConfig: { voiceName: LIVE_RUNTIME_CONFIG.voiceName },
               },
             },
             systemInstruction: {
               parts: [{ text: systemPrompt }],
             },
+            tools: LIVE_TOOL_DECLARATIONS,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             outputAudioTranscription: {} as any,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -100,19 +113,35 @@ export async function POST(req: NextRequest) {
       ?? (tokenResponse as Record<string, unknown>).token as string | undefined;
 
     if (!token) {
-      console.error("[live-token] Unexpected token response shape:", tokenResponse);
+      logger.error({
+        event: "live_token.invalid_response",
+        sessionId,
+        causalChain: ["live_token.request", "live_token.invalid_response"],
+        data: { storyId },
+      });
       return NextResponse.json(
         { error: "Gemini returned an unexpected token response — check API version" },
         { status: 502 },
       );
     }
 
-    console.log(`[live-token] Ephemeral token minted for storyId="${storyId}"`);
+    logger.info({
+      event: "live_token.minted",
+      sessionId,
+      causalChain: ["live_token.request", "live_token.minted"],
+      data: { storyId, model: LIVE_RUNTIME_CONFIG.modelName },
+    });
 
     return NextResponse.json({ token });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[live-token] Failed to create ephemeral token:", message);
+    logger.error({
+      event: "live_token.failed",
+      sessionId,
+      causalChain: ["live_token.request", "live_token.failed"],
+      error: err,
+      data: { storyId },
+    });
 
     // Surface specific errors clearly for the client-side error UI
     if (message.includes("401") || message.includes("UNAUTHENTICATED")) {

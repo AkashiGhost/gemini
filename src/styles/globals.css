@@ -56,39 +56,52 @@ button {
 }
 
 /* Breathing animation for game session — phase-aware variants */
-@keyframes breathe {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.6; }
+@keyframes breathe-phase0 {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 0.8; transform: scale(1.2); }
 }
 
-/* Phase 0-1: Calm, slow breathing (default) */
-.breathe {
-  animation: breathe 4s ease-in-out infinite;
+@keyframes breathe-phase1 {
+  0%, 100% { opacity: 0.5; transform: scale(0.8); }
+  50% { opacity: 0.9; transform: scale(1.3); }
 }
 
-/* Phase 2: Slightly faster — unease creeping in */
+@keyframes breathe-phase2 {
+  0%, 100% { opacity: 0.6; transform: scale(0.75); }
+  50% { opacity: 1; transform: scale(1.4); }
+}
+
+@keyframes breathe-phase3 {
+  0%, 100% { opacity: 0.7; transform: scale(0.7); }
+  50% { opacity: 1; transform: scale(1.5); }
+}
+
+@keyframes breathe-phase4 {
+  0% { opacity: 0.82; transform: scale(0.62); }
+  22% { opacity: 1; transform: scale(1.6); }
+  38% { opacity: 0.9; transform: scale(1.05); }
+  63% { opacity: 1; transform: scale(1.45); }
+  100% { opacity: 0.84; transform: scale(0.68); }
+}
+
+.breathe-phase0 {
+  animation: breathe-phase0 4s ease-in-out infinite;
+}
+
+.breathe-phase1 {
+  animation: breathe-phase1 2.5s ease-in-out infinite;
+}
+
 .breathe-phase2 {
-  animation: breathe 3.2s ease-in-out infinite;
-}
-
-/* Phase 3: Tension — noticeably faster, higher max opacity */
-@keyframes breathe-tense {
-  0%, 100% { opacity: 0.25; }
-  50% { opacity: 0.75; }
+  animation: breathe-phase2 1.5s ease-in-out infinite;
 }
 
 .breathe-phase3 {
-  animation: breathe-tense 2.5s ease-in-out infinite;
-}
-
-/* Phase 4+: Dread — slow, deep, barely visible pulsing */
-@keyframes breathe-dread {
-  0%, 100% { opacity: 0.1; }
-  50% { opacity: 0.4; }
+  animation: breathe-phase3 1s ease-in-out infinite;
 }
 
 .breathe-phase4 {
-  animation: breathe-dread 6s ease-in-out infinite;
+  animation: breathe-phase4 0.65s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* Pulse animation for when Elara is speaking */

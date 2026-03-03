@@ -1,15 +1,5 @@
 "use client";
 
-// ─────────────────────────────────────────────
-// GameContext — Gemini Live API implementation
-//
-// Architecture: Ephemeral token pattern
-//   Browser → POST /api/live-token (gets short-lived token)
-//   Browser → Gemini Live WebSocket directly (using ephemeral token)
-//
-// No WS proxy server needed. All audio I/O handled here.
-// ─────────────────────────────────────────────
-
 import {
   createContext,
   useContext,
@@ -19,14 +9,18 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import { GoogleGenAI, Modality } from "@google/genai";
-import type { Session } from "@google/genai";
+import { FunctionResponseScheduling, GoogleGenAI, Modality } from "@google/genai";
+import type { FunctionCall, Session } from "@google/genai";
 import { AudioCapture } from "@/lib/audio-capture";
 import { AudioPlayback } from "@/lib/audio-playback";
-
-// ─────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────
+import {
+  LIVE_RUNTIME_CONFIG,
+  parseLiveToolCall,
+  tensionToPhase,
+  type LiveToolCallEvent,
+  type LiveToolCallListener,
+} from "@/lib/config/live-tools";
+import { createLogger, extendCausalChain } from "@/lib/logging";
 
 export interface TranscriptEntry {
   source: "user" | "ai";
@@ -35,6 +29,7 @@ export interface TranscriptEntry {
 
 export interface GameContextValue {
   phase: number;
+  sessionId: string | undefined;
   status: "idle" | "connecting" | "playing" | "ended" | "error";
   isSpeaking: boolean;
   isPaused: boolean;
@@ -46,16 +41,16 @@ export interface GameContextValue {
   errorMessage: string | undefined;
   startSession: (storyId: string) => Promise<void>;
   endSession: () => void;
+  setPhase: (phase: number, options?: { reason?: string; causalChain?: string[] }) => void;
+  setPhaseFromTension: (tension: number, options?: { reason?: string; causalChain?: string[] }) => number;
+  onToolCall: (listener: LiveToolCallListener) => () => void;
   togglePause: () => void;
   toggleMicMute: () => void;
 }
 
-// ─────────────────────────────────────────────
-// Reducer
-// ─────────────────────────────────────────────
-
 type UIState = {
   phase: number;
+  sessionId: string | undefined;
   status: "idle" | "connecting" | "playing" | "ended" | "error";
   isSpeaking: boolean;
   isPaused: boolean;
@@ -76,10 +71,12 @@ type UIAction =
   | { type: "TICK" }
   | { type: "TOGGLE_PAUSE" }
   | { type: "SET_MIC_MUTED"; value: boolean }
-  | { type: "SET_PHASE"; phase: number };
+  | { type: "SET_PHASE"; phase: number }
+  | { type: "SET_SESSION_ID"; sessionId: string | undefined };
 
 const initialState: UIState = {
   phase: 0,
+  sessionId: undefined,
   status: "idle",
   isSpeaking: false,
   isPaused: false,
@@ -94,7 +91,6 @@ const initialState: UIState = {
 function uiReducer(state: UIState, action: UIAction): UIState {
   switch (action.type) {
     case "SET_STATUS":
-      // Guard: never overwrite "ended" with "idle" (e.g. from a stale cleanup path)
       if (state.status === "ended" && action.status === "idle") return state;
       return {
         ...state,
@@ -106,20 +102,12 @@ function uiReducer(state: UIState, action: UIAction): UIState {
       return { ...state, isSpeaking: action.value };
 
     case "AI_TEXT":
-      return {
-        ...state,
-        lastAiText: action.text,
-        hasAiSpoken: true,
-      };
+      return { ...state, lastAiText: action.text, hasAiSpoken: true };
 
     case "ADD_TRANSCRIPT":
-      return {
-        ...state,
-        transcript: [...state.transcript, action.entry],
-      };
+      return { ...state, transcript: [...state.transcript, action.entry] };
 
     case "GAME_OVER":
-      // "ended" is terminal — don't allow further status changes after this
       return { ...state, status: "ended", isSpeaking: false };
 
     case "TICK":
@@ -135,38 +123,70 @@ function uiReducer(state: UIState, action: UIAction): UIState {
     case "SET_PHASE":
       return { ...state, phase: action.phase };
 
+    case "SET_SESSION_ID":
+      return { ...state, sessionId: action.sessionId };
+
     default:
       return state;
   }
 }
 
-// ─────────────────────────────────────────────
-// Context
-// ─────────────────────────────────────────────
-
 const GameContext = createContext<GameContextValue | null>(null);
 
-// ─────────────────────────────────────────────
-// Provider
-// ─────────────────────────────────────────────
+interface PendingEndGame {
+  callId: string;
+  reason?: string;
+  fadeOutSeconds?: number;
+  causalChain: string[];
+}
+
+function createSessionId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 export function GameProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(uiReducer, initialState);
+  const loggerRef = useRef(createLogger("GameContext"));
+  const logger = loggerRef.current;
 
-  // ── Stable refs for callbacks (prevent stale closure bugs) ──
   const stateRef = useRef(state);
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
-  // ── Gemini Live session ref ──────────────────────────────────
-  const sessionRef = useRef<Session | null>(null);
+  const toolCallSubscribersRef = useRef<Set<LiveToolCallListener>>(new Set());
+  const pendingEndGameRef = useRef<PendingEndGame | null>(null);
 
-  // ── Audio I/O refs ───────────────────────────────────────────
+  const onToolCall = useCallback((listener: LiveToolCallListener) => {
+    toolCallSubscribersRef.current.add(listener);
+    return () => {
+      toolCallSubscribersRef.current.delete(listener);
+    };
+  }, []);
+
+  const emitToolCall = useCallback((toolCall: LiveToolCallEvent) => {
+    for (const listener of toolCallSubscribersRef.current) {
+      try {
+        listener(toolCall);
+      } catch (error) {
+        logger.warn({
+          event: "tool.subscriber_error",
+          sessionId: toolCall.sessionId,
+          causalChain: extendCausalChain(toolCall.causalChain, "tool.subscriber_error"),
+          error,
+          data: { tool: toolCall.name, callId: toolCall.callId },
+        });
+      }
+    }
+  }, [logger]);
+
+  const sessionRef = useRef<Session | null>(null);
   const audioPlaybackRef = useRef<AudioPlayback | null>(null);
   const audioCaptureRef = useRef<AudioCapture | null>(null);
 
-  // Initialize AudioPlayback on mount (client-only)
   useEffect(() => {
     audioPlaybackRef.current = new AudioPlayback();
     return () => {
@@ -175,8 +195,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // ── Elapsed time ticker ───────────────────────────────────────
-  // 1s interval when playing; paused or non-playing states skip TICK via reducer guard
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startTicker = useCallback(() => {
@@ -193,9 +211,32 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // ── Silence nudge timer ───────────────────────────────────────
-  // When status=playing, isSpeaking=false, and not paused for 12 seconds,
-  // send a silence nudge to prompt Gemini to continue the story.
+  const setPhase = useCallback(
+    (phase: number, options?: { reason?: string; causalChain?: string[] }) => {
+      const clampedPhase = Math.max(0, Math.min(4, Math.trunc(phase)));
+      dispatch({ type: "SET_PHASE", phase: clampedPhase });
+      logger.info({
+        event: "phase.updated",
+        sessionId: stateRef.current.sessionId,
+        causalChain: extendCausalChain(options?.causalChain, "phase.updated"),
+        data: { phase: clampedPhase, reason: options?.reason ?? "manual" },
+      });
+    },
+    [logger],
+  );
+
+  const setPhaseFromTension = useCallback(
+    (tension: number, options?: { reason?: string; causalChain?: string[] }) => {
+      const phase = tensionToPhase(tension);
+      setPhase(phase, {
+        reason: options?.reason ?? "set_tension",
+        causalChain: extendCausalChain(options?.causalChain, `tension:${tension.toFixed(3)}`),
+      });
+      return phase;
+    },
+    [setPhase],
+  );
+
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetSilenceTimer = useCallback(() => {
@@ -209,21 +250,29 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     silenceTimerRef.current = setTimeout(() => {
       const s = stateRef.current;
-      // Double-check state hasn't changed while we were waiting
       if (s.status !== "playing" || s.isSpeaking || s.isPaused) return;
       const session = sessionRef.current;
       if (!session) return;
-      console.log("[GameContext] Silence nudge — sending [The patient waits...]");
+      logger.info({
+        event: "silence_nudge.send",
+        sessionId: s.sessionId,
+        causalChain: ["silence_timer", "silence_nudge.send"],
+      });
       try {
         session.sendClientContent({
           turns: "[The patient waits in silence...]",
           turnComplete: true,
         });
-      } catch (err) {
-        console.warn("[GameContext] Silence nudge failed:", err);
+      } catch (error) {
+        logger.warn({
+          event: "silence_nudge.failed",
+          sessionId: s.sessionId,
+          causalChain: ["silence_timer", "silence_nudge.failed"],
+          error,
+        });
       }
-    }, 12_000);
-  }, []);
+    }, LIVE_RUNTIME_CONFIG.silenceNudgeMs);
+  }, [logger]);
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current !== null) {
@@ -232,7 +281,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // ── isSpeaking / paused changes → restart silence timer ──────
   useEffect(() => {
     if (state.status !== "playing") {
       clearSilenceTimer();
@@ -245,7 +293,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [state.isSpeaking, state.isPaused, state.status, clearSilenceTimer, resetSilenceTimer]);
 
-  // ── Cleanup on unmount ────────────────────────────────────────
   useEffect(() => {
     return () => {
       stopTicker();
@@ -258,27 +305,188 @@ export function GameProvider({ children }: { children: ReactNode }) {
         try {
           sessionRef.current.close();
         } catch {
-          // ignore
+          // no-op
         }
         sessionRef.current = null;
       }
     };
   }, [stopTicker, clearSilenceTimer]);
 
-  // ── Accumulating AI transcript text ──────────────────────────
-  // Gemini streams text in fragments. We accumulate them in a ref and
-  // commit the full turn to the transcript when generationComplete fires.
   const aiTextAccumRef = useRef<string>("");
 
-  // ── Connect to Gemini Live ────────────────────────────────────
+  const sendSilentToolAck = useCallback(
+    (session: Session, functionCall: FunctionCall, sessionId: string | undefined, causalChain: string[]) => {
+      try {
+        session.sendToolResponse({
+          functionResponses: [{
+            id: functionCall.id,
+            name: functionCall.name,
+            response: { output: { ok: true, scheduling: "SILENT" } },
+            scheduling: FunctionResponseScheduling.SILENT,
+          }],
+        });
+
+        logger.info({
+          event: "tool.ack_sent",
+          sessionId,
+          causalChain: extendCausalChain(causalChain, "tool.ack_sent"),
+          data: { tool: functionCall.name, callId: functionCall.id },
+        });
+      } catch (error) {
+        logger.warn({
+          event: "tool.ack_failed",
+          sessionId,
+          causalChain: extendCausalChain(causalChain, "tool.ack_failed"),
+          error,
+          data: { tool: functionCall.name, callId: functionCall.id },
+        });
+      }
+    },
+    [logger],
+  );
+
+  const handleLiveToolCalls = useCallback(
+    (functionCalls: FunctionCall[], session: Session, sessionId: string | undefined) => {
+      for (const functionCall of functionCalls) {
+        const parsed = parseLiveToolCall(functionCall, {
+          sessionId,
+          causalChain: ["tool.received"],
+        });
+
+        if (!parsed) {
+          logger.warn({
+            event: "tool.invalid_payload",
+            sessionId,
+            causalChain: ["tool.received", "tool.invalid_payload"],
+            data: {
+              name: functionCall.name,
+              callId: functionCall.id,
+              args: functionCall.args as Record<string, unknown> | undefined,
+            },
+          });
+          continue;
+        }
+
+        logger.info({
+          event: "tool.received",
+          sessionId,
+          causalChain: parsed.causalChain,
+          data: {
+            name: parsed.name,
+            callId: parsed.callId,
+            args: parsed.args as unknown as Record<string, unknown>,
+          },
+        });
+
+        sendSilentToolAck(session, functionCall, sessionId, parsed.causalChain);
+
+        if (parsed.name === "set_tension") {
+          const phase = parsed.args.phase != null
+            ? Math.max(0, Math.min(4, Math.trunc(parsed.args.phase)))
+            : setPhaseFromTension(parsed.args.tension, {
+              reason: "tool:set_tension",
+              causalChain: parsed.causalChain,
+            });
+
+          if (parsed.args.phase != null) {
+            setPhase(phase, {
+              reason: "tool:set_tension:explicit_phase",
+              causalChain: parsed.causalChain,
+            });
+          }
+
+          logger.info({
+            event: "tool.set_tension.applied",
+            sessionId,
+            causalChain: extendCausalChain(parsed.causalChain, "tool.set_tension.applied"),
+            data: {
+              tension: parsed.args.tension,
+              phase,
+              transitionSeconds: parsed.args.transitionSeconds,
+            },
+          });
+        }
+
+        if (parsed.name === "end_game") {
+          pendingEndGameRef.current = {
+            callId: parsed.callId,
+            reason: parsed.args.reason,
+            fadeOutSeconds: parsed.args.fadeOutSeconds,
+            causalChain: extendCausalChain(parsed.causalChain, "tool.end_game.pending"),
+          };
+          logger.info({
+            event: "tool.end_game.pending",
+            sessionId,
+            causalChain: pendingEndGameRef.current.causalChain,
+            data: {
+              reason: parsed.args.reason,
+              fadeOutSeconds: parsed.args.fadeOutSeconds,
+            },
+          });
+        }
+
+        emitToolCall(parsed);
+      }
+    },
+    [emitToolCall, logger, sendSilentToolAck, setPhase, setPhaseFromTension],
+  );
+
+  const endSession = useCallback(() => {
+    stopTicker();
+    clearSilenceTimer();
+    pendingEndGameRef.current = null;
+
+    audioCaptureRef.current?.stop();
+    audioCaptureRef.current = null;
+
+    audioPlaybackRef.current?.stop();
+
+    if (sessionRef.current) {
+      try {
+        sessionRef.current.close();
+      } catch {
+        // no-op
+      }
+      sessionRef.current = null;
+    }
+
+    dispatch({ type: "GAME_OVER" });
+    logger.info({
+      event: "session.ended",
+      sessionId: stateRef.current.sessionId,
+      causalChain: ["session.ended"],
+    });
+  }, [clearSilenceTimer, logger, stopTicker]);
+
+  useEffect(() => {
+    if (!pendingEndGameRef.current) return;
+    if (state.isSpeaking) return;
+    if (state.status !== "playing") return;
+
+    const pending = pendingEndGameRef.current;
+    pendingEndGameRef.current = null;
+    logger.info({
+      event: "tool.end_game.executing",
+      sessionId: state.sessionId,
+      causalChain: extendCausalChain(pending.causalChain, "tool.end_game.executing"),
+      data: { reason: pending.reason, fadeOutSeconds: pending.fadeOutSeconds },
+    });
+    endSession();
+  }, [endSession, logger, state.isSpeaking, state.sessionId, state.status]);
+
   const startSession = useCallback(async (storyId: string) => {
+    const sessionId = createSessionId();
+    dispatch({ type: "SET_SESSION_ID", sessionId });
     dispatch({ type: "SET_STATUS", status: "connecting" });
+    dispatch({ type: "SET_PHASE", phase: 0 });
 
     try {
-      // 1. Fetch ephemeral token from server (system prompt locked in server-side)
       const tokenRes = await fetch("/api/live-token", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-id": sessionId,
+        },
         body: JSON.stringify({ storyId }),
       });
 
@@ -289,65 +497,63 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
       const { token } = (await tokenRes.json()) as { token: string };
 
-      // 2. Request microphone access before connecting (fail fast if blocked)
       try {
-        await audioCaptureRef.current?.stop(); // stop any previous capture
+        await audioCaptureRef.current?.stop();
       } catch {
-        // ignore
+        // no-op
       }
 
-      // 3. Connect to Gemini Live using the ephemeral token as the API key
       const ai = new GoogleGenAI({
         apiKey: token,
         httpOptions: { apiVersion: "v1alpha" },
       } as ConstructorParameters<typeof GoogleGenAI>[0]);
 
       const session = await ai.live.connect({
-        model: "gemini-live-2.5-flash-native-audio",
+        model: LIVE_RUNTIME_CONFIG.modelName,
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
             voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: "Charon" },
+              prebuiltVoiceConfig: { voiceName: LIVE_RUNTIME_CONFIG.voiceName },
             },
           },
-          // Transcript of AI audio output — allows us to display and parse text
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           outputAudioTranscription: {} as any,
-          // Session resumption tokens (valid 2h) — handles brief disconnects
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           sessionResumption: {} as any,
-          // Compress old context to keep session alive beyond 10-15 min
           contextWindowCompression: { slidingWindow: {} },
-          // Affective dialog — adapts voice register to player's emotional tone
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           enableAffectiveDialog: true as any,
-          // Low end-of-speech sensitivity — waits longer before cutting off player
           realtimeInputConfig: {
             automaticActivityDetection: {
               endOfSpeechSensitivity: "END_SENSITIVITY_LOW",
-              silenceDurationMs: 1200,
+              silenceDurationMs: LIVE_RUNTIME_CONFIG.realtimeInputSilenceDurationMs,
             },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any,
         } as Record<string, unknown>,
         callbacks: {
           onopen: () => {
-            console.log("[GameContext] Gemini Live session opened");
             dispatch({ type: "SET_STATUS", status: "playing" });
             startTicker();
+            logger.info({
+              event: "session.open",
+              sessionId,
+              causalChain: ["session.open"],
+              data: { model: LIVE_RUNTIME_CONFIG.modelName, storyId },
+            });
           },
 
           onmessage: (msg) => {
-            // ── Audio output ─────────────────────────────────────────────
+            if (msg.toolCall?.functionCalls?.length && sessionRef.current) {
+              handleLiveToolCalls(msg.toolCall.functionCalls, sessionRef.current, sessionId);
+            }
+
             const parts = msg.serverContent?.modelTurn?.parts ?? [];
             let hadAudio = false;
 
             for (const part of parts) {
-              // Skip internal thinking tokens
               if ((part as Record<string, unknown>).thought) continue;
-
-              // Audio chunk — play immediately via AudioPlayback
               if (part.inlineData?.data) {
                 hadAudio = true;
                 audioPlaybackRef.current?.play(part.inlineData.data);
@@ -361,19 +567,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
               dispatch({ type: "SET_SPEAKING", value: true });
             }
 
-            // ── Output transcription (text of what Gemini is saying) ─────
-            // Comes in msg.serverContent.outputTranscription.text (streaming fragments)
             const outputTranscription = (
               msg.serverContent as Record<string, unknown> | undefined
             )?.outputTranscription as { text?: string } | undefined;
 
             if (outputTranscription?.text) {
               aiTextAccumRef.current += outputTranscription.text;
-              // Update lastAiText incrementally for real-time display
               dispatch({ type: "AI_TEXT", text: aiTextAccumRef.current });
             }
 
-            // ── Input transcription (what the user said) ─────────────────
             const inputTranscription = (
               msg.serverContent as Record<string, unknown> | undefined
             )?.inputTranscription as { text?: string } | undefined;
@@ -385,10 +587,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
               });
             }
 
-            // ── Generation complete — commit AI turn to transcript ────────
             if (msg.serverContent?.generationComplete) {
               dispatch({ type: "SET_SPEAKING", value: false });
-
               const aiText = aiTextAccumRef.current.trim();
               if (aiText) {
                 dispatch({
@@ -399,43 +599,34 @@ export function GameProvider({ children }: { children: ReactNode }) {
               aiTextAccumRef.current = "";
             }
 
-            // ── Interrupted (barge-in) ────────────────────────────────────
             if ((msg.serverContent as Record<string, unknown> | undefined)?.interrupted) {
-              console.log("[GameContext] Barge-in detected — clearing audio queue");
               audioPlaybackRef.current?.stop();
               aiTextAccumRef.current = "";
               dispatch({ type: "SET_SPEAKING", value: false });
             }
 
-            // ── Turn complete ─────────────────────────────────────────────
             if (msg.serverContent?.turnComplete) {
               dispatch({ type: "SET_SPEAKING", value: false });
             }
-
-            // ── Session resumption token ──────────────────────────────────
-            // Log but don't need to act — SDK handles reconnection automatically
-            const resumptionUpdate = (
-              msg as unknown as Record<string, unknown>
-            )?.sessionResumptionUpdate as { newHandle?: string } | undefined;
-
-            if (resumptionUpdate?.newHandle) {
-              console.log("[GameContext] Session resumption token refreshed");
-            }
           },
 
-          onerror: (e: ErrorEvent) => {
-            console.error("[GameContext] Gemini Live error:", e.message);
+          onerror: (errorEvent: ErrorEvent) => {
             dispatch({
               type: "SET_STATUS",
               status: "error",
-              errorMessage: e.message ?? "Gemini Live connection error",
+              errorMessage: errorEvent.message ?? "Gemini Live connection error",
             });
             stopTicker();
             clearSilenceTimer();
+            logger.error({
+              event: "session.error",
+              sessionId,
+              causalChain: ["session.error"],
+              data: { message: errorEvent.message },
+            });
           },
 
-          onclose: (e: CloseEvent) => {
-            console.log("[GameContext] Gemini Live session closed:", e.code, e.reason);
+          onclose: (closeEvent: CloseEvent) => {
             sessionRef.current = null;
             audioCaptureRef.current?.stop();
             audioCaptureRef.current = null;
@@ -443,29 +634,37 @@ export function GameProvider({ children }: { children: ReactNode }) {
             clearSilenceTimer();
 
             const current = stateRef.current;
-            // Only transition to ended/error if not already in a terminal state
             if (current.status !== "ended" && current.status !== "error") {
-              if (e.code === 1000 || e.code === 1001) {
-                // Normal closure — game ended gracefully
+              if (closeEvent.code === 1000 || closeEvent.code === 1001) {
                 dispatch({ type: "GAME_OVER" });
               } else {
                 dispatch({
                   type: "SET_STATUS",
                   status: "error",
-                  errorMessage: e.reason || `Connection closed (code ${e.code})`,
+                  errorMessage: closeEvent.reason || `Connection closed (code ${closeEvent.code})`,
                 });
               }
             }
+
+            logger.info({
+              event: "session.closed",
+              sessionId,
+              causalChain: ["session.closed"],
+              data: {
+                code: closeEvent.code,
+                reason: closeEvent.reason,
+              },
+            });
           },
         },
       });
 
       sessionRef.current = session;
 
-      // 4. Start mic capture — stream 16kHz PCM to Gemini
       const capture = new AudioCapture((base64: string) => {
         const s = stateRef.current;
         if (s.micMuted || s.isPaused || s.status !== "playing") return;
+
         try {
           session.sendRealtimeInput({
             audio: {
@@ -473,8 +672,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
               mimeType: "audio/pcm;rate=16000",
             },
           });
-        } catch (err) {
-          console.warn("[GameContext] Failed to send audio chunk:", err);
+        } catch (error) {
+          logger.warn({
+            event: "mic.send_failed",
+            sessionId,
+            causalChain: ["mic.send_failed"],
+            error,
+          });
         }
       });
 
@@ -482,10 +686,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
       try {
         await capture.start();
-        console.log("[GameContext] Microphone capture started");
-      } catch (err) {
-        // Mic access denied — still let the session run (Elara can monologue)
-        console.warn("[GameContext] Microphone access denied:", err);
+        logger.info({
+          event: "mic.started",
+          sessionId,
+          causalChain: ["mic.started"],
+        });
+      } catch (error) {
         dispatch({
           type: "SET_STATUS",
           status: "error",
@@ -493,54 +699,41 @@ export function GameProvider({ children }: { children: ReactNode }) {
         });
         session.close();
         stopTicker();
+
+        logger.error({
+          event: "mic.start_failed",
+          sessionId,
+          causalChain: ["mic.start_failed"],
+          error,
+        });
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error("[GameContext] startSession failed:", message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       dispatch({
         type: "SET_STATUS",
         status: "error",
         errorMessage: message,
       });
+      logger.error({
+        event: "session.start_failed",
+        sessionId,
+        causalChain: ["session.start_failed"],
+        error,
+      });
     }
-  }, [startTicker, stopTicker, clearSilenceTimer]);
+  }, [clearSilenceTimer, handleLiveToolCalls, logger, startTicker, stopTicker]);
 
-  // ── End session (user-initiated) ─────────────────────────────
-  const endSession = useCallback(() => {
-    console.log("[GameContext] endSession called");
-    stopTicker();
-    clearSilenceTimer();
-
-    audioCaptureRef.current?.stop();
-    audioCaptureRef.current = null;
-
-    audioPlaybackRef.current?.stop();
-
-    if (sessionRef.current) {
-      try {
-        sessionRef.current.close();
-      } catch {
-        // ignore
-      }
-      sessionRef.current = null;
-    }
-
-    dispatch({ type: "GAME_OVER" });
-  }, [stopTicker, clearSilenceTimer]);
-
-  // ── Toggle pause ──────────────────────────────────────────────
   const togglePause = useCallback(() => {
     dispatch({ type: "TOGGLE_PAUSE" });
-    // After toggling, the isSpeaking effect will handle silence timer restart
   }, []);
 
-  // ── Toggle mic mute ───────────────────────────────────────────
   const toggleMicMute = useCallback(() => {
     dispatch({ type: "SET_MIC_MUTED", value: !stateRef.current.micMuted });
   }, []);
 
   const value: GameContextValue = {
     phase: state.phase,
+    sessionId: state.sessionId,
     status: state.status,
     isSpeaking: state.isSpeaking,
     isPaused: state.isPaused,
@@ -552,6 +745,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
     errorMessage: state.errorMessage,
     startSession,
     endSession,
+    setPhase,
+    setPhaseFromTension,
+    onToolCall,
     togglePause,
     toggleMicMute,
   };

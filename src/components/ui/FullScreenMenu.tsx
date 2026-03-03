@@ -11,6 +11,7 @@ interface FullScreenMenuProps {
 
 const MENU_ITEMS = [
   { label: "PLAY", href: "/play?story=the-call", accent: true },
+  { label: "CREATE", href: "/create", accent: false },
   { label: "STORIES", href: "/#stories", accent: false },
   { label: "ABOUT", href: "/#about", accent: false },
 ];

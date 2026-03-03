@@ -28,12 +28,14 @@ const ATMOSPHERE_STORIES = new Set(["room-4b"]);
 export function GameSession({ storyId }: GameSessionProps) {
   const {
     phase,
+    sessionId,
     status,
     lastAiText,
     isSpeaking,
     isPaused,
     hasAiSpoken,
     transcript,
+    onToolCall,
     endSession,
     togglePause,
   } = useGame();
@@ -53,11 +55,13 @@ export function GameSession({ storyId }: GameSessionProps) {
   // ── Sound Engine — story-aware ambient sounds, timeline, TTS ducking ──
   useSoundEngine({
     storyId,
+    sessionId,
     status,
     isSpeaking,
     isPaused,
     hasAiSpoken,
     lastAiText,
+    onToolCall,
   });
 
   // ── Mount / unmount logging ──────────────────────────────────

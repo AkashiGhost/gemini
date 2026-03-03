@@ -140,6 +140,9 @@ export class SoundEngine {
   /** Start playing a sound (loop or one-shot) */
   play(id: string, volume: number, loop: boolean, fadeInSeconds = 0): void {
     if (!this.ctx) return;
+    if (this.ctx.state === "suspended") {
+      void this.ctx.resume();
+    }
 
     console.log(`[SOUND] play(${id}) — volume=${volume}, loop=${loop}, fadeIn=${fadeInSeconds}s`);
     const channel = this.getOrCreateChannel(id);
@@ -533,6 +536,29 @@ export class SoundEngine {
   triggerCue(soundId: string, volume = 0.5): void {
     console.log(`[SOUND] triggerCue(${soundId}) — volume=${volume}`);
     this.play(soundId, volume, false);
+  }
+
+  /** Tool-call-driven sound trigger path (authoritative, no cooldown). */
+  handleToolCall(soundId: string, volume = 0.7, loop = false, fadeInSeconds = 0): void {
+    console.log(
+      `[SOUND] handleToolCall(${soundId}) — volume=${volume}, loop=${loop}, fadeIn=${fadeInSeconds}s`,
+    );
+    this.play(soundId, volume, loop, fadeInSeconds);
+  }
+
+  /** Expose the active AudioContext for auxiliary buses (e.g. adaptive music). */
+  getAudioContext(): AudioContext {
+    if (!this.ctx) throw new Error("SoundEngine not initialized");
+    return this.ctx;
+  }
+
+  /** Creates a gain node routed to master gain for independent mix layers. */
+  createAuxGain(initialGain = 1): GainNode {
+    if (!this.ctx || !this.masterGain) throw new Error("SoundEngine not initialized");
+    const node = this.ctx.createGain();
+    node.gain.value = initialGain;
+    node.connect(this.masterGain);
+    return node;
   }
 
   /** Destroy engine and release resources */

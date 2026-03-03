@@ -10,6 +10,11 @@ import { SoundEngine } from "@/lib/sound-engine";
 import { generateSoundsForStory } from "@/lib/synth-sounds";
 import type { TimelineEvent as SoundTimelineEvent } from "@/lib/sound-engine";
 import { parseSoundCues } from "@/lib/sound-cue-parser";
+import { AUDIO_CONFIG } from "@/lib/config/audio";
+import { DEBUG_CONFIG } from "@/lib/config/debug";
+import type { LiveToolCallListener } from "@/lib/config/live-tools";
+import { createLogger, extendCausalChain } from "@/lib/logging";
+import { MusicEngine } from "@/lib/music-engine";
 
 // ─────────────────────────────────────────────
 // Story-specific timelines
@@ -139,59 +144,67 @@ const SPATIAL_MAPS: Record<string, Record<string, { pan: number }>> = {
 
 interface UseSoundEngineOptions {
   storyId: string;
+  sessionId?: string;
   status: "idle" | "connecting" | "playing" | "ended" | "error";
   isSpeaking: boolean;
   isPaused: boolean;
   hasAiSpoken: boolean;
   lastAiText: string;
+  onToolCall: (listener: LiveToolCallListener) => () => void;
 }
 
 export function useSoundEngine({
   storyId,
+  sessionId,
   status,
   isSpeaking,
   isPaused,
   hasAiSpoken,
   lastAiText,
+  onToolCall,
 }: UseSoundEngineOptions) {
+  const loggerRef = useRef(createLogger("useSoundEngine"));
+  const logger = loggerRef.current;
   const engineRef = useRef<SoundEngine | null>(null);
+  const musicEngineRef = useRef<MusicEngine | null>(null);
   const initStartedRef = useRef(false);
   // Tracks whether we've already fired the phone-pickup sequence for "the-call"
   const hasPickedUpRef = useRef(false);
   // Tracks cooldowns for keyword-triggered sound cues (soundId → timestamp)
   const cueCooldownsRef = useRef<Map<string, number>>(new Map());
-  const CUE_COOLDOWN_MS = 30_000; // 30 seconds between same sound cue re-triggers
+  const CUE_COOLDOWN_MS = AUDIO_CONFIG.cueCooldownMs;
 
   // ── Initialize engine when game starts playing ────────────
-  // Delayed by 3s to let ElevenLabs WebRTC audio establish first.
-  // Creating AudioContext + 13 concurrent OfflineAudioContext renders
-  // can starve the audio thread and cause ElevenLabs first audio to fail.
+  // Configurable delay defaults to 0. We still keep it tunable for debugging.
   useEffect(() => {
     if (status !== "playing" || initStartedRef.current) return;
     initStartedRef.current = true;
-
-    const INIT_DELAY_MS = 3000; // Give ElevenLabs 3s head start
+    const INIT_DELAY_MS = AUDIO_CONFIG.engineInitDelayMs;
+    let cancelled = false;
 
     const setup = async () => {
       try {
-        console.log(`[USE-SOUND] Initializing SoundEngine for story: ${storyId} (delayed ${INIT_DELAY_MS}ms)`);
+        logger.info({
+          event: "sound.init_start",
+          sessionId,
+          causalChain: ["sound.init_start"],
+          data: { storyId, initDelayMs: INIT_DELAY_MS },
+        });
 
         const spatialMap = SPATIAL_MAPS[storyId] ?? SPATIAL_MAPS["the-last-session"];
         const engine = new SoundEngine({
-          ttsDucking: {
-            reductionDb: -6,
-            fadeInMs: 300,
-            fadeOutMs: 600,
-          },
-          crossfadeDefaultMs: 2000,
+          ttsDucking: AUDIO_CONFIG.ttsDucking,
+          crossfadeDefaultMs: AUDIO_CONFIG.crossfadeDefaultMs,
           spatialMap,
           preloadOrder: [],
         });
 
         await engine.init();
+        if (cancelled) return;
 
         // Generate and register story-specific synthetic sounds
         const sounds = await generateSoundsForStory(storyId);
+        if (cancelled) return;
         for (const [id, buffer] of Object.entries(sounds)) {
           engine.registerBuffer(id, buffer);
         }
@@ -201,15 +214,54 @@ export function useSoundEngine({
         // Start the story-specific timeline
         const timeline = TIMELINES[storyId] ?? TIMELINES["the-last-session"];
         engine.startTimeline(timeline);
-        console.log(`[USE-SOUND] SoundEngine ready for "${storyId}", timeline started with ${timeline.length} events`);
+
+        // Adaptive music is optional. If it fails, we soft-fail and continue.
+        try {
+          const auxGain = engine.createAuxGain(0);
+          const musicEngine = new MusicEngine({
+            audioContext: engine.getAudioContext(),
+            gainNode: auxGain,
+          });
+          musicEngineRef.current = musicEngine;
+          const connected = await musicEngine.connect();
+          logger.info({
+            event: connected ? "music.connected" : "music.disabled_soft_fail",
+            sessionId,
+            causalChain: ["sound.init_start", "music.connect"],
+          });
+        } catch (musicError) {
+          logger.warn({
+            event: "music.disabled_soft_fail",
+            sessionId,
+            causalChain: ["sound.init_start", "music.connect_failed"],
+            error: musicError,
+          });
+        }
+
+        logger.info({
+          event: "sound.init_ready",
+          sessionId,
+          causalChain: ["sound.init_start", "sound.init_ready"],
+          data: { storyId, timelineEvents: timeline.length },
+        });
       } catch (err) {
-        console.error("[USE-SOUND] Failed to initialize SoundEngine:", err);
+        logger.error({
+          event: "sound.init_failed",
+          sessionId,
+          causalChain: ["sound.init_start", "sound.init_failed"],
+          error: err,
+          data: { storyId },
+        });
+        initStartedRef.current = false;
       }
     };
 
     const delayTimer = setTimeout(() => void setup(), INIT_DELAY_MS);
-    return () => clearTimeout(delayTimer);
-  }, [status, storyId]);
+    return () => {
+      cancelled = true;
+      clearTimeout(delayTimer);
+    };
+  }, [logger, sessionId, status, storyId]);
 
   // ── TTS Ducking ───────────────────────────────────────
   useEffect(() => {
@@ -241,10 +293,64 @@ export function useSoundEngine({
     engine.play("pickup_click", 0.9, false); // one-shot click
   }, [isSpeaking, hasAiSpoken, storyId]);
 
+  // ── Authoritative tool-call path ───────────────────────────
+  useEffect(() => {
+    const unsubscribe = onToolCall((toolCall) => {
+      const engine = engineRef.current;
+      const musicEngine = musicEngineRef.current;
+
+      if (toolCall.name === "trigger_sound" && engine) {
+        engine.handleToolCall(
+          toolCall.args.soundId,
+          toolCall.args.volume ?? AUDIO_CONFIG.defaultCueVolume,
+          toolCall.args.loop ?? false,
+          toolCall.args.fadeInSeconds ?? 0,
+        );
+        logger.info({
+          event: "tool.trigger_sound.applied",
+          sessionId,
+          causalChain: extendCausalChain(toolCall.causalChain, "tool.trigger_sound.applied"),
+          data: { soundId: toolCall.args.soundId },
+        });
+        return;
+      }
+
+      if (toolCall.name === "set_tension") {
+        void musicEngine?.updateTension(
+          toolCall.args.tension,
+          toolCall.args.transitionSeconds,
+        );
+        logger.info({
+          event: "tool.set_tension.forwarded",
+          sessionId,
+          causalChain: extendCausalChain(toolCall.causalChain, "tool.set_tension.forwarded"),
+          data: {
+            tension: toolCall.args.tension,
+            transitionSeconds: toolCall.args.transitionSeconds,
+          },
+        });
+        return;
+      }
+
+      if (toolCall.name === "end_game" && engine) {
+        engine.fadeAllToNothing(toolCall.args.fadeOutSeconds ?? AUDIO_CONFIG.endGameFadeOutSeconds);
+        logger.info({
+          event: "tool.end_game.audio_fade",
+          sessionId,
+          causalChain: extendCausalChain(toolCall.causalChain, "tool.end_game.audio_fade"),
+          data: { fadeOutSeconds: toolCall.args.fadeOutSeconds ?? AUDIO_CONFIG.endGameFadeOutSeconds },
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [logger, onToolCall, sessionId]);
+
   // ── Keyword-based reactive sound cues ─────────────────
   // Parse AI narration text for keywords that match story sounds.
   // Triggers one-shot cues via triggerCue() with a per-sound cooldown.
   useEffect(() => {
+    if (!DEBUG_CONFIG.enableKeywordCueFallback) return;
     if (!lastAiText || status !== "playing") return;
     const engine = engineRef.current;
     if (!engine) return;
@@ -268,11 +374,14 @@ export function useSoundEngine({
   // ── Pause / Resume ────────────────────────────────────
   useEffect(() => {
     const engine = engineRef.current;
+    const musicEngine = musicEngineRef.current;
     if (!engine) return;
     if (isPaused) {
       engine.pauseAudio();
+      musicEngine?.pause();
     } else {
       engine.resumeAudio();
+      musicEngine?.resume();
     }
   }, [isPaused]);
 
@@ -280,8 +389,12 @@ export function useSoundEngine({
   useEffect(() => {
     if (status === "ended" || status === "error") {
       const engine = engineRef.current;
+      const musicEngine = musicEngineRef.current;
+      if (musicEngine) {
+        musicEngine.destroy();
+        musicEngineRef.current = null;
+      }
       if (engine) {
-        console.log("[USE-SOUND] Game ended/error — destroying SoundEngine");
         engine.destroy();
         engineRef.current = null;
         initStartedRef.current = false;
@@ -293,8 +406,12 @@ export function useSoundEngine({
   useEffect(() => {
     return () => {
       const engine = engineRef.current;
+      const musicEngine = musicEngineRef.current;
+      if (musicEngine) {
+        musicEngine.destroy();
+        musicEngineRef.current = null;
+      }
       if (engine) {
-        console.log("[USE-SOUND] Component unmounting — destroying SoundEngine");
         engine.destroy();
         engineRef.current = null;
       }
