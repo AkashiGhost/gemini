@@ -80,6 +80,17 @@ export class AudioPlayback {
   }
 
   /**
+   * Remaining scheduled playback time in milliseconds.
+   * Lets the session layer wait for queued TTS audio to finish before
+   * reopening the microphone for barge-in.
+   */
+  getRemainingPlaybackMs(): number {
+    if (!this.audioCtx || this.audioCtx.state === "closed") return 0;
+    if (this.activeSources.length === 0) return 0;
+    return Math.max(0, Math.ceil((this.nextStartTime - this.audioCtx.currentTime) * 1000));
+  }
+
+  /**
    * Stop all playing audio and reset the playhead to now.
    * Call this when starting a new session after a reconnect so that
    * stale nextStartTime (from a previous session) doesn't delay new audio.

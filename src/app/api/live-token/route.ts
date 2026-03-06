@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
                 systemInstruction: {
                   parts: [{ text: systemPrompt }],
                 },
-                tools: LIVE_TOOL_DECLARATIONS,
+                ...(LIVE_RUNTIME_CONFIG.enableTools ? { tools: LIVE_TOOL_DECLARATIONS } : {}),
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 outputAudioTranscription: {} as any,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any

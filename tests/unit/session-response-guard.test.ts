@@ -13,6 +13,10 @@ describe("didReceiveModelResponse", () => {
     expect(didReceiveModelResponse({ hasAudio: false, outputTranscriptionText: "hello there" })).toBe(true);
   });
 
+  it("treats non-empty model text as a valid model response", () => {
+    expect(didReceiveModelResponse({ hasAudio: false, outputTranscriptionText: "", modelText: "Hello? Can you hear me?" })).toBe(true);
+  });
+
   it("does not treat empty signals as a model response", () => {
     expect(didReceiveModelResponse({ hasAudio: false, outputTranscriptionText: "   " })).toBe(false);
   });

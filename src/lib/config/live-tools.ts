@@ -39,6 +39,10 @@ export const LIVE_RUNTIME_CONFIG = {
   connectTimeoutMs: 15_000,
   firstResponseFallbackMs: 12_000,
   firstResponseFailureMs: 10_000,
+  // Native-audio sessions with function declarations are currently returning
+  // empty opening turns for the story prompts in production. Keep tools off
+  // until the Live API path is stable enough to verify end-to-end.
+  enableTools: false,
   voiceName: "Charon",
   silenceNudgeMs: 12_000,
   realtimeInputSilenceDurationMs: 1_200,
