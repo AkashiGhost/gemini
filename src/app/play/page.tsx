@@ -81,7 +81,20 @@ function PlayContent() {
             margin: 0,
           }}
         >
-          preparing the session...
+          connecting to the live session...
+        </p>
+        <p
+          style={{
+            color: "var(--muted)",
+            fontSize: "var(--type-caption)",
+            fontFamily: "var(--font-ui)",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            margin: 0,
+            opacity: 0.45,
+          }}
+        >
+          securing voice and session state
         </p>
       </div>
     );

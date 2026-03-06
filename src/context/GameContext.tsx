@@ -258,6 +258,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const pendingAiTurnFinalizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const micStartInFlightRef = useRef(false);
   const sessionTimingRef = useRef<SessionTimingState | null>(null);
+  const pendingUserTranscriptRef = useRef("");
 
   const safeCloseSession = useCallback((session: Session | null | undefined) => {
     if (!session) return;
@@ -793,6 +794,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       safeCloseSession(sessionRef.current);
       sessionRef.current = null;
       sessionTimingRef.current = null;
+      pendingUserTranscriptRef.current = "";
     };
   }, [stopTicker, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, safeCloseSession]);
 
@@ -937,6 +939,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       responseReceived: false,
       completed: false,
     };
+    pendingUserTranscriptRef.current = "";
     pendingEndGameRef.current = null;
     pendingKickoffRef.current = null;
 
@@ -975,6 +978,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const startSession = useCallback(async (storyId: string, options?: { deferKickoff?: boolean; beginClickedAtMs?: number }) => {
     const sessionId = createSessionId();
     const beginClickedAtMs = options?.beginClickedAtMs ?? Date.now();
+    pendingUserTranscriptRef.current = "";
     sessionTimingRef.current = createSessionTimingState({
       sessionId,
       storyId,
@@ -1184,13 +1188,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
             const inputTranscription = (
               msg.serverContent as Record<string, unknown> | undefined
-            )?.inputTranscription as { text?: string } | undefined;
+            )?.inputTranscription as { text?: string; finished?: boolean } | undefined;
 
             if (inputTranscription?.text?.trim()) {
+              pendingUserTranscriptRef.current = inputTranscription.text.trim();
+            }
+
+            if (inputTranscription?.finished && pendingUserTranscriptRef.current) {
               dispatch({
                 type: "ADD_TRANSCRIPT",
-                entry: { source: "user", text: inputTranscription.text.trim() },
+                entry: { source: "user", text: pendingUserTranscriptRef.current },
               });
+              pendingUserTranscriptRef.current = "";
             }
 
             if (msg.serverContent?.generationComplete) {
@@ -1241,6 +1250,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             clearMicEnableFallbackTimer();
             micStreamingEnabledRef.current = true;
             micStartInFlightRef.current = false;
+            pendingUserTranscriptRef.current = "";
             openingTurnStateRef.current = {
               locked: false,
               responseReceived: false,
@@ -1272,6 +1282,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             clearMicEnableFallbackTimer();
             micStreamingEnabledRef.current = true;
             micStartInFlightRef.current = false;
+            pendingUserTranscriptRef.current = "";
             openingTurnStateRef.current = {
               locked: false,
               responseReceived: false,
@@ -1316,6 +1327,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         errorMessage: message,
       });
       micStartInFlightRef.current = false;
+      pendingUserTranscriptRef.current = "";
       openingTurnStateRef.current = {
         locked: false,
         responseReceived: false,

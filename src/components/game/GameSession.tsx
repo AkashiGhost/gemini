@@ -222,18 +222,33 @@ export function GameSession({ storyId, enableAdaptiveMusic }: GameSessionProps) 
           {/* Breathing / speaking indicator — phase-aware animation */}
           <BreathingDot size={dotSize} phase={phase} isSpeaking={isSpeaking} />
           {status === "playing" && !hasAiSpoken && (
-            <p
-              style={{
-                color: "var(--muted)",
-                fontSize: "var(--type-body)",
-                fontFamily: "var(--font-literary)",
-                fontStyle: "italic",
-                margin: 0,
-                opacity: 0.6,
-              }}
-            >
-              preparing the session...
-            </p>
+            <>
+              <p
+                style={{
+                  color: "var(--muted)",
+                  fontSize: "var(--type-body)",
+                  fontFamily: "var(--font-literary)",
+                  fontStyle: "italic",
+                  margin: 0,
+                  opacity: 0.6,
+                }}
+              >
+                waiting for the opening line...
+              </p>
+              <p
+                style={{
+                  color: "var(--muted)",
+                  fontSize: "var(--type-caption)",
+                  fontFamily: "var(--font-ui)",
+                  margin: 0,
+                  opacity: 0.35,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                session live, response pending
+              </p>
+            </>
           )}
           {/* "tap anywhere" hint — only visible when controls are hidden */}
           {status === "playing" && hasAiSpoken && !showControls && (
@@ -249,7 +264,7 @@ export function GameSession({ storyId, enableAdaptiveMusic }: GameSessionProps) 
                 marginTop: "var(--space-lg)",
               }}
             >
-              tap anywhere for controls
+              your turn. tap anywhere for controls
             </p>
           )}
         </div>

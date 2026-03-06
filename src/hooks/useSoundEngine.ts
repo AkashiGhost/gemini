@@ -16,6 +16,7 @@ import type { LiveToolCallListener } from "@/lib/config/live-tools";
 import { LYRIA_RUNTIME_CONFIG } from "@/lib/config/lyria";
 import { createLogger, extendCausalChain } from "@/lib/logging";
 import { MusicEngine } from "@/lib/music-engine";
+import { getStoryRuntimeProfile } from "@/lib/story-runtime";
 import {
   detectTranscriptIntentCueSoundIds,
   getTranscriptIntentCueRules,
@@ -180,6 +181,7 @@ export function useSoundEngine({
   onToolCall,
 }: UseSoundEngineOptions) {
   const logger = useMemo(() => createLogger("useSoundEngine"), []);
+  const runtimeProfile = useMemo(() => getStoryRuntimeProfile(storyId), [storyId]);
   const engineRef = useRef<SoundEngine | null>(null);
   const musicEngineRef = useRef<MusicEngine | null>(null);
   const initStartedRef = useRef(false);
@@ -376,6 +378,7 @@ export function useSoundEngine({
   // Parse AI narration text for keywords that match story sounds.
   // Triggers one-shot cues via triggerCue() with a per-sound cooldown.
   useEffect(() => {
+    if (runtimeProfile.soundStrategy !== "timeline_scripted") return;
     if (!DEBUG_CONFIG.enableKeywordCueFallback) return;
     if (!lastAiText || status !== "playing") return;
     const engine = engineRef.current;
@@ -396,12 +399,13 @@ export function useSoundEngine({
       console.log(`[USE-SOUND] Inline cue triggered: "${cueId}"`);
       engine.triggerCue(cueId);
     }
-  }, [lastAiText, storyId, status]);
+  }, [lastAiText, runtimeProfile.soundStrategy, status, storyId]);
 
   // ── Deterministic transcript intent fallback (tool-call aware) ──
   // If no authoritative trigger_sound arrives shortly after a user turn,
   // map transcript intent keywords to a deterministic cue list.
   useEffect(() => {
+    if (runtimeProfile.soundStrategy !== "timeline_scripted") return;
     if (!DEBUG_CONFIG.enableKeywordCueFallback) return;
     if (status !== "playing") return;
     if (!lastUserTranscriptText.trim()) return;
@@ -452,7 +456,7 @@ export function useSoundEngine({
     }, TRANSCRIPT_INTENT_FALLBACK_DELAY_MS);
 
     return () => clearTimeout(timer);
-  }, [lastUserTranscriptSeq, lastUserTranscriptText, logger, sessionId, status, storyId]);
+  }, [lastUserTranscriptSeq, lastUserTranscriptText, logger, runtimeProfile.soundStrategy, sessionId, status, storyId]);
 
   // ── Pause / Resume ────────────────────────────────────
   useEffect(() => {

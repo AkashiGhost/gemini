@@ -16,12 +16,23 @@ export function classifyPlaySessionError(errorMessage?: string): PlayErrorPresen
     msg.includes("not found") ||
     msg.includes("model/resource not found") ||
     msg.includes("configured live model is unavailable");
+  const hasTokenizerInferenceFailure =
+    msg.includes("failed to run inference for model") ||
+    msg.includes("streaming-audio-tokenizer");
 
   if (msg.includes("did not produce the opening turn") || msg.includes("no response was received from gemini")) {
     return {
       title: "Session delayed",
       detail,
       hint: "The Live session connected but Gemini did not answer in time. Retry before treating this as a model access issue.",
+    };
+  }
+
+  if (hasTokenizerInferenceFailure) {
+    return {
+      title: "Live service interrupted",
+      detail,
+      hint: "Retry the session. This looks like an upstream Gemini Live audio-stack failure, not a quota issue.",
     };
   }
 

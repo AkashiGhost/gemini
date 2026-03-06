@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────
 
 import type { StoryId } from "@/lib/constants";
+import type { StoryRuntimeMode } from "@/lib/story-runtime";
 
 // ─── STORY PROMPTS ────────────────────────────────────────────────────────────
 
@@ -657,8 +658,40 @@ const FIRST_MESSAGES: Record<string, string> = {
 
 // ─── EXPORTS ──────────────────────────────────────────────────────────────────
 
-export function getStoryPrompt(storyId: string): string {
-  return PROMPTS[storyId] ?? PROMPTS["the-call"];
+function stripToolInstructions(prompt: string): string {
+  return prompt
+    .replace(/\nTOOL CALL RULES \(MANDATORY\):[\s\S]*?\nCALIBRATION —/m, "\nCALIBRATION —")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function appendLiveModeConstraints(prompt: string): string {
+  return `${prompt}
+
+LIVE MODE CONSTRAINTS:
+- The first response after connection must be one short line, then stop and wait for the player.
+- Never speak tool names, sound IDs, control syntax, XML-like tags, JSON, or production markers out loud.
+- Keep spoken responses short and clean enough for realtime playback. If one sentence works, use one.
+`.trim();
+}
+
+export function getStoryPrompt(
+  storyId: string,
+  options?: {
+    enableTools?: boolean;
+    runtimeMode?: StoryRuntimeMode;
+  },
+): string {
+  const basePrompt = PROMPTS[storyId] ?? PROMPTS["the-call"];
+  const promptWithoutTools = options?.enableTools === false
+    ? stripToolInstructions(basePrompt)
+    : basePrompt;
+
+  if (options?.runtimeMode === "live") {
+    return appendLiveModeConstraints(promptWithoutTools);
+  }
+
+  return promptWithoutTools;
 }
 
 export function getFirstMessage(storyId: string): string {

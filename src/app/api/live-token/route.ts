@@ -16,6 +16,7 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import { getStoryPrompt } from "@/lib/story-prompts";
 import type { StoryId } from "@/lib/constants";
 import { STORY_IDS } from "@/lib/constants";
+import { getStoryRuntimeProfile } from "@/lib/story-runtime";
 import {
   LIVE_RUNTIME_CONFIG,
   LIVE_TOOL_DECLARATIONS,
@@ -68,7 +69,11 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Get story system prompt ───────────────────────────────────
-  const systemPrompt = getStoryPrompt(storyId);
+  const runtimeProfile = getStoryRuntimeProfile(storyId);
+  const systemPrompt = getStoryPrompt(storyId, {
+    enableTools: LIVE_RUNTIME_CONFIG.enableTools,
+    runtimeMode: runtimeProfile.runtimeMode,
+  });
 
   // ── Mint ephemeral token via Gemini API ───────────────────────
   try {
@@ -105,6 +110,8 @@ export async function POST(req: NextRequest) {
                   parts: [{ text: systemPrompt }],
                 },
                 ...(LIVE_RUNTIME_CONFIG.enableTools ? { tools: LIVE_TOOL_DECLARATIONS } : {}),
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                inputAudioTranscription: {} as any,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 outputAudioTranscription: {} as any,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
