@@ -21,11 +21,10 @@ export function markOpeningTurnResponseReceived(state: OpeningTurnState): Openin
 }
 
 export function markOpeningTurnCompleted(state: OpeningTurnState): OpeningTurnState {
-  if (!state.responseReceived) return state;
   if (state.completed && !state.locked) return state;
   return {
     locked: false,
-    responseReceived: true,
+    responseReceived: state.responseReceived,
     completed: true,
   };
 }

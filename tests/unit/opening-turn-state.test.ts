@@ -23,12 +23,16 @@ describe("opening turn state", () => {
     expect(shouldFailOpeningTurn(state)).toBe(false);
   });
 
-  it("keeps the opening turn locked when completion arrives before any response", () => {
+  it("unlocks the opening turn when completion arrives before any response", () => {
     const state = markOpeningTurnCompleted(beginOpeningTurn());
 
-    expect(state).toEqual(beginOpeningTurn());
-    expect(shouldSendOpeningFallback(state)).toBe(true);
-    expect(shouldFailOpeningTurn(state)).toBe(true);
+    expect(state).toEqual({
+      locked: false,
+      responseReceived: false,
+      completed: true,
+    });
+    expect(shouldSendOpeningFallback(state)).toBe(false);
+    expect(shouldFailOpeningTurn(state)).toBe(false);
   });
 
   it("re-arms the opening turn after an interruption before completion", () => {

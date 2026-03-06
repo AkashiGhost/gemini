@@ -32,13 +32,13 @@ function PlayContent() {
   const handleOnboardingPrepare = useCallback(() => {
     if (sessionPrepared) return;
     setSessionPrepared(true);
-    void startSession(storyId, { deferKickoff: true });
+    void startSession(storyId, { deferKickoff: true, beginClickedAtMs: Date.now() });
   }, [sessionPrepared, startSession, storyId]);
 
   const handleOnboardingComplete = useCallback(() => {
     if (!sessionPrepared) {
       setSessionPrepared(true);
-      void startSession(storyId, { deferKickoff: true });
+      void startSession(storyId, { deferKickoff: true, beginClickedAtMs: Date.now() });
     }
     kickoffSession(storyId);
     setOnboardingDone(true);

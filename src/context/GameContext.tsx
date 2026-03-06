@@ -13,6 +13,7 @@ import { FunctionResponseScheduling, GoogleGenAI } from "@google/genai";
 import type { FunctionCall, Session } from "@google/genai";
 import { AudioCapture } from "@/lib/audio-capture";
 import { AudioPlayback } from "@/lib/audio-playback";
+import { sanitizeModelDisplayText } from "@/lib/model-text-sanitizer";
 import {
   LIVE_RUNTIME_CONFIG,
   parseLiveToolCall,
@@ -37,6 +38,13 @@ import {
 } from "@/context/opening-turn-state";
 import { shouldStartMicCapture } from "@/context/mic-activation-policy";
 import { shouldScheduleSilenceNudge } from "@/context/session-flow-guards";
+import {
+  buildSessionTimingSummary,
+  createSessionTimingState,
+  markSessionTimingStage,
+  type SessionTimingStage,
+  type SessionTimingState,
+} from "@/context/session-timing";
 
 export interface TranscriptEntry {
   source: "user" | "ai";
@@ -57,7 +65,7 @@ export interface GameContextValue {
   micMuted: boolean;
   elapsedSeconds: number;
   errorMessage: string | undefined;
-  startSession: (storyId: string, options?: { deferKickoff?: boolean }) => Promise<void>;
+  startSession: (storyId: string, options?: { deferKickoff?: boolean; beginClickedAtMs?: number }) => Promise<void>;
   kickoffSession: (storyId: string) => void;
   endSession: () => void;
   setPhase: (phase: number, options?: { reason?: string; causalChain?: string[] }) => void;
@@ -249,6 +257,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const firstResponseFailureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingAiTurnFinalizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const micStartInFlightRef = useRef(false);
+  const sessionTimingRef = useRef<SessionTimingState | null>(null);
 
   const safeCloseSession = useCallback((session: Session | null | undefined) => {
     if (!session) return;
@@ -294,6 +303,54 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const logSessionTimingStage = useCallback((
+    sessionId: string | undefined,
+    stage: SessionTimingStage,
+    data?: Record<string, unknown>,
+    recordedAtMs?: number,
+  ) => {
+    if (!sessionId) return;
+    const current = sessionTimingRef.current;
+    if (!current || current.sessionId !== sessionId) return;
+
+    const result = markSessionTimingStage(current, stage, recordedAtMs);
+    sessionTimingRef.current = result.state;
+    if (!result.firstRecorded) return;
+
+    logger.info({
+      event: "session.timing_stage",
+      sessionId,
+      causalChain: ["session.timing_stage", `stage:${stage}`],
+      data: {
+        storyId: current.storyId,
+        stage,
+        elapsedMs: result.elapsedMs,
+        deltaMs: result.deltaMs,
+        ...data,
+      },
+    });
+  }, [logger]);
+
+  const logSessionTimingSummary = useCallback((
+    sessionId: string | undefined,
+    event: string,
+    data?: Record<string, unknown>,
+  ) => {
+    if (!sessionId) return;
+    const current = sessionTimingRef.current;
+    if (!current || current.sessionId !== sessionId) return;
+
+    logger.info({
+      event,
+      sessionId,
+      causalChain: [event],
+      data: {
+        ...buildSessionTimingSummary(current),
+        ...data,
+      },
+    });
+  }, [logger]);
+
   const failNoModelResponse = useCallback((sessionId: string | undefined, causalChain: string[]) => {
     const current = stateRef.current;
     if (current.status !== "playing" || current.sessionId !== sessionId) return;
@@ -319,7 +376,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
       causalChain: extendCausalChain(causalChain, "session.first_response_timeout"),
       data: { totalTimeoutMs },
     });
-  }, [logger, safeCloseSession]);
+    logSessionTimingStage(sessionId, "first_response_timeout");
+    logSessionTimingSummary(sessionId, "session.timing_summary", { reason: "first_response_timeout" });
+  }, [logSessionTimingStage, logSessionTimingSummary, logger, safeCloseSession]);
 
   const startFirstResponseWatchdog = useCallback(
     (session: Session, sessionId: string | undefined, storyId: string, causalChain: string[]) => {
@@ -335,6 +394,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           causalChain: extendCausalChain(causalChain, "session.first_response_delayed"),
           data: { waitMs: LIVE_RUNTIME_CONFIG.firstResponseFallbackMs },
         });
+        logSessionTimingStage(sessionId, "first_response_delayed");
 
         try {
           if (sessionRef.current === session && closingSessionRef.current !== session) {
@@ -348,6 +408,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
               causalChain: extendCausalChain(causalChain, "session.first_response_fallback_sent"),
               data: { storyId },
             });
+            logSessionTimingStage(sessionId, "first_response_fallback_sent");
           }
         } catch (error) {
           logger.warn({
@@ -366,7 +427,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         }, LIVE_RUNTIME_CONFIG.firstResponseFailureMs);
       }, LIVE_RUNTIME_CONFIG.firstResponseFallbackMs);
     },
-    [clearFirstResponseWatchdog, failNoModelResponse, logger],
+    [clearFirstResponseWatchdog, failNoModelResponse, logSessionTimingStage, logger],
   );
 
   const enableMicStreaming = useCallback((sessionId: string | undefined, reason: string) => {
@@ -475,6 +536,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (openingTurnWasLocked) {
       openingTurnStateRef.current = markOpeningTurnCompleted(openingTurnStateRef.current);
       clearFirstResponseWatchdog();
+      logSessionTimingStage(sessionId, "first_turn_finalized", { reason });
     }
 
     if (openingTurnWasLocked && !stateRef.current.hasAiSpoken) {
@@ -501,7 +563,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       });
     }
     aiTextAccumRef.current = "";
-  }, [clearFirstResponseWatchdog, clearPendingAiTurnFinalizeTimer, enableMicStreaming, logger, startMicCapture]);
+  }, [clearFirstResponseWatchdog, clearPendingAiTurnFinalizeTimer, enableMicStreaming, logSessionTimingStage, logger, startMicCapture]);
 
   const scheduleAiTurnFinalize = useCallback((sessionId: string | undefined, reason: string) => {
     clearPendingAiTurnFinalizeTimer();
@@ -553,6 +615,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           causalChain: extendCausalChain(pending.causalChain, "session.kickoff_sent"),
           data: { storyId: pending.storyId },
         });
+        logSessionTimingStage(sessionId, "kickoff_sent", { storyId: pending.storyId });
       } catch (error) {
         logger.warn({
           event: "session.kickoff_failed",
@@ -563,7 +626,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [logger, startFirstResponseWatchdog],
+    [logSessionTimingStage, logger, startFirstResponseWatchdog],
   );
 
   const kickoffSession = useCallback(
@@ -729,6 +792,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       audioPlaybackRef.current = null;
       safeCloseSession(sessionRef.current);
       sessionRef.current = null;
+      sessionTimingRef.current = null;
     };
   }, [stopTicker, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, safeCloseSession]);
 
@@ -857,6 +921,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
   );
 
   const endSession = useCallback(() => {
+    logSessionTimingSummary(stateRef.current.sessionId, "session.timing_summary", {
+      reason: "end_session",
+    });
     stopTicker();
     clearSilenceTimer();
     clearMicEnableFallbackTimer();
@@ -887,7 +954,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       sessionId: stateRef.current.sessionId,
       causalChain: ["session.ended"],
     });
-  }, [clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, logger, safeCloseSession, stopTicker]);
+  }, [clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, logSessionTimingSummary, logger, safeCloseSession, stopTicker]);
 
   useEffect(() => {
     if (!pendingEndGameRef.current) return;
@@ -905,8 +972,26 @@ export function GameProvider({ children }: { children: ReactNode }) {
     endSession();
   }, [endSession, logger, state.isSpeaking, state.sessionId, state.status]);
 
-  const startSession = useCallback(async (storyId: string, options?: { deferKickoff?: boolean }) => {
+  const startSession = useCallback(async (storyId: string, options?: { deferKickoff?: boolean; beginClickedAtMs?: number }) => {
     const sessionId = createSessionId();
+    const beginClickedAtMs = options?.beginClickedAtMs ?? Date.now();
+    sessionTimingRef.current = createSessionTimingState({
+      sessionId,
+      storyId,
+      beginClickedAtMs,
+    });
+    logger.info({
+      event: "session.timing_stage",
+      sessionId,
+      causalChain: ["session.timing_stage", "stage:begin_clicked"],
+      data: {
+        storyId,
+        stage: "begin_clicked",
+        elapsedMs: 0,
+        deltaMs: 0,
+      },
+    });
+    logSessionTimingStage(sessionId, "start_session_enter");
     dispatch({ type: "SET_SESSION_ID", sessionId });
     dispatch({ type: "SET_STATUS", status: "connecting" });
     dispatch({ type: "SET_PHASE", phase: 0 });
@@ -948,12 +1033,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
           `Session start timed out after ${Math.round(LIVE_RUNTIME_CONFIG.connectTimeoutMs / 1000)}s. ` +
           "Check model availability and API key.",
       });
+      logSessionTimingStage(sessionId, "session_error", { reason: "connect_timeout" });
+      logSessionTimingSummary(sessionId, "session.timing_summary", { reason: "connect_timeout" });
     }, LIVE_RUNTIME_CONFIG.connectTimeoutMs);
 
     try {
       // Prime output audio while still inside a potential user-gesture call stack.
       await audioPlaybackRef.current?.prime();
 
+      logSessionTimingStage(sessionId, "live_token_request_start");
       const tokenRes = await fetch("/api/live-token", {
         method: "POST",
         headers: {
@@ -969,6 +1057,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
 
       const tokenPayload = (await tokenRes.json()) as { token: string; model?: string };
+      logSessionTimingStage(sessionId, "live_token_request_end", {
+        model: tokenPayload.model,
+      });
       const token = tokenPayload.token;
       const liveModel = typeof tokenPayload.model === "string" && tokenPayload.model.trim().length > 0
         ? tokenPayload.model
@@ -988,6 +1079,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       // Config (voice, tools, system prompt, VAD, etc.) is locked in the
       // ephemeral token via liveConnectConstraints. Passing redundant config
       // here can conflict with the BidiGenerateContentConstrained endpoint.
+      logSessionTimingStage(sessionId, "live_connect_start", { model: liveModel });
       const session = await ai.live.connect({
         model: liveModel,
         callbacks: {
@@ -996,6 +1088,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             dispatch({ type: "SET_STATUS", status: "playing" });
             startTicker();
             clearMicEnableFallbackTimer();
+            logSessionTimingStage(sessionId, "session_open", { model: liveModel });
             const activeSession = sessionRef.current;
             if (activeSession) {
               flushPendingKickoff(activeSession, sessionId);
@@ -1028,6 +1121,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
               if (part.inlineData?.data) {
                 hadAudio = true;
                 audioPlaybackRef.current?.play(part.inlineData.data);
+                logSessionTimingStage(sessionId, "first_audio_chunk_played");
                 if (!stateRef.current.hasAiSpoken) {
                   dispatch({ type: "SET_SPEAKING", value: true });
                 }
@@ -1041,12 +1135,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
             const outputTranscription = (
               msg.serverContent as Record<string, unknown> | undefined
             )?.outputTranscription as { text?: string } | undefined;
+            const sanitizedOutputTranscription = outputTranscription?.text
+              ? sanitizeModelDisplayText(outputTranscription.text)
+              : undefined;
 
             if (didReceiveModelResponse({
               hasAudio: hadAudio,
               modelText,
-              outputTranscriptionText: outputTranscription?.text,
-            }) && !stateRef.current.hasAiSpoken) {
+              outputTranscriptionText: sanitizedOutputTranscription,
+            }) && !openingTurnStateRef.current.responseReceived) {
+              logSessionTimingStage(sessionId, "first_response_received", {
+                source: hadAudio && sanitizedOutputTranscription?.trim()
+                  ? "audio_and_transcription"
+                  : hadAudio
+                    ? "audio"
+                    : sanitizedOutputTranscription?.trim()
+                      ? "transcription"
+                      : "text",
+              });
               openingTurnStateRef.current = markOpeningTurnResponseReceived(openingTurnStateRef.current);
               dispatch({ type: "MARK_AI_SPOKEN" });
               logger.info({
@@ -1054,22 +1160,25 @@ export function GameProvider({ children }: { children: ReactNode }) {
                 sessionId,
                 causalChain: ["session.first_response_received"],
                 data: {
-                  source: hadAudio && outputTranscription?.text?.trim()
+                  source: hadAudio && sanitizedOutputTranscription?.trim()
                     ? "audio_and_transcription"
                     : hadAudio
                       ? "audio"
-                      : outputTranscription?.text?.trim()
+                      : sanitizedOutputTranscription?.trim()
                         ? "transcription"
                         : "text",
                 },
               });
             }
 
-            if (outputTranscription?.text) {
-              aiTextAccumRef.current += outputTranscription.text;
+            if (sanitizedOutputTranscription) {
+              aiTextAccumRef.current += sanitizedOutputTranscription;
               dispatch({ type: "AI_TEXT", text: aiTextAccumRef.current });
             } else if (modelText.trim()) {
-              aiTextAccumRef.current += modelText;
+              const sanitizedModelText = sanitizeModelDisplayText(modelText);
+              if (sanitizedModelText) {
+                aiTextAccumRef.current += sanitizedModelText;
+              }
               dispatch({ type: "AI_TEXT", text: aiTextAccumRef.current });
             }
 
@@ -1085,6 +1194,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             }
 
             if (msg.serverContent?.generationComplete) {
+              logSessionTimingStage(sessionId, "generation_complete");
               scheduleAiTurnFinalize(sessionId, "generation_complete");
             }
 
@@ -1112,6 +1222,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             }
 
             if (msg.serverContent?.turnComplete) {
+              logSessionTimingStage(sessionId, "turn_complete");
               scheduleAiTurnFinalize(sessionId, "turn_complete");
             }
           },
@@ -1140,6 +1251,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
               sessionId,
               causalChain: ["session.error"],
               data: { message: errorEvent.message },
+            });
+            logSessionTimingStage(sessionId, "session_error", { reason: "onerror" });
+            logSessionTimingSummary(sessionId, "session.timing_summary", {
+              reason: "session_error",
+              message: errorEvent.message,
             });
           },
 
@@ -1211,8 +1327,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
         causalChain: ["session.start_failed"],
         error,
       });
+      logSessionTimingStage(sessionId, "session_error", { reason: "start_failed" });
+      logSessionTimingSummary(sessionId, "session.timing_summary", {
+        reason: "start_failed",
+        message,
+      });
     }
-  }, [clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logger, safeCloseSession, scheduleAiTurnFinalize, startTicker, stopTicker]);
+  }, [clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logSessionTimingStage, logSessionTimingSummary, logger, safeCloseSession, scheduleAiTurnFinalize, startTicker, stopTicker]);
 
   const togglePause = useCallback(() => {
     dispatch({ type: "TOGGLE_PAUSE" });
