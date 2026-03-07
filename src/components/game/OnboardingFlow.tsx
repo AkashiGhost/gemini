@@ -12,7 +12,7 @@ import { DEFAULT_STORY_ID } from "@/lib/constants";
 
 interface StoryOnboarding {
   scenes: Array<{
-    image: string;
+    image?: string;
     text: string;
   }>;
   firstAudioLine: string;
@@ -86,6 +86,7 @@ type OnboardingStep = "scene" | "headphones" | "countdown" | "ringing";
 
 interface OnboardingFlowProps {
   storyId: string;
+  customOnboarding?: StoryOnboarding;
   isSessionReady?: boolean;
   adaptiveMusicAvailable?: boolean;
   enableAdaptiveMusic?: boolean;
@@ -96,6 +97,7 @@ interface OnboardingFlowProps {
 
 export function OnboardingFlow({
   storyId,
+  customOnboarding,
   isSessionReady = true,
   adaptiveMusicAvailable = false,
   enableAdaptiveMusic = false,
@@ -103,7 +105,7 @@ export function OnboardingFlow({
   onPrepare,
   onComplete,
 }: OnboardingFlowProps) {
-  const onboarding = STORY_ONBOARDING[storyId] ?? STORY_ONBOARDING[DEFAULT_STORY_ID];
+  const onboarding = customOnboarding ?? STORY_ONBOARDING[storyId] ?? STORY_ONBOARDING[DEFAULT_STORY_ID];
   const totalScenes = onboarding.scenes.length;
 
   const [step, setStep] = useState<OnboardingStep>("scene");
@@ -287,23 +289,35 @@ export function OnboardingFlow({
             borderRadius: 0,
           }}
         >
-          <Image
-            src={currentScene.image}
-            alt=""
-            fill
-            sizes="(max-width: 600px) 90vw, 600px"
-            style={{ objectFit: "cover" }}
-            priority
-          />
-          {/* Dark overlay for text */}
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background:
-                "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 40%, transparent 100%)",
-            }}
-          />
+          {currentScene.image ? (
+            <>
+              <Image
+                src={currentScene.image}
+                alt=""
+                fill
+                sizes="(max-width: 600px) 90vw, 600px"
+                style={{ objectFit: "cover" }}
+                priority
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background:
+                    "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 40%, transparent 100%)",
+                }}
+              />
+            </>
+          ) : (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background:
+                  "radial-gradient(circle at 20% 20%, rgba(232,148,60,0.14), transparent 35%), radial-gradient(circle at 80% 30%, rgba(255,255,255,0.08), transparent 30%), linear-gradient(180deg, rgba(18,18,18,1), rgba(0,0,0,1))",
+              }}
+            />
+          )}
         </div>
 
         {/* Scene text */}

@@ -18,6 +18,10 @@ import type { StoryId } from "@/lib/constants";
 import { STORY_IDS } from "@/lib/constants";
 import { getStoryRuntimeProfile } from "@/lib/story-runtime";
 import {
+  buildPublishedStoryPrompt,
+  normalizePublishedStoryInput,
+} from "@/lib/published-story";
+import {
   LIVE_RUNTIME_CONFIG,
   LIVE_TOOL_DECLARATIONS,
 } from "@/lib/config/live-tools";
@@ -50,15 +54,22 @@ export async function POST(req: NextRequest) {
 
   // ── Parse and validate request body ─────────────────────────
   let storyId: string;
+  let publishedStory: ReturnType<typeof normalizePublishedStoryInput> = null;
   try {
-    const body = (await req.json()) as { storyId?: unknown };
+    const body = (await req.json()) as { storyId?: unknown; publishedStory?: unknown };
     storyId = typeof body.storyId === "string" ? body.storyId : "";
+    publishedStory = normalizePublishedStoryInput(body.publishedStory);
+    if (body.publishedStory !== undefined && !publishedStory) {
+      return NextResponse.json({ error: "Invalid publishedStory payload" }, { status: 400 });
+    }
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  // Fall back to default story if id is unknown
-  if (!STORY_IDS.includes(storyId as StoryId)) {
+  if (publishedStory) {
+    storyId = publishedStory.id;
+  } else if (!STORY_IDS.includes(storyId as StoryId)) {
+    // Fall back to default story if id is unknown
     logger.warn({
       event: "live_token.unknown_story",
       sessionId,
@@ -69,11 +80,15 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Get story system prompt ───────────────────────────────────
-  const runtimeProfile = getStoryRuntimeProfile(storyId);
-  const systemPrompt = getStoryPrompt(storyId, {
-    enableTools: LIVE_RUNTIME_CONFIG.enableTools,
-    runtimeMode: runtimeProfile.runtimeMode,
-  });
+  const runtimeProfile = publishedStory
+    ? { runtimeMode: publishedStory.runtimeMode, soundStrategy: publishedStory.soundStrategy }
+    : getStoryRuntimeProfile(storyId);
+  const systemPrompt = publishedStory
+    ? buildPublishedStoryPrompt(publishedStory)
+    : getStoryPrompt(storyId, {
+      enableTools: LIVE_RUNTIME_CONFIG.enableTools,
+      runtimeMode: runtimeProfile.runtimeMode,
+    });
 
   // ── Mint ephemeral token via Gemini API ───────────────────────
   try {

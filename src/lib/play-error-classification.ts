@@ -6,7 +6,11 @@ export interface PlayErrorPresentation {
 
 export function isTransientLiveServiceErrorMessage(errorMessage?: string): boolean {
   const msg = errorMessage?.toLowerCase() ?? "";
-  return msg.includes("failed to run inference for model") || msg.includes("streaming-audio-tokenizer");
+  return (
+    msg.includes("failed to run inference for model") ||
+    msg.includes("streaming-audio-tokenizer") ||
+    msg.includes("operation is not implemented, or supported, or enabled")
+  );
 }
 
 export function classifyPlaySessionError(errorMessage?: string): PlayErrorPresentation {

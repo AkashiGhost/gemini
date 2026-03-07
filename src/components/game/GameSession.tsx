@@ -29,12 +29,18 @@ interface GameSessionProps {
   storyId: string;
   enableAdaptiveMusic: boolean;
   debugTextMode?: boolean;
+  characterName?: string;
 }
 
 // Stories that show the AtmosphereLayer (fog/vignette)
 const ATMOSPHERE_STORIES = new Set(["room-4b"]);
 
-export function GameSession({ storyId, enableAdaptiveMusic, debugTextMode = false }: GameSessionProps) {
+export function GameSession({
+  storyId,
+  enableAdaptiveMusic,
+  debugTextMode = false,
+  characterName,
+}: GameSessionProps) {
   const {
     phase,
     sessionId,
@@ -48,6 +54,7 @@ export function GameSession({ storyId, enableAdaptiveMusic, debugTextMode = fals
     transcript,
     onToolCall,
     endSession,
+    canSendDebugTurn,
     sendDebugTextTurn,
     togglePause,
   } = useGame();
@@ -199,6 +206,8 @@ export function GameSession({ storyId, enableAdaptiveMusic, debugTextMode = fals
     setDebugInput("");
   };
 
+  const transcriptCharacterName = characterName || CHARACTER_NAMES[storyId] || "The Voice";
+
   return (
     <div
       style={{
@@ -325,7 +334,7 @@ export function GameSession({ storyId, enableAdaptiveMusic, debugTextMode = fals
                     marginBottom: 2,
                   }}
                 >
-                  {isUser ? "You" : (CHARACTER_NAMES[storyId] ?? "Alex")}
+                  {isUser ? "You" : transcriptCharacterName}
                 </span>
                 <p
                   style={{
@@ -529,7 +538,7 @@ export function GameSession({ storyId, enableAdaptiveMusic, debugTextMode = fals
           <button
             type="button"
             onClick={handleDebugSend}
-            disabled={status !== "playing" || debugInput.trim().length === 0}
+            disabled={!canSendDebugTurn || debugInput.trim().length === 0}
             style={{
               alignSelf: "stretch",
               background: "none",
@@ -543,7 +552,7 @@ export function GameSession({ storyId, enableAdaptiveMusic, debugTextMode = fals
               minHeight: "var(--touch-min)",
               minWidth: 120,
               borderRadius: 0,
-              opacity: status === "playing" && debugInput.trim().length > 0 ? 0.9 : 0.45,
+              opacity: canSendDebugTurn && debugInput.trim().length > 0 ? 0.9 : 0.45,
             }}
           >
             send text

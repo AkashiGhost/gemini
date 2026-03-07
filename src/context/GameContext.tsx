@@ -47,6 +47,9 @@ import {
   type SessionTimingStage,
   type SessionTimingState,
 } from "@/context/session-timing";
+import { canSendDebugTurn } from "@/context/debug-turn-policy";
+import { shouldCommitAiTranscript } from "@/context/ai-transcript-commit";
+import type { PublishedStoryManifest } from "@/lib/published-story";
 
 export interface TranscriptEntry {
   source: "user" | "ai";
@@ -67,6 +70,7 @@ export interface GameContextValue {
   micMuted: boolean;
   elapsedSeconds: number;
   errorMessage: string | undefined;
+  canSendDebugTurn: boolean;
   startSession: (storyId: string, options?: StartSessionOptions) => Promise<void>;
   kickoffSession: (storyId: string) => void;
   endSession: () => void;
@@ -82,6 +86,7 @@ type StartSessionOptions = {
   deferKickoff?: boolean;
   beginClickedAtMs?: number;
   internalRetry?: boolean;
+  publishedStory?: PublishedStoryManifest;
 };
 
 type UIState = {
@@ -98,6 +103,7 @@ type UIState = {
   micMuted: boolean;
   elapsedSeconds: number;
   errorMessage: string | undefined;
+  turnInputReady: boolean;
 };
 
 type UIAction =
@@ -111,7 +117,8 @@ type UIAction =
   | { type: "TOGGLE_PAUSE" }
   | { type: "SET_MIC_MUTED"; value: boolean }
   | { type: "SET_PHASE"; phase: number }
-  | { type: "SET_SESSION_ID"; sessionId: string | undefined };
+  | { type: "SET_SESSION_ID"; sessionId: string | undefined }
+  | { type: "SET_TURN_INPUT_READY"; value: boolean };
 
 const initialState: UIState = {
   phase: 0,
@@ -127,6 +134,7 @@ const initialState: UIState = {
   micMuted: false,
   elapsedSeconds: 0,
   errorMessage: undefined,
+  turnInputReady: false,
 };
 
 function uiReducer(state: UIState, action: UIAction): UIState {
@@ -137,6 +145,7 @@ function uiReducer(state: UIState, action: UIAction): UIState {
         ...state,
         status: action.status,
         errorMessage: "errorMessage" in action ? action.errorMessage : state.errorMessage,
+        turnInputReady: action.status === "playing" ? state.turnInputReady : false,
       };
 
     case "SET_SPEAKING":
@@ -180,6 +189,9 @@ function uiReducer(state: UIState, action: UIAction): UIState {
     case "SET_SESSION_ID":
       return { ...state, sessionId: action.sessionId };
 
+    case "SET_TURN_INPUT_READY":
+      return { ...state, turnInputReady: action.value };
+
     default:
       return state;
   }
@@ -203,6 +215,7 @@ interface LiveRetryPlan {
   storyId: string;
   beginClickedAtMs: number;
   deferKickoff: boolean;
+  publishedStory?: PublishedStoryManifest;
 }
 
 function createSessionId(): string {
@@ -212,7 +225,10 @@ function createSessionId(): string {
   return `session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function getInitialKickoffPrompt(storyId: string): string {
+function getInitialKickoffPrompt(storyId: string, publishedStory?: PublishedStoryManifest): string {
+  if (publishedStory) {
+    return `Begin the published session now as ${publishedStory.characterName}. Open with one short line anchored to "${publishedStory.openingLine}", then pause for the player.`;
+  }
   if (storyId === "the-call") {
     return "The phone has just been answered. Speak immediately as Alex with one urgent line, then pause for the player.";
   }
@@ -418,7 +434,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         try {
           if (sessionRef.current === session && closingSessionRef.current !== session) {
             session.sendClientContent({
-              turns: getInitialKickoffPrompt(storyId),
+              turns: getInitialKickoffPrompt(storyId, liveRetryPlanRef.current?.publishedStory),
               turnComplete: true,
             });
             logger.info({
@@ -573,14 +589,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
       void startMicCapture(session, sessionId);
     }
     dispatch({ type: "SET_SPEAKING", value: false });
+    dispatch({ type: "SET_TURN_INPUT_READY", value: true });
 
     const aiText = aiTextAccumRef.current.trim();
-    if (aiText) {
+    if (shouldCommitAiTranscript(aiText, committedAiTextRef.current)) {
       dispatch({
         type: "ADD_TRANSCRIPT",
         entry: { source: "ai", text: aiText },
       });
     }
+    committedAiTextRef.current = "";
     aiTextAccumRef.current = "";
   }, [clearFirstResponseWatchdog, clearPendingAiTurnFinalizeTimer, enableMicStreaming, logSessionTimingStage, logger, startMicCapture]);
 
@@ -588,6 +606,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     clearPendingAiTurnFinalizeTimer();
     const session = sessionRef.current;
     if (!session) return;
+    dispatch({ type: "SET_TURN_INPUT_READY", value: false });
     const remainingPlaybackMs = audioPlaybackRef.current?.getRemainingPlaybackMs() ?? 0;
     const decision = getOpeningTurnUnlockDecision(remainingPlaybackMs);
 
@@ -615,7 +634,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       if (closingSessionRef.current === session) return;
       if (sessionRef.current !== session) return;
 
-      const prompt = getInitialKickoffPrompt(pending.storyId);
+      const prompt = getInitialKickoffPrompt(pending.storyId, liveRetryPlanRef.current?.publishedStory);
       try {
         session.sendClientContent({
           turns: prompt,
@@ -780,7 +799,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const session = sessionRef.current;
     const current = stateRef.current;
 
-    if (!message || !session || current.status !== "playing") {
+    if (!session) {
+      return false;
+    }
+
+    if (!canSendDebugTurn({
+      status: current.status,
+      isPaused: current.isPaused,
+      turnInputReady: current.turnInputReady,
+      hasSession: true,
+      text: message,
+    })) {
       return false;
     }
 
@@ -794,6 +823,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         type: "ADD_TRANSCRIPT",
         entry: { source: "user", text: message },
       });
+      dispatch({ type: "SET_TURN_INPUT_READY", value: false });
       logger.info({
         event: "session.debug_text_turn_sent",
         sessionId: current.sessionId,
@@ -891,6 +921,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         deferKickoff: retryPlan.deferKickoff,
         beginClickedAtMs: retryPlan.beginClickedAtMs,
         internalRetry: true,
+        publishedStory: retryPlan.publishedStory,
       });
     }, 250);
 
@@ -941,6 +972,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [stopTicker, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, safeCloseSession]);
 
   const aiTextAccumRef = useRef<string>("");
+  const committedAiTextRef = useRef("");
 
   const sendSilentToolAck = useCallback(
     (session: Session, functionCall: FunctionCall, sessionId: string | undefined, causalChain: string[]) => {
@@ -1128,10 +1160,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
         storyId,
         beginClickedAtMs,
         deferKickoff: !!options?.deferKickoff,
+        publishedStory: options?.publishedStory,
       };
     }
     pendingUserTranscriptRef.current = "";
     aiTextAccumRef.current = "";
+    committedAiTextRef.current = "";
     sessionTimingRef.current = createSessionTimingState({
       sessionId,
       storyId,
@@ -1154,6 +1188,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SET_SESSION_ID", sessionId });
     dispatch({ type: "SET_STATUS", status: "connecting", errorMessage: undefined });
     dispatch({ type: "SET_PHASE", phase: 0 });
+    dispatch({ type: "SET_TURN_INPUT_READY", value: false });
     if (options?.deferKickoff) {
       pendingKickoffRef.current = null;
     } else {
@@ -1207,7 +1242,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
           "Content-Type": "application/json",
           "x-session-id": sessionId,
         },
-        body: JSON.stringify({ storyId }),
+        body: JSON.stringify({
+          storyId,
+          ...(options?.publishedStory ? { publishedStory: options.publishedStory } : {}),
+        }),
       });
 
       if (!tokenRes.ok) {
@@ -1363,6 +1401,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
             }
 
             if (msg.serverContent?.generationComplete) {
+              const aiText = aiTextAccumRef.current.trim();
+              if (shouldCommitAiTranscript(aiText, committedAiTextRef.current)) {
+                dispatch({
+                  type: "ADD_TRANSCRIPT",
+                  entry: { source: "ai", text: aiText },
+                });
+                committedAiTextRef.current = aiText;
+              }
               logSessionTimingStage(sessionId, "generation_complete");
               scheduleAiTurnFinalize(sessionId, "generation_complete");
             }
@@ -1371,7 +1417,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
               clearPendingAiTurnFinalizeTimer();
               audioPlaybackRef.current?.stop();
               aiTextAccumRef.current = "";
+              committedAiTextRef.current = "";
               dispatch({ type: "SET_SPEAKING", value: false });
+              dispatch({ type: "SET_TURN_INPUT_READY", value: false });
 
               const interruptedOpening = handleOpeningTurnInterrupted(openingTurnStateRef.current);
               openingTurnStateRef.current = interruptedOpening.next;
@@ -1554,6 +1602,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     micMuted: state.micMuted,
     elapsedSeconds: state.elapsedSeconds,
     errorMessage: state.errorMessage,
+    canSendDebugTurn: canSendDebugTurn({
+      status: state.status,
+      isPaused: state.isPaused,
+      turnInputReady: state.turnInputReady,
+      hasSession: Boolean(sessionRef.current),
+      text: "debug",
+    }),
     startSession,
     kickoffSession,
     endSession,

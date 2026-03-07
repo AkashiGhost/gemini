@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { classifyPlaySessionError } from "../../src/lib/play-error-classification";
+import {
+  classifyPlaySessionError,
+  isTransientLiveServiceErrorMessage,
+} from "../../src/lib/play-error-classification";
 
 describe("classifyPlaySessionError", () => {
   it("treats first-response timeout as a delayed session, not missing model access", () => {
@@ -30,5 +33,12 @@ describe("classifyPlaySessionError", () => {
 
     expect(result.title).toBe("Live service interrupted");
     expect(result.hint).toContain("Retry");
+  });
+
+  it("treats startup 1008 unsupported-operation closes as transient live interruptions", () => {
+    const message = "Operation is not implemented, or supported, or enabled.";
+
+    expect(isTransientLiveServiceErrorMessage(message)).toBe(true);
+    expect(classifyPlaySessionError(message).title).toBe("Live service interrupted");
   });
 });

@@ -41,4 +41,14 @@ describe("shouldAutoRetryLiveSession", () => {
       transcriptCount: 0,
     })).toBe(false);
   });
+
+  it("retries one startup failure for transient unsupported-operation closes", () => {
+    expect(shouldAutoRetryLiveSession({
+      errorMessage: "Operation is not implemented, or supported, or enabled.",
+      retryAttempts: 0,
+      maxRetryAttempts: 1,
+      hasAiSpoken: false,
+      transcriptCount: 0,
+    })).toBe(true);
+  });
 });

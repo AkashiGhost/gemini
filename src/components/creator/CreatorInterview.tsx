@@ -12,6 +12,8 @@ import {
   EMPTY_CREATOR_SPEC,
   isCreatorInterviewChunk,
 } from "@/lib/config/creator";
+import { createPublishedStoryManifest } from "@/lib/published-story";
+import { savePublishedStory } from "@/lib/published-story-play";
 
 const CREATOR_PAGE_CSS = `
 .creator-shell {
@@ -874,6 +876,27 @@ export function CreatorInterview() {
     });
   }, [logClientEvent, storyPack]);
 
+  const handlePublishAndPlay = useCallback(() => {
+    if (!storyPack) return;
+
+    try {
+      const manifest = createPublishedStoryManifest(storyPack);
+      savePublishedStory(manifest);
+      logClientEvent("creator.ui.story_pack.published", {
+        storyId: manifest.id,
+        title: manifest.title,
+      });
+      window.location.assign(`/play?published=${encodeURIComponent(manifest.id)}`);
+    } catch (publishError) {
+      const messageFromError =
+        publishError instanceof Error ? publishError.message : "Could not publish this story pack";
+      setError(messageFromError);
+      logClientEvent("creator.ui.story_pack.publish_failed", {
+        message: messageFromError,
+      });
+    }
+  }, [logClientEvent, storyPack]);
+
   const stepStatusRows = useMemo(
     () => [
       { label: "Interview", value: interviewStatus },
@@ -1248,6 +1271,14 @@ export function CreatorInterview() {
                 disabled={!storyPack}
               >
                 Use System Prompt as Draft
+              </button>
+              <button
+                type="button"
+                className="creator-btn"
+                onClick={handlePublishAndPlay}
+                disabled={!storyPack}
+              >
+                Publish &amp; Play
               </button>
             </div>
           </section>

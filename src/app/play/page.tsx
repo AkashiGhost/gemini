@@ -1,21 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useState, useCallback, useEffect } from "react";
+import { Suspense, useState, useCallback, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { GameProvider, useGame } from "@/context/GameContext";
 import { DEFAULT_STORY_ID } from "@/lib/constants";
+import {
+  buildPublishedStoryOnboarding,
+  getPublishedStoryCharacterName,
+} from "@/lib/published-story-play";
 import { OnboardingFlow } from "@/components/game/OnboardingFlow";
 import { GameSession } from "@/components/game/GameSession";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BreathingDot } from "@/components/ui/BreathingDot";
 import { LYRIA_RUNTIME_CONFIG } from "@/lib/config/lyria";
 import { classifyPlaySessionError } from "@/lib/play-error-classification";
+import { resolvePlayStorySelection, resolveRequestedPublishedStoryId } from "@/lib/play-story-selection";
 
 function PlayContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const storyId = searchParams.get("story") ?? DEFAULT_STORY_ID;
+  const storyParam = searchParams.get("story") ?? DEFAULT_STORY_ID;
+  const publishedParam = searchParams.get("published");
+  const requestedPublishedStoryId = useMemo(
+    () => resolveRequestedPublishedStoryId({ storyParam, publishedParam }),
+    [publishedParam, storyParam],
+  );
+  const { storyId, publishedStory } = useMemo(
+    () => resolvePlayStorySelection({ storyParam, publishedParam }),
+    [publishedParam, storyParam],
+  );
   const debugTextMode = searchParams.get("debugText") === "1";
 
   const [onboardingDone, setOnboardingDone] = useState(false);
@@ -33,22 +47,72 @@ function PlayContent() {
   const handleOnboardingPrepare = useCallback(() => {
     if (sessionPrepared) return;
     setSessionPrepared(true);
-    void startSession(storyId, { deferKickoff: true, beginClickedAtMs: Date.now() });
-  }, [sessionPrepared, startSession, storyId]);
+    void startSession(storyId, {
+      deferKickoff: true,
+      beginClickedAtMs: Date.now(),
+      ...(publishedStory ? { publishedStory } : {}),
+    });
+  }, [publishedStory, sessionPrepared, startSession, storyId]);
 
   const handleOnboardingComplete = useCallback(() => {
     if (!sessionPrepared) {
       setSessionPrepared(true);
-      void startSession(storyId, { deferKickoff: true, beginClickedAtMs: Date.now() });
+      void startSession(storyId, {
+        deferKickoff: true,
+        beginClickedAtMs: Date.now(),
+        ...(publishedStory ? { publishedStory } : {}),
+      });
     }
     kickoffSession(storyId);
     setOnboardingDone(true);
-  }, [kickoffSession, sessionPrepared, startSession, storyId]);
+  }, [kickoffSession, publishedStory, sessionPrepared, startSession, storyId]);
+
+  if (requestedPublishedStoryId && !publishedStory) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100dvh",
+          gap: "var(--space-sm)",
+          padding: "var(--space-lg)",
+          textAlign: "center",
+        }}
+      >
+        <p style={{
+          color: "var(--error)",
+          fontFamily: "var(--font-display)",
+          fontSize: "var(--type-section)",
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+          margin: 0,
+        }}>
+          published story missing
+        </p>
+        <p style={{
+          color: "var(--muted)",
+          fontFamily: "var(--font-literary)",
+          fontSize: "var(--type-body)",
+          fontStyle: "italic",
+          maxWidth: "32rem",
+          margin: 0,
+        }}>
+          This generated story is not available in browser storage anymore. Return to the creator and publish it again.
+        </p>
+        <Link href="/create" style={{ color: "var(--muted)", padding: "var(--space-xs) var(--space-sm)" }}>
+          Return to creator
+        </Link>
+      </div>
+    );
+  }
 
   if (!onboardingDone) {
     return (
       <OnboardingFlow
         storyId={storyId}
+        customOnboarding={publishedStory ? buildPublishedStoryOnboarding(publishedStory) : undefined}
         isSessionReady={status === "playing" || status === "error"}
         adaptiveMusicAvailable={LYRIA_RUNTIME_CONFIG.enabled}
         enableAdaptiveMusic={enableAdaptiveMusic}
@@ -188,6 +252,7 @@ function PlayContent() {
   return (
     <GameSession
       storyId={storyId}
+      characterName={publishedStory ? getPublishedStoryCharacterName(publishedStory) : undefined}
       enableAdaptiveMusic={enableAdaptiveMusic}
       debugTextMode={debugTextMode}
     />
