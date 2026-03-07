@@ -9,6 +9,7 @@ describe("shouldStartMicCapture", () => {
         openingTurnLocked: true,
         micCaptureStarted: false,
         micStartInFlight: false,
+        textTurnMode: false,
       }),
     ).toBe(false);
   });
@@ -20,6 +21,7 @@ describe("shouldStartMicCapture", () => {
         openingTurnLocked: false,
         micCaptureStarted: false,
         micStartInFlight: false,
+        textTurnMode: false,
       }),
     ).toBe(true);
   });
@@ -31,6 +33,7 @@ describe("shouldStartMicCapture", () => {
         openingTurnLocked: false,
         micCaptureStarted: true,
         micStartInFlight: false,
+        textTurnMode: false,
       }),
     ).toBe(false);
     expect(
@@ -39,6 +42,19 @@ describe("shouldStartMicCapture", () => {
         openingTurnLocked: false,
         micCaptureStarted: false,
         micStartInFlight: true,
+        textTurnMode: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps microphone capture disabled after the session switches to text-turn debug mode", () => {
+    expect(
+      shouldStartMicCapture({
+        status: "playing",
+        openingTurnLocked: false,
+        micCaptureStarted: false,
+        micStartInFlight: false,
+        textTurnMode: true,
       }),
     ).toBe(false);
   });

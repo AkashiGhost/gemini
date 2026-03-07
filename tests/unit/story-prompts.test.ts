@@ -19,5 +19,7 @@ describe("getStoryPrompt", () => {
 
     expect(prompt).toContain("LIVE MODE CONSTRAINTS");
     expect(prompt).toContain("first response after connection must be one short line");
+    expect(prompt).toContain("Maximum 2 sentences per response");
+    expect(prompt).toContain("Never narrate more than one movement or room transition per turn");
   });
 });

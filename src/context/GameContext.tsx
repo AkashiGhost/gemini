@@ -48,6 +48,11 @@ import {
   type SessionTimingState,
 } from "@/context/session-timing";
 import { canSendDebugTurn } from "@/context/debug-turn-policy";
+import {
+  isDebugTextSessionEnabled,
+  shouldUseMicrophoneInSession,
+  shouldUseSilenceNudgesInSession,
+} from "@/context/debug-session-mode";
 import { shouldCommitAiTranscript } from "@/context/ai-transcript-commit";
 import type { PublishedStoryManifest } from "@/lib/published-story";
 
@@ -288,11 +293,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const firstResponseFailureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingAiTurnFinalizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const micStartInFlightRef = useRef(false);
+  const textTurnModeRef = useRef(false);
   const sessionTimingRef = useRef<SessionTimingState | null>(null);
   const pendingUserTranscriptRef = useRef("");
   const liveRetryPlanRef = useRef<LiveRetryPlan | null>(null);
   const liveRetryAttemptsRef = useRef(0);
   const startSessionRef = useRef<(storyId: string, options?: StartSessionOptions) => Promise<void>>(async () => {});
+  const debugTextModeRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    debugTextModeRef.current = isDebugTextSessionEnabled(window.location.search);
+  }, []);
 
   const safeCloseSession = useCallback((session: Session | null | undefined) => {
     if (!session) return;
@@ -487,11 +499,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [clearMicEnableFallbackTimer, logger]);
 
   const startMicCapture = useCallback(async (session: Session, sessionId: string | undefined) => {
+    if (!shouldUseMicrophoneInSession(debugTextModeRef.current)) {
+      logger.info({
+        event: "mic.skipped_debug_text_mode",
+        sessionId,
+        causalChain: ["mic.skipped_debug_text_mode"],
+      });
+      return;
+    }
+
     if (!shouldStartMicCapture({
       status: stateRef.current.status,
       openingTurnLocked: openingTurnStateRef.current.locked,
       micCaptureStarted: audioCaptureRef.current !== null,
       micStartInFlight: micStartInFlightRef.current,
+      textTurnMode: textTurnModeRef.current,
     })) {
       return;
     }
@@ -525,7 +547,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
       await capture.start();
 
-      if (closingSessionRef.current === session || sessionRef.current !== session) {
+      if (
+        closingSessionRef.current === session ||
+        sessionRef.current !== session ||
+        textTurnModeRef.current
+      ) {
         capture.stop();
         return;
       }
@@ -584,8 +610,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       });
     }
 
-    enableMicStreaming(sessionId, reason);
-    if (session) {
+    if (!textTurnModeRef.current) {
+      enableMicStreaming(sessionId, reason);
+    }
+    if (session && !textTurnModeRef.current) {
       void startMicCapture(session, sessionId);
     }
     dispatch({ type: "SET_SPEAKING", value: false });
@@ -745,6 +773,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       silenceTimerRef.current = null;
     }
 
+    if (!shouldUseSilenceNudgesInSession(debugTextModeRef.current)) {
+      return;
+    }
+
     const current = stateRef.current;
     if (!shouldScheduleSilenceNudge({
       status: current.status,
@@ -815,6 +847,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     try {
       clearSilenceTimer();
+      textTurnModeRef.current = true;
+      micStreamingEnabledRef.current = false;
+      audioCaptureRef.current?.stop();
+      audioCaptureRef.current = null;
       session.sendClientContent({
         turns: message,
         turnComplete: true,
@@ -851,6 +887,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     stopTicker();
     micStreamingEnabledRef.current = true;
     micStartInFlightRef.current = false;
+    textTurnModeRef.current = false;
     pendingUserTranscriptRef.current = "";
     pendingEndGameRef.current = null;
     aiTextAccumRef.current = "";
@@ -929,6 +966,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [logger, resetLiveConnectionState]);
 
   useEffect(() => {
+    if (!shouldUseSilenceNudgesInSession(debugTextModeRef.current)) {
+      clearSilenceTimer();
+      return;
+    }
     if (!shouldScheduleSilenceNudge({
       status: state.status,
       isSpeaking: state.isSpeaking,
@@ -952,6 +993,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       clearPendingAiTurnFinalizeTimer();
       micStreamingEnabledRef.current = true;
       micStartInFlightRef.current = false;
+      textTurnModeRef.current = false;
       openingTurnStateRef.current = {
         locked: false,
         responseReceived: false,
@@ -1108,6 +1150,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     clearPendingAiTurnFinalizeTimer();
     micStreamingEnabledRef.current = true;
     micStartInFlightRef.current = false;
+    textTurnModeRef.current = false;
     openingTurnStateRef.current = {
       locked: false,
       responseReceived: false,
@@ -1154,6 +1197,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const startSession = useCallback(async (storyId: string, options?: StartSessionOptions) => {
     const sessionId = createSessionId();
     const beginClickedAtMs = options?.beginClickedAtMs ?? Date.now();
+    const debugTextMode = typeof window !== "undefined"
+      && isDebugTextSessionEnabled(window.location.search);
     if (!options?.internalRetry) {
       liveRetryAttemptsRef.current = 0;
       liveRetryPlanRef.current = {
@@ -1189,6 +1234,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SET_STATUS", status: "connecting", errorMessage: undefined });
     dispatch({ type: "SET_PHASE", phase: 0 });
     dispatch({ type: "SET_TURN_INPUT_READY", value: false });
+    debugTextModeRef.current = debugTextMode;
+    textTurnModeRef.current = debugTextMode;
     if (options?.deferKickoff) {
       pendingKickoffRef.current = null;
     } else {
@@ -1467,6 +1514,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             clearMicEnableFallbackTimer();
             micStreamingEnabledRef.current = true;
             micStartInFlightRef.current = false;
+            textTurnModeRef.current = false;
             pendingUserTranscriptRef.current = "";
             openingTurnStateRef.current = {
               locked: false,
@@ -1558,6 +1606,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         errorMessage: message,
       });
       micStartInFlightRef.current = false;
+      textTurnModeRef.current = false;
       pendingUserTranscriptRef.current = "";
       openingTurnStateRef.current = {
         locked: false,
