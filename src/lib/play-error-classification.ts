@@ -4,6 +4,11 @@ export interface PlayErrorPresentation {
   hint: string;
 }
 
+export function isTransientLiveServiceErrorMessage(errorMessage?: string): boolean {
+  const msg = errorMessage?.toLowerCase() ?? "";
+  return msg.includes("failed to run inference for model") || msg.includes("streaming-audio-tokenizer");
+}
+
 export function classifyPlaySessionError(errorMessage?: string): PlayErrorPresentation {
   const msg = errorMessage?.toLowerCase() ?? "";
   const detail = errorMessage ?? "The session could not start.";
@@ -16,9 +21,6 @@ export function classifyPlaySessionError(errorMessage?: string): PlayErrorPresen
     msg.includes("not found") ||
     msg.includes("model/resource not found") ||
     msg.includes("configured live model is unavailable");
-  const hasTokenizerInferenceFailure =
-    msg.includes("failed to run inference for model") ||
-    msg.includes("streaming-audio-tokenizer");
 
   if (msg.includes("did not produce the opening turn") || msg.includes("no response was received from gemini")) {
     return {
@@ -28,7 +30,7 @@ export function classifyPlaySessionError(errorMessage?: string): PlayErrorPresen
     };
   }
 
-  if (hasTokenizerInferenceFailure) {
+  if (isTransientLiveServiceErrorMessage(errorMessage)) {
     return {
       title: "Live service interrupted",
       detail,

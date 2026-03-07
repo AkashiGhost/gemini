@@ -13,6 +13,7 @@ import { FunctionResponseScheduling, GoogleGenAI } from "@google/genai";
 import type { FunctionCall, Session } from "@google/genai";
 import { AudioCapture } from "@/lib/audio-capture";
 import { AudioPlayback } from "@/lib/audio-playback";
+import { appendLiveDisplayText, selectLiveDisplayText } from "@/lib/live-text-selection";
 import { sanitizeModelDisplayText } from "@/lib/model-text-sanitizer";
 import {
   LIVE_RUNTIME_CONFIG,
@@ -26,6 +27,7 @@ import {
   buildNoModelResponseErrorMessage,
   didReceiveModelResponse,
 } from "@/context/session-response-guard";
+import { shouldAutoRetryLiveSession } from "@/context/live-retry-policy";
 import { getOpeningTurnUnlockDecision } from "@/context/turn-completion-policy";
 import {
   beginOpeningTurn,
@@ -65,15 +67,22 @@ export interface GameContextValue {
   micMuted: boolean;
   elapsedSeconds: number;
   errorMessage: string | undefined;
-  startSession: (storyId: string, options?: { deferKickoff?: boolean; beginClickedAtMs?: number }) => Promise<void>;
+  startSession: (storyId: string, options?: StartSessionOptions) => Promise<void>;
   kickoffSession: (storyId: string) => void;
   endSession: () => void;
+  sendDebugTextTurn: (text: string) => boolean;
   setPhase: (phase: number, options?: { reason?: string; causalChain?: string[] }) => void;
   setPhaseFromTension: (tension: number, options?: { reason?: string; causalChain?: string[] }) => number;
   onToolCall: (listener: LiveToolCallListener) => () => void;
   togglePause: () => void;
   toggleMicMute: () => void;
 }
+
+type StartSessionOptions = {
+  deferKickoff?: boolean;
+  beginClickedAtMs?: number;
+  internalRetry?: boolean;
+};
 
 type UIState = {
   phase: number;
@@ -127,7 +136,7 @@ function uiReducer(state: UIState, action: UIAction): UIState {
       return {
         ...state,
         status: action.status,
-        errorMessage: action.errorMessage ?? state.errorMessage,
+        errorMessage: "errorMessage" in action ? action.errorMessage : state.errorMessage,
       };
 
     case "SET_SPEAKING":
@@ -188,6 +197,12 @@ interface PendingEndGame {
 interface PendingKickoff {
   storyId: string;
   causalChain: string[];
+}
+
+interface LiveRetryPlan {
+  storyId: string;
+  beginClickedAtMs: number;
+  deferKickoff: boolean;
 }
 
 function createSessionId(): string {
@@ -259,6 +274,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const micStartInFlightRef = useRef(false);
   const sessionTimingRef = useRef<SessionTimingState | null>(null);
   const pendingUserTranscriptRef = useRef("");
+  const liveRetryPlanRef = useRef<LiveRetryPlan | null>(null);
+  const liveRetryAttemptsRef = useRef(0);
+  const startSessionRef = useRef<(storyId: string, options?: StartSessionOptions) => Promise<void>>(async () => {});
 
   const safeCloseSession = useCallback((session: Session | null | undefined) => {
     if (!session) return;
@@ -757,6 +775,128 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const sendDebugTextTurn = useCallback((text: string): boolean => {
+    const message = text.trim();
+    const session = sessionRef.current;
+    const current = stateRef.current;
+
+    if (!message || !session || current.status !== "playing") {
+      return false;
+    }
+
+    try {
+      clearSilenceTimer();
+      session.sendClientContent({
+        turns: message,
+        turnComplete: true,
+      });
+      dispatch({
+        type: "ADD_TRANSCRIPT",
+        entry: { source: "user", text: message },
+      });
+      logger.info({
+        event: "session.debug_text_turn_sent",
+        sessionId: current.sessionId,
+        causalChain: ["session.debug_text_turn_sent"],
+        data: { length: message.length },
+      });
+      return true;
+    } catch (error) {
+      logger.warn({
+        event: "session.debug_text_turn_failed",
+        sessionId: current.sessionId,
+        causalChain: ["session.debug_text_turn_failed"],
+        error,
+      });
+      return false;
+    }
+  }, [clearSilenceTimer, logger]);
+
+  const resetLiveConnectionState = useCallback((session?: Session | null) => {
+    clearConnectTimeout();
+    clearFirstResponseWatchdog();
+    clearPendingAiTurnFinalizeTimer();
+    clearMicEnableFallbackTimer();
+    clearSilenceTimer();
+    stopTicker();
+    micStreamingEnabledRef.current = true;
+    micStartInFlightRef.current = false;
+    pendingUserTranscriptRef.current = "";
+    pendingEndGameRef.current = null;
+    aiTextAccumRef.current = "";
+    openingTurnStateRef.current = {
+      locked: false,
+      responseReceived: false,
+      completed: false,
+    };
+
+    audioCaptureRef.current?.stop();
+    audioCaptureRef.current = null;
+    audioPlaybackRef.current?.reset();
+
+    if (session) {
+      safeCloseSession(session);
+      if (sessionRef.current === session) {
+        sessionRef.current = null;
+      }
+    }
+  }, [
+    clearConnectTimeout,
+    clearFirstResponseWatchdog,
+    clearPendingAiTurnFinalizeTimer,
+    clearMicEnableFallbackTimer,
+    clearSilenceTimer,
+    safeCloseSession,
+    stopTicker,
+  ]);
+
+  const attemptLiveRetry = useCallback((
+    errorMessage: string | undefined,
+    sessionId: string,
+    origin: "onerror" | "onclose" | "start_failed",
+    session?: Session | null,
+  ): boolean => {
+    const retryPlan = liveRetryPlanRef.current;
+    if (!retryPlan) return false;
+
+    const shouldRetry = shouldAutoRetryLiveSession({
+      errorMessage,
+      retryAttempts: liveRetryAttemptsRef.current,
+      maxRetryAttempts: 1,
+      hasAiSpoken: stateRef.current.hasAiSpoken,
+      transcriptCount: stateRef.current.transcript.length,
+    });
+    if (!shouldRetry) return false;
+
+    liveRetryAttemptsRef.current += 1;
+    logger.warn({
+      event: "session.retry_scheduled",
+      sessionId,
+      causalChain: ["session.retry_scheduled"],
+      data: {
+        origin,
+        attempt: liveRetryAttemptsRef.current,
+        maxAttempts: 1,
+        storyId: retryPlan.storyId,
+        errorMessage,
+      },
+    });
+
+    resetLiveConnectionState(session);
+    dispatch({ type: "SET_SPEAKING", value: false });
+    dispatch({ type: "SET_STATUS", status: "connecting", errorMessage: undefined });
+
+    window.setTimeout(() => {
+      void startSessionRef.current(retryPlan.storyId, {
+        deferKickoff: retryPlan.deferKickoff,
+        beginClickedAtMs: retryPlan.beginClickedAtMs,
+        internalRetry: true,
+      });
+    }, 250);
+
+    return true;
+  }, [logger, resetLiveConnectionState]);
+
   useEffect(() => {
     if (!shouldScheduleSilenceNudge({
       status: state.status,
@@ -795,6 +935,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       sessionRef.current = null;
       sessionTimingRef.current = null;
       pendingUserTranscriptRef.current = "";
+      liveRetryPlanRef.current = null;
+      liveRetryAttemptsRef.current = 0;
     };
   }, [stopTicker, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, safeCloseSession]);
 
@@ -942,6 +1084,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
     pendingUserTranscriptRef.current = "";
     pendingEndGameRef.current = null;
     pendingKickoffRef.current = null;
+    liveRetryPlanRef.current = null;
+    liveRetryAttemptsRef.current = 0;
 
     audioCaptureRef.current?.stop();
     audioCaptureRef.current = null;
@@ -975,29 +1119,40 @@ export function GameProvider({ children }: { children: ReactNode }) {
     endSession();
   }, [endSession, logger, state.isSpeaking, state.sessionId, state.status]);
 
-  const startSession = useCallback(async (storyId: string, options?: { deferKickoff?: boolean; beginClickedAtMs?: number }) => {
+  const startSession = useCallback(async (storyId: string, options?: StartSessionOptions) => {
     const sessionId = createSessionId();
     const beginClickedAtMs = options?.beginClickedAtMs ?? Date.now();
+    if (!options?.internalRetry) {
+      liveRetryAttemptsRef.current = 0;
+      liveRetryPlanRef.current = {
+        storyId,
+        beginClickedAtMs,
+        deferKickoff: !!options?.deferKickoff,
+      };
+    }
     pendingUserTranscriptRef.current = "";
+    aiTextAccumRef.current = "";
     sessionTimingRef.current = createSessionTimingState({
       sessionId,
       storyId,
       beginClickedAtMs,
     });
-    logger.info({
-      event: "session.timing_stage",
-      sessionId,
-      causalChain: ["session.timing_stage", "stage:begin_clicked"],
-      data: {
-        storyId,
-        stage: "begin_clicked",
-        elapsedMs: 0,
-        deltaMs: 0,
-      },
-    });
+    if (!options?.internalRetry) {
+      logger.info({
+        event: "session.timing_stage",
+        sessionId,
+        causalChain: ["session.timing_stage", "stage:begin_clicked"],
+        data: {
+          storyId,
+          stage: "begin_clicked",
+          elapsedMs: 0,
+          deltaMs: 0,
+        },
+      });
+    }
     logSessionTimingStage(sessionId, "start_session_enter");
     dispatch({ type: "SET_SESSION_ID", sessionId });
-    dispatch({ type: "SET_STATUS", status: "connecting" });
+    dispatch({ type: "SET_STATUS", status: "connecting", errorMessage: undefined });
     dispatch({ type: "SET_PHASE", phase: 0 });
     if (options?.deferKickoff) {
       pendingKickoffRef.current = null;
@@ -1088,6 +1243,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
         model: liveModel,
         callbacks: {
           onopen: () => {
+            if (sessionRef.current && sessionRef.current !== session) {
+              return;
+            }
             clearConnectTimeout();
             dispatch({ type: "SET_STATUS", status: "playing" });
             startTicker();
@@ -1109,6 +1267,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
           },
 
           onmessage: (msg) => {
+            if (sessionRef.current !== session) {
+              return;
+            }
             if (msg.toolCall?.functionCalls?.length && sessionRef.current) {
               handleLiveToolCalls(msg.toolCall.functionCalls, sessionRef.current, sessionId);
             }
@@ -1142,6 +1303,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
             const sanitizedOutputTranscription = outputTranscription?.text
               ? sanitizeModelDisplayText(outputTranscription.text)
               : undefined;
+            const selectedDisplayText = selectLiveDisplayText({
+              modelText,
+              outputTranscriptionText: sanitizedOutputTranscription,
+            });
 
             if (didReceiveModelResponse({
               hasAudio: hadAudio,
@@ -1175,14 +1340,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
               });
             }
 
-            if (sanitizedOutputTranscription) {
-              aiTextAccumRef.current += sanitizedOutputTranscription;
-              dispatch({ type: "AI_TEXT", text: aiTextAccumRef.current });
-            } else if (modelText.trim()) {
-              const sanitizedModelText = sanitizeModelDisplayText(modelText);
-              if (sanitizedModelText) {
-                aiTextAccumRef.current += sanitizedModelText;
-              }
+            if (selectedDisplayText) {
+              aiTextAccumRef.current = appendLiveDisplayText(aiTextAccumRef.current, selectedDisplayText);
               dispatch({ type: "AI_TEXT", text: aiTextAccumRef.current });
             }
 
@@ -1191,6 +1350,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             )?.inputTranscription as { text?: string; finished?: boolean } | undefined;
 
             if (inputTranscription?.text?.trim()) {
+              clearSilenceTimer();
               pendingUserTranscriptRef.current = inputTranscription.text.trim();
             }
 
@@ -1237,9 +1397,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
           },
 
           onerror: (errorEvent: ErrorEvent) => {
+            if (sessionRef.current !== session && closingSessionRef.current !== session) {
+              return;
+            }
+            if (sessionRef.current !== session && closingSessionRef.current === session) {
+              return;
+            }
             clearConnectTimeout();
             clearFirstResponseWatchdog();
             clearPendingAiTurnFinalizeTimer();
+            if (attemptLiveRetry(errorEvent.message, sessionId, "onerror", session)) {
+              return;
+            }
             dispatch({
               type: "SET_STATUS",
               status: "error",
@@ -1270,6 +1439,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
           },
 
           onclose: (closeEvent: CloseEvent) => {
+            if (sessionRef.current !== session && closingSessionRef.current !== session) {
+              return;
+            }
+            if (sessionRef.current !== session && closingSessionRef.current === session) {
+              closingSessionRef.current = null;
+              return;
+            }
             clearConnectTimeout();
             clearFirstResponseWatchdog();
             clearPendingAiTurnFinalizeTimer();
@@ -1288,6 +1464,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
               responseReceived: false,
               completed: false,
             };
+
+            if (attemptLiveRetry(closeEvent.reason, sessionId, "onclose")) {
+              return;
+            }
 
             const current = stateRef.current;
             if (current.status !== "ended" && current.status !== "error") {
@@ -1321,6 +1501,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
       clearConnectTimeout();
       clearFirstResponseWatchdog();
       const message = error instanceof Error ? error.message : String(error);
+      if (attemptLiveRetry(message, sessionId, "start_failed")) {
+        return;
+      }
       dispatch({
         type: "SET_STATUS",
         status: "error",
@@ -1345,7 +1528,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
         message,
       });
     }
-  }, [clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logSessionTimingStage, logSessionTimingSummary, logger, safeCloseSession, scheduleAiTurnFinalize, startTicker, stopTicker]);
+  }, [attemptLiveRetry, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logSessionTimingStage, logSessionTimingSummary, logger, safeCloseSession, scheduleAiTurnFinalize, startTicker, stopTicker]);
+
+  startSessionRef.current = startSession;
 
   const togglePause = useCallback(() => {
     dispatch({ type: "TOGGLE_PAUSE" });
@@ -1372,6 +1557,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     startSession,
     kickoffSession,
     endSession,
+    sendDebugTextTurn,
     setPhase,
     setPhaseFromTension,
     onToolCall,

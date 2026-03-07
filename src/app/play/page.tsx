@@ -16,6 +16,7 @@ function PlayContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const storyId = searchParams.get("story") ?? DEFAULT_STORY_ID;
+  const debugTextMode = searchParams.get("debugText") === "1";
 
   const [onboardingDone, setOnboardingDone] = useState(false);
   const [sessionPrepared, setSessionPrepared] = useState(false);
@@ -184,7 +185,13 @@ function PlayContent() {
     );
   }
 
-  return <GameSession storyId={storyId} enableAdaptiveMusic={enableAdaptiveMusic} />;
+  return (
+    <GameSession
+      storyId={storyId}
+      enableAdaptiveMusic={enableAdaptiveMusic}
+      debugTextMode={debugTextMode}
+    />
+  );
 }
 
 export default function PlayPage() {

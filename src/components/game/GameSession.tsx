@@ -27,12 +27,13 @@ const CHARACTER_NAMES: Record<string, string> = {
 interface GameSessionProps {
   storyId: string;
   enableAdaptiveMusic: boolean;
+  debugTextMode?: boolean;
 }
 
 // Stories that show the AtmosphereLayer (fog/vignette)
 const ATMOSPHERE_STORIES = new Set(["room-4b"]);
 
-export function GameSession({ storyId, enableAdaptiveMusic }: GameSessionProps) {
+export function GameSession({ storyId, enableAdaptiveMusic, debugTextMode = false }: GameSessionProps) {
   const {
     phase,
     sessionId,
@@ -46,8 +47,10 @@ export function GameSession({ storyId, enableAdaptiveMusic }: GameSessionProps) 
     transcript,
     onToolCall,
     endSession,
+    sendDebugTextTurn,
     togglePause,
   } = useGame();
+  const [debugInput, setDebugInput] = useState("");
 
   const showAtmosphere = ATMOSPHERE_STORIES.has(storyId);
 
@@ -182,6 +185,11 @@ export function GameSession({ storyId, enableAdaptiveMusic }: GameSessionProps) 
 
   const handleMainAreaClick = () => {
     setShowControls(true);
+  };
+
+  const handleDebugSend = () => {
+    if (!sendDebugTextTurn(debugInput)) return;
+    setDebugInput("");
   };
 
   return (
@@ -457,6 +465,61 @@ export function GameSession({ storyId, enableAdaptiveMusic }: GameSessionProps) 
             }}
           >
             end session
+          </button>
+        </div>
+      )}
+
+      {debugTextMode && (
+        <div
+          style={{
+            position: "relative",
+            zIndex: 3,
+            display: "flex",
+            gap: "var(--space-sm)",
+            alignItems: "stretch",
+            padding: "var(--space-sm) var(--space-md) var(--space-md)",
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+            backgroundColor: "rgba(0, 0, 0, 0.82)",
+          }}
+        >
+          <textarea
+            aria-label="Debug text turn"
+            value={debugInput}
+            onChange={(event) => setDebugInput(event.target.value)}
+            placeholder="Debug text turn"
+            rows={2}
+            style={{
+              flex: 1,
+              resize: "vertical",
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.14)",
+              color: "var(--white)",
+              padding: "var(--space-sm)",
+              fontFamily: "var(--font-ui)",
+              fontSize: "var(--type-ui)",
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleDebugSend}
+            disabled={status !== "playing" || debugInput.trim().length === 0}
+            style={{
+              alignSelf: "stretch",
+              background: "none",
+              border: "1px solid var(--muted)",
+              color: "var(--muted)",
+              fontSize: "var(--type-body)",
+              fontFamily: "var(--font-ui)",
+              cursor: "pointer",
+              padding: "var(--space-sm) var(--space-md)",
+              letterSpacing: "0.04em",
+              minHeight: "var(--touch-min)",
+              minWidth: 120,
+              borderRadius: 0,
+              opacity: status === "playing" && debugInput.trim().length > 0 ? 0.9 : 0.45,
+            }}
+          >
+            send text
           </button>
         </div>
       )}
