@@ -35,6 +35,7 @@ export interface SoundEngineConfig {
   };
   crossfadeDefaultMs: number;
   spatialMap: Record<string, { pan: number }>;
+  defaultVolumes: Record<string, number>;
   preloadOrder: string[];
 }
 
@@ -50,6 +51,7 @@ export class SoundEngine {
   private pausedAt: number | null = null;
   private config: SoundEngineConfig;
   private isDucking = false;
+  private soundEnabled = true;
 
   constructor(config: SoundEngineConfig) {
     this.config = config;
@@ -57,6 +59,7 @@ export class SoundEngine {
       ttsDucking: config.ttsDucking,
       crossfadeDefaultMs: config.crossfadeDefaultMs,
       spatialMapKeys: Object.keys(config.spatialMap),
+      defaultVolumeKeys: Object.keys(config.defaultVolumes),
       preloadOrder: config.preloadOrder,
     });
   }
@@ -66,6 +69,7 @@ export class SoundEngine {
     console.log("[SOUND] init() — creating AudioContext");
     this.ctx = new AudioContext();
     this.masterGain = this.ctx.createGain();
+    this.masterGain.gain.value = this.soundEnabled ? 1 : 0;
     this.masterGain.connect(this.ctx.destination);
 
     // Resume if suspended (browser autoplay policy)
@@ -268,6 +272,25 @@ export class SoundEngine {
       }
       console.log("[SOUND] muteAll() — all channels stopped");
     }, fadeDurationSeconds * 1000 + 50);
+  }
+
+  /** Global sound toggle at the engine master bus. */
+  setSoundEnabled(enabled: boolean, fadeDurationSeconds = 0.2): void {
+    this.soundEnabled = enabled;
+    if (!this.ctx || !this.masterGain) return;
+
+    const targetGain = enabled ? 1 : 0;
+    console.log(`[SOUND] setSoundEnabled(${enabled}) — fade=${fadeDurationSeconds}s`);
+    if (fadeDurationSeconds > 0) {
+      this.masterGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, this.ctx.currentTime);
+      this.masterGain.gain.linearRampToValueAtTime(
+        targetGain,
+        this.ctx.currentTime + fadeDurationSeconds,
+      );
+    } else {
+      this.masterGain.gain.setValueAtTime(targetGain, this.ctx.currentTime);
+    }
   }
 
   /** Restore all channels to their base volumes */
@@ -528,8 +551,7 @@ export class SoundEngine {
   }
 
   private getDefaultVolume(id: string): number {
-    const channel = this.channels.get(id);
-    return channel?.baseVolume ?? 0.5;
+    return this.config.defaultVolumes[id] ?? 0.5;
   }
 
   /** Trigger a single sound cue (from LLM response) */

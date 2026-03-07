@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
 import { motion } from "motion/react";
 import { BreathingDot } from "./BreathingDot";
 import { DEFAULT_STORY_ID } from "@/lib/constants";
+import { setSoundPref, useSoundPref } from "@/lib/sound-preferences";
 
 interface NavigationChromeProps {
   onMenuToggle: () => void;
@@ -12,49 +12,12 @@ interface NavigationChromeProps {
   variant?: "landing" | "catalogue" | "play";
 }
 
-const SOUND_PREF_KEY = "innerplay-sound";
-const SOUND_PREF_EVENT = "innerplay-sound-change";
-
-function getSoundPrefServerSnapshot(): boolean {
-  return true;
-}
-
-function getSoundPrefSnapshot(): boolean {
-  if (typeof window === "undefined") return true;
-  const stored = window.localStorage.getItem(SOUND_PREF_KEY);
-  return stored === null ? true : stored === "on";
-}
-
-function subscribeSoundPref(callback: () => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === SOUND_PREF_KEY) callback();
-  };
-  const onLocalChange = () => callback();
-  window.addEventListener("storage", onStorage);
-  window.addEventListener(SOUND_PREF_EVENT, onLocalChange);
-  return () => {
-    window.removeEventListener("storage", onStorage);
-    window.removeEventListener(SOUND_PREF_EVENT, onLocalChange);
-  };
-}
-
-function setSoundPref(nextOn: boolean): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(SOUND_PREF_KEY, nextOn ? "on" : "off");
-  window.dispatchEvent(new Event(SOUND_PREF_EVENT));
-}
-
 export function NavigationChrome({
   onMenuToggle,
   menuOpen,
   variant = "landing",
 }: NavigationChromeProps) {
-  const soundOn = useSyncExternalStore(
-    subscribeSoundPref,
-    getSoundPrefSnapshot,
-    getSoundPrefServerSnapshot,
-  );
+  const soundOn = useSoundPref();
 
   const toggleSound = () => {
     setSoundPref(!soundOn);

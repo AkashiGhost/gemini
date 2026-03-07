@@ -22,6 +22,7 @@ import {
   getTranscriptIntentCueRules,
   selectCuesOffCooldown,
 } from "@/lib/sound-intent-fallback";
+import { useSoundPref } from "@/lib/sound-preferences";
 
 // ─────────────────────────────────────────────
 // Story-specific timelines
@@ -87,19 +88,19 @@ const TIMELINES: Record<string, SoundTimelineEvent[]> = {
 
     // Phone static starts immediately at near-inaudible volume
     { time: 0, action: "start_ambient", soundIds: ["phone_static"] },
-    { time: 0, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.03, fadeDurationSeconds: 0 },
+    { time: 0, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.08, fadeDurationSeconds: 0 },
 
     // ── Pickup ────────────────────────────────────────────────
     // pickup_click is event-driven (fires when AI first speaks, see useSoundEngine)
     // Electrical hum + static swell start immediately (call already connected)
     { time: 0, action: "start_ambient", soundIds: ["electrical_hum"] },
-    { time: 0, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.15, fadeDurationSeconds: 2 },
+    { time: 0, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.22, fadeDurationSeconds: 2 },
 
     // ── Mid-game tension ──────────────────────────────────────
     // Sub bass creeps in after a couple minutes
     { time: 120, action: "fade_in", soundIds: ["sub_bass"], fadeInSeconds: 10 },
     // Static intensifies slightly mid-game (line degrading, situation escalating)
-    { time: 300, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.5, fadeDurationSeconds: 8 },
+    { time: 300, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.35, fadeDurationSeconds: 8 },
 
     // ── Ending ────────────────────────────────────────────────
     // Everything fades toward the end
@@ -151,6 +152,49 @@ const SPATIAL_MAPS: Record<string, Record<string, { pan: number }>> = {
   },
 };
 
+const DEFAULT_VOLUMES: Record<string, Record<string, number>> = {
+  "the-last-session": {
+    rain: 0.7,
+    hvac: 0.38,
+    clock: 0.34,
+    cello_drone: 0.32,
+    sub_bass: 0.28,
+    low_tone: 0.3,
+  },
+  "the-lighthouse": {
+    ocean: 0.68,
+    wind: 0.42,
+    creak: 0.22,
+    foghorn_drone: 0.34,
+    sub_bass: 0.28,
+  },
+  "room-4b": {
+    fluorescent_hum: 0.34,
+    machinery: 0.26,
+    metal_echo: 0.18,
+    heartbeat_drone: 0.28,
+    sub_bass: 0.24,
+    low_tone: 0.28,
+  },
+  "the-call": {
+    phone_static: 0.12,
+    electrical_hum: 0.2,
+    sub_bass: 0.24,
+    phone_ring: 0.8,
+    pickup_click: 0.9,
+    disconnect_tone: 0.7,
+    footsteps: 0.55,
+    water_drip: 0.4,
+    door_creak: 0.42,
+    door_slam: 0.72,
+    keypad_beep: 0.55,
+    metal_scrape: 0.5,
+    pipe_clank: 0.52,
+    heavy_breathing: 0.48,
+    glass_break: 0.68,
+  },
+};
+
 const CUE_COOLDOWN_MS = AUDIO_CONFIG.cueCooldownMs;
 const TRANSCRIPT_INTENT_FALLBACK_DELAY_MS = AUDIO_CONFIG.transcriptIntentFallbackDelayMs;
 const TRANSCRIPT_TOOL_PRIORITY_WINDOW_MS = AUDIO_CONFIG.transcriptIntentToolPriorityWindowMs;
@@ -182,6 +226,7 @@ export function useSoundEngine({
 }: UseSoundEngineOptions) {
   const logger = useMemo(() => createLogger("useSoundEngine"), []);
   const runtimeProfile = useMemo(() => getStoryRuntimeProfile(storyId), [storyId]);
+  const soundOn = useSoundPref();
   const engineRef = useRef<SoundEngine | null>(null);
   const musicEngineRef = useRef<MusicEngine | null>(null);
   const initStartedRef = useRef(false);
@@ -214,11 +259,13 @@ export function useSoundEngine({
           ttsDucking: AUDIO_CONFIG.ttsDucking,
           crossfadeDefaultMs: AUDIO_CONFIG.crossfadeDefaultMs,
           spatialMap,
+          defaultVolumes: DEFAULT_VOLUMES[storyId] ?? DEFAULT_VOLUMES["the-last-session"],
           preloadOrder: [],
         });
 
         await engine.init();
         if (cancelled) return;
+        engine.setSoundEnabled(soundOn, 0);
 
         // Generate and register story-specific synthetic sounds
         const sounds = await generateSoundsForStory(storyId);
@@ -288,7 +335,7 @@ export function useSoundEngine({
       cancelled = true;
       clearTimeout(delayTimer);
     };
-  }, [enableAdaptiveMusic, logger, sessionId, status, storyId]);
+  }, [enableAdaptiveMusic, logger, sessionId, soundOn, status, storyId]);
 
   // ── TTS Ducking ───────────────────────────────────────
   useEffect(() => {
@@ -300,6 +347,19 @@ export function useSoundEngine({
       engine.stopDucking();
     }
   }, [isSpeaking]);
+
+  // ── Global sound preference ───────────────────────────
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.setSoundEnabled(soundOn, 0.2);
+    logger.info({
+      event: "sound.preference_applied",
+      sessionId,
+      causalChain: ["sound.preference_applied"],
+      data: { soundOn, storyId },
+    });
+  }, [logger, sessionId, soundOn, storyId]);
 
   // ── Phone pickup — stop ring when AI first speaks ─────
   // Only active for "the-call" story.

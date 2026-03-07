@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { useSoundEngine } from "@/hooks/useSoundEngine";
 import { stripSoundMarkers } from "@/lib/sound-cue-parser";
+import { setSoundPref, useSoundPref } from "@/lib/sound-preferences";
 import { AtmosphereLayer } from "./AtmosphereLayer";
 import { BreathingDot } from "@/components/ui/BreathingDot";
 
@@ -50,6 +51,7 @@ export function GameSession({ storyId, enableAdaptiveMusic, debugTextMode = fals
     sendDebugTextTurn,
     togglePause,
   } = useGame();
+  const soundOn = useSoundPref();
   const [debugInput, setDebugInput] = useState("");
 
   const showAtmosphere = ATMOSPHERE_STORIES.has(storyId);
@@ -184,6 +186,11 @@ export function GameSession({ storyId, enableAdaptiveMusic, debugTextMode = fals
   }
 
   const handleMainAreaClick = () => {
+    setShowControls(true);
+  };
+
+  const toggleSound = () => {
+    setSoundPref(!soundOn);
     setShowControls(true);
   };
 
@@ -442,6 +449,26 @@ export function GameSession({ storyId, enableAdaptiveMusic, debugTextMode = fals
             }}
           >
             pause
+          </button>
+          <button
+            type="button"
+            onClick={toggleSound}
+            style={{
+              background: "none",
+              border: "1px solid var(--muted)",
+              color: "var(--muted)",
+              fontSize: "var(--type-body)",
+              fontFamily: "var(--font-ui)",
+              cursor: "pointer",
+              opacity: 0.8,
+              padding: "var(--space-sm) var(--space-md)",
+              letterSpacing: "0.04em",
+              minHeight: "var(--touch-min)",
+              minWidth: 120,
+              borderRadius: 0,
+            }}
+          >
+            {soundOn ? "sound on" : "sound off"}
           </button>
           <button
             type="button"
