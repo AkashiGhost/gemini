@@ -1,6 +1,7 @@
 "use client";
 
 import type { PublishedStoryManifest } from "@/lib/published-story";
+import { loadBundledPublishedStory } from "@/lib/published-story-catalog";
 
 export interface PublishedStoryOnboarding {
   scenes: Array<{
@@ -26,14 +27,15 @@ export function savePublishedStory(story: PublishedStoryManifest): void {
 }
 
 export function loadPublishedStory(storyId: string): PublishedStoryManifest | null {
-  if (typeof window === "undefined") return null;
+  const bundled = loadBundledPublishedStory(storyId);
+  if (typeof window === "undefined") return bundled;
   const raw = window.localStorage.getItem(getPublishedStoryStorageKey(storyId));
-  if (!raw) return null;
+  if (!raw) return bundled;
 
   try {
     return JSON.parse(raw) as PublishedStoryManifest;
   } catch {
-    return null;
+    return bundled;
   }
 }
 

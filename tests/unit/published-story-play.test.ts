@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPublishedStoryOnboarding,
   getPublishedStoryCharacterName,
+  loadPublishedStory,
 } from "../../src/lib/published-story-play";
 import type { PublishedStoryManifest } from "../../src/lib/published-story";
 
@@ -31,5 +32,12 @@ describe("published story play helpers", () => {
 
   it("returns the manifest character name for transcript labels", () => {
     expect(getPublishedStoryCharacterName(publishedStory)).toBe("Mara");
+  });
+
+  it("loads bundled published stories when client storage is unavailable", () => {
+    const story = loadPublishedStory("published-exit-interview");
+
+    expect(story?.title).toBe("Exit Interview");
+    expect(story?.characterName).toBe("Guide");
   });
 });

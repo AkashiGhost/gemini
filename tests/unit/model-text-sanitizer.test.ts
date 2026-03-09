@@ -13,4 +13,16 @@ describe("sanitizeModelDisplayText", () => {
       sanitizeModelDisplayText("Can you hear me?"),
     ).toBe("Can you hear me?");
   });
+
+  it("removes leaked parenthetical cue markers from spoken text", () => {
+    expect(
+      sanitizeModelDisplayText("The active file dictates the procedure. (badge-scan)"),
+    ).toBe("The active file dictates the procedure.");
+    expect(
+      sanitizeModelDisplayText("Your packet is printing now. [printer-spool]"),
+    ).toBe("Your packet is printing now.");
+    expect(
+      sanitizeModelDisplayText("Your severance packet is being finalized now. (printer spool We note your current address is Portland."),
+    ).toBe("Your severance packet is being finalized now. We note your current address is Portland.");
+  });
 });

@@ -46,6 +46,17 @@ describe("resolvePlayStorySelection", () => {
     });
   });
 
+  it("resolves bundled published stories without client storage", async () => {
+    const { resolvePlayStorySelection } = await import("../../src/lib/play-story-selection");
+
+    const selection = resolvePlayStorySelection(
+      { storyParam: "the-call", publishedParam: "published-exit-interview" },
+    );
+
+    expect(selection.storyId).toBe("published-exit-interview");
+    expect(selection.publishedStory?.title).toBe("Exit Interview");
+  });
+
   it("falls back to the default story for invalid query params", async () => {
     const { resolvePlayStorySelection } = await import("../../src/lib/play-story-selection");
 

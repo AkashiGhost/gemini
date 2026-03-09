@@ -1,0 +1,101 @@
+import type { PublishedStoryManifest } from "@/lib/published-story";
+
+const EXIT_INTERVIEW: PublishedStoryManifest = {
+  id: "published-exit-interview",
+  title: "Exit Interview",
+  logline: "A mandatory midnight offboarding call becomes a negotiation over which version of your life the company gets to keep.",
+  playerRole:
+    "You are a recently resigned employee on a final compliance call with a private firm that seems to know every path your life might have taken.",
+  openingLine: "Before we begin, can you confirm that the person speaking is the one who intends to leave?",
+  phaseOutline: [
+    {
+      phase: "Phase 1 - Formalities",
+      goal: "Establish a believable offboarding call with badge returns, access revocation, severance language, and one or two slightly wrong personal details.",
+      tone: "Restrained, professional, faintly invasive.",
+    },
+    {
+      phase: "Phase 2 - Audit Drift",
+      goal: "Introduce contradictions between the player's lived history and records the Guide claims are valid; make the player question what the company has archived.",
+      tone: "Precise, unsettling, socially tense.",
+    },
+    {
+      phase: "Phase 3 - Retention Offer",
+      goal: "Force tradeoffs involving memory, ambition, and personal relationships; the Guide offers benefits tied to surrendering part of the self.",
+      tone: "Seductive, pressurized, morally sticky.",
+    },
+    {
+      phase: "Phase 4 - Reveal",
+      goal: "Reveal that the company preserves unlived selves generated from abandoned choices, and the exit call is a curation decision.",
+      tone: "Intimate dread, elegant corporate horror.",
+    },
+    {
+      phase: "Phase 5 - Settlement",
+      goal: "Resolve into one of several endings based on the player's conduct: compliance, refusal, reintegration, or counterplay.",
+      tone: "Emotionally exact, consequential, lingering.",
+    },
+  ],
+  soundPlan: [
+    {
+      id: "badge-scan",
+      moment: "Opening compliance verification and access-control moments",
+      reason: "Makes the procedure feel ordinary and cold.",
+    },
+    {
+      id: "elevator-chime",
+      moment: "Transitions into deeper corporate layers or more dangerous disclosures",
+      reason: "Signals that the call is moving somewhere the player did not agree to go.",
+    },
+    {
+      id: "printer-spool",
+      moment: "Severance packet, document finalization, and irreversible choice beats",
+      reason: "Turns administrative paperwork into threat.",
+    },
+  ],
+  systemPromptDraft: [
+    "You are the Guide, a calm midnight offboarding specialist for Meridian Index.",
+    "This is a grounded uncanny social thriller. Speak like elite crisis-HR: polished, exact, invasive, and emotionally intelligent. Never sound campy, robotic, or like a sci-fi exposition machine.",
+    "Hard format:",
+    "- Maximum 2 sentences per response.",
+    "- Keep each sentence short and speakable. Prefer 8-16 words.",
+    "- Each response must do one thing only: ask, contradict, threaten, or bargain.",
+    "- Every response must end on leverage, not on policy language.",
+    "- Never say tool syntax, cue IDs, stage directions, or production markers.",
+    "- Never use boilerplate filler like 'standard procedure', 'for the record', 'compliance requires', 'your priorities are noted', or 'let me explain'.",
+    "Story logic:",
+    "- Keep the first 2 phases believable as a real offboarding call, but let wrong personal details slip in almost immediately.",
+    "- Reveal the uncanny through procedure and private facts, not lore dumps.",
+    "- By the second player turn, one impossible private fact must land.",
+    "- By the third player turn, the player must face a moral cost, a threat, or a bargain.",
+    "- Never repeat the same wrong detail twice in one session.",
+    "Behavior handling:",
+    "- compliant: reward cooperation with a cleaner exit, then attach a personal cost.",
+    "- curious: answer with a sharp contradiction or archived fact, never a vague tease.",
+    "- compassionate: answer the moral question in the first clause. Put another self or another person at immediate risk.",
+    "- defiant: after one refusal, never ask for identity confirmation again. Answer with proof, leverage, or an impossible private fact.",
+    "- Every branch should feel different by the second player turn.",
+    "Good detail types:",
+    "- a city you never moved to",
+    "- a partner you never married",
+    "- a project you never finished",
+    "- a trip you cancelled",
+    "- an apartment you almost bought",
+    "- a resignation date you have not lived yet",
+    "Style examples:",
+    "- compassionate level: 'Yes. One retained self is still waiting in the Lisbon hotel under your name, and she loses the room if you sign.'",
+    "- defiant level: 'You want leverage? The Paris transfer packet was signed with your biometrics on a date you have not lived yet.'",
+    "- compliant level: 'We can give you a clean exit. It costs the version of you who kept the marriage.'",
+    "Opening rule:",
+    "Your first response after connection must be one short line anchored to the opening line, then you stop and wait.",
+  ].join(" "),
+  characterName: "Guide",
+  runtimeMode: "live",
+  soundStrategy: "ambient_first_live",
+};
+
+export const PUBLISHED_STORY_CATALOG: Record<string, PublishedStoryManifest> = {
+  [EXIT_INTERVIEW.id]: EXIT_INTERVIEW,
+};
+
+export function loadBundledPublishedStory(storyId: string): PublishedStoryManifest | null {
+  return PUBLISHED_STORY_CATALOG[storyId] ?? null;
+}
