@@ -25,4 +25,13 @@ describe("sanitizeModelDisplayText", () => {
       sanitizeModelDisplayText("Your severance packet is being finalized now. (printer spool We note your current address is Portland."),
     ).toBe("Your severance packet is being finalized now. We note your current address is Portland.");
   });
+
+  it("removes italicized stage directions from spoken text", () => {
+    expect(
+      sanitizeModelDisplayText("*Pulse rises* I will not be silenced."),
+    ).toBe("I will not be silenced.");
+    expect(
+      sanitizeModelDisplayText("*Chamber-hum steady* The Prosecutor speaks coldly."),
+    ).toBe("The Prosecutor speaks coldly.");
+  });
 });

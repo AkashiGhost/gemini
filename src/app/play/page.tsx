@@ -67,6 +67,10 @@ function PlayContent() {
     setOnboardingDone(true);
   }, [kickoffSession, publishedStory, sessionPrepared, startSession, storyId]);
 
+  const handleOnboardingExit = useCallback(() => {
+    router.push("/#stories");
+  }, [router]);
+
   if (requestedPublishedStoryId && !publishedStory) {
     return (
       <div
@@ -119,6 +123,8 @@ function PlayContent() {
         onToggleAdaptiveMusic={() => setEnableAdaptiveMusic((prev) => !prev)}
         onPrepare={handleOnboardingPrepare}
         onComplete={handleOnboardingComplete}
+        onSkip={handleOnboardingComplete}
+        onExit={handleOnboardingExit}
       />
     );
   }

@@ -44,6 +44,7 @@ export interface CreatorStoryPackRequestBody {
   sessionId?: string;
   spec?: unknown;
   draftText?: unknown;
+  playerProfileContext?: unknown;
 }
 
 export interface CreatorStoryPackPhase {

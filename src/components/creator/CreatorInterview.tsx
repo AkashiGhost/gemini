@@ -14,6 +14,12 @@ import {
 } from "@/lib/config/creator";
 import { createPublishedStoryManifest } from "@/lib/published-story";
 import { savePublishedStory } from "@/lib/published-story-play";
+import { PlayerProfileBuilder } from "@/components/profile/PlayerProfileBuilder";
+import {
+  buildGameProfileContext,
+  loadPlayerProfile,
+  type PlayerProfileV1,
+} from "@/lib/player-profile";
 
 const CREATOR_PAGE_CSS = `
 .creator-shell {
@@ -501,6 +507,8 @@ export function CreatorInterview() {
   const [storyPackStatus, setStoryPackStatus] = useState<PipelineStepStatus>(() =>
     createInitialStepStatus("Story Pack generation has not started."),
   );
+  const [playerProfile, setPlayerProfile] = useState<PlayerProfileV1 | null>(null);
+  const [useApprovedProfile, setUseApprovedProfile] = useState<boolean>(true);
   const [debugEvents, setDebugEvents] = useState<CreatorDebugEvent[]>([]);
   const countersRef = useRef({
     interview: 0,
@@ -511,6 +519,10 @@ export function CreatorInterview() {
 
   useEffect(() => {
     setSessionId(createSessionId());
+  }, []);
+
+  useEffect(() => {
+    setPlayerProfile(loadPlayerProfile());
   }, []);
 
   const ensureSessionId = useCallback((): string => {
@@ -787,7 +799,19 @@ export function CreatorInterview() {
       requestId,
       hasDraftText: draftText.length > 0,
       draftLength: draftText.length,
+      usingProfile: Boolean(
+        useApprovedProfile &&
+        playerProfile?.review.userConfirmed &&
+        playerProfile.consent.personalizedGamesApproved,
+      ),
     });
+
+    const approvedProfileContext =
+      useApprovedProfile &&
+      playerProfile?.review.userConfirmed &&
+      playerProfile.consent.personalizedGamesApproved
+        ? buildGameProfileContext(playerProfile)
+        : undefined;
 
     try {
       const response = await fetch("/api/creator/story-pack", {
@@ -797,6 +821,7 @@ export function CreatorInterview() {
           sessionId: activeSessionId,
           draftText: draftText || undefined,
           spec,
+          playerProfileContext: approvedProfileContext,
         }),
       });
 
@@ -841,7 +866,7 @@ export function CreatorInterview() {
     } finally {
       setIsGeneratingStoryPack(false);
     }
-  }, [ensureSessionId, isGeneratingStoryPack, logClientEvent, spec, storyDraft]);
+  }, [ensureSessionId, isGeneratingStoryPack, logClientEvent, playerProfile, spec, storyDraft, useApprovedProfile]);
 
   const handleStoryPackFieldChange = useCallback((field: StoryPackTextField, value: string) => {
     setStoryPack((prev) => (prev ? { ...prev, [field]: value } : prev));
@@ -1052,7 +1077,41 @@ export function CreatorInterview() {
         </div>
 
         <aside className="creator-panel" aria-label="Creative spec">
-          <h2 className="creator-panel-title">Live Spec</h2>
+          <PlayerProfileBuilder
+            key={playerProfile?.id ?? "new-player-profile"}
+            initialProfile={playerProfile}
+            onProfileSave={(profile) => {
+              setPlayerProfile(profile);
+              setUseApprovedProfile(true);
+              logClientEvent("creator.ui.profile.saved", {
+                candidateSelves: profile.castSeed.candidateSelves.map((self) => self.name),
+              });
+            }}
+            onProfileClear={() => {
+              setPlayerProfile(null);
+              setUseApprovedProfile(false);
+              logClientEvent("creator.ui.profile.cleared");
+            }}
+          />
+
+          <div className="creator-spec-item" style={{ marginTop: "var(--space-md)" }}>
+            <label className="creator-muted" style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={useApprovedProfile}
+                onChange={(event) => setUseApprovedProfile(event.target.checked)}
+                disabled={!playerProfile?.review.userConfirmed}
+              />
+              Use approved player profile when generating Story Pack
+            </label>
+            <p className="creator-muted" style={{ marginTop: "0.5rem" }}>
+              {playerProfile?.review.userConfirmed
+                ? `Profile ready with selves: ${playerProfile.castSeed.candidateSelves.map((self) => self.name).join(", ")}`
+                : "No approved profile yet. Story generation will use only the creator interview until you save one."}
+            </p>
+          </div>
+
+          <h2 className="creator-panel-title" style={{ marginTop: "var(--space-md)" }}>Live Spec</h2>
           <div className="creator-spec-grid">
             <div className="creator-spec-item">
               <span className="creator-spec-label">Title</span>

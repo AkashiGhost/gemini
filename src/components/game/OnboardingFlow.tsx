@@ -82,7 +82,32 @@ const STORY_ONBOARDING: Record<string, StoryOnboarding> = {
   },
 };
 
-type OnboardingStep = "scene" | "headphones" | "countdown" | "ringing";
+export type OnboardingStep = "scene" | "headphones" | "countdown" | "ringing";
+
+export function canGoBackInOnboarding(step: OnboardingStep, sceneIndex: number): boolean {
+  if (step === "scene") return sceneIndex > 0;
+  return step === "headphones";
+}
+
+export function getPreviousOnboardingState(
+  step: OnboardingStep,
+  sceneIndex: number,
+  totalScenes: number,
+): { step: OnboardingStep; sceneIndex: number } | null {
+  if (step === "scene" && sceneIndex > 0) {
+    return { step: "scene", sceneIndex: sceneIndex - 1 };
+  }
+
+  if (step === "headphones") {
+    return { step: "scene", sceneIndex: Math.max(0, totalScenes - 1) };
+  }
+
+  return null;
+}
+
+export function canSkipOnboarding(step: OnboardingStep): boolean {
+  return step === "scene" || step === "headphones";
+}
 
 interface OnboardingFlowProps {
   storyId: string;
@@ -93,6 +118,8 @@ interface OnboardingFlowProps {
   onToggleAdaptiveMusic?: () => void;
   onPrepare?: () => void;
   onComplete: () => void;
+  onExit?: () => void;
+  onSkip?: () => void;
 }
 
 export function OnboardingFlow({
@@ -104,6 +131,8 @@ export function OnboardingFlow({
   onToggleAdaptiveMusic,
   onPrepare,
   onComplete,
+  onExit,
+  onSkip,
 }: OnboardingFlowProps) {
   const onboarding = customOnboarding ?? STORY_ONBOARDING[storyId] ?? STORY_ONBOARDING[DEFAULT_STORY_ID];
   const totalScenes = onboarding.scenes.length;
@@ -119,6 +148,17 @@ export function OnboardingFlow({
   const ringCompletionTriggeredRef = useRef(false);
 
   const currentScene = onboarding.scenes[sceneIndex];
+
+  const handleBack = useCallback(() => {
+    const previous = getPreviousOnboardingState(step, sceneIndex, totalScenes);
+    if (!previous) return;
+    setStep(previous.step);
+    setSceneIndex(previous.sceneIndex);
+    setTextOpacity(0);
+    setShowContinue(false);
+    setContinueOpacity(0);
+    setCountdown(3);
+  }, [sceneIndex, step, totalScenes]);
 
   // ── Delayed text fade-in (1s after scene loads) ──────────────
   useEffect(() => {
@@ -372,6 +412,80 @@ export function OnboardingFlow({
           )}
         </div>
 
+        <div
+          style={{
+            marginTop: "var(--space-sm)",
+            display: "flex",
+            gap: "var(--space-sm)",
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
+          {canGoBackInOnboarding(step, sceneIndex) && (
+            <button
+              type="button"
+              onClick={handleBack}
+              style={{
+                background: "none",
+                border: "1px solid rgba(255,255,255,0.25)",
+                color: "var(--muted)",
+                padding: "var(--space-xs) var(--space-md)",
+                minHeight: "var(--touch-min)",
+                minWidth: 120,
+                cursor: "pointer",
+                fontFamily: "var(--font-ui)",
+                fontSize: "var(--type-caption)",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
+              Back
+            </button>
+          )}
+          {canSkipOnboarding(step) && onSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              style={{
+                background: "none",
+                border: "1px solid rgba(255,255,255,0.25)",
+                color: "var(--muted)",
+                padding: "var(--space-xs) var(--space-md)",
+                minHeight: "var(--touch-min)",
+                minWidth: 120,
+                cursor: "pointer",
+                fontFamily: "var(--font-ui)",
+                fontSize: "var(--type-caption)",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
+              Skip Intro
+            </button>
+          )}
+          {onExit && (
+            <button
+              type="button"
+              onClick={onExit}
+              style={{
+                background: "none",
+                border: "1px solid rgba(255,255,255,0.25)",
+                color: "var(--muted)",
+                padding: "var(--space-xs) var(--space-md)",
+                minHeight: "var(--touch-min)",
+                minWidth: 120,
+                cursor: "pointer",
+                fontFamily: "var(--font-ui)",
+                fontSize: "var(--type-caption)",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
+              Exit
+            </button>
+          )}
+        </div>
+
         {/* Scene indicators */}
         {totalScenes > 1 && (
           <div
@@ -494,6 +608,79 @@ export function OnboardingFlow({
         >
           Adaptive Music (Experimental): {adaptiveMusicAvailable ? (enableAdaptiveMusic ? "On" : "Off") : "Unavailable"}
         </button>
+        <div
+          style={{
+            display: "flex",
+            gap: "var(--space-sm)",
+            marginTop: "var(--space-sm)",
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
+          {canGoBackInOnboarding(step, sceneIndex) && (
+            <button
+              type="button"
+              onClick={handleBack}
+              style={{
+                minHeight: "var(--touch-min)",
+                padding: "var(--space-xs) var(--space-md)",
+                border: "1px solid var(--muted)",
+                borderRadius: 0,
+                color: "var(--muted)",
+                fontSize: "var(--type-caption)",
+                fontFamily: "var(--font-ui)",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                backgroundColor: "transparent",
+                cursor: "pointer",
+              }}
+            >
+              Back
+            </button>
+          )}
+          {onSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              style={{
+                minHeight: "var(--touch-min)",
+                padding: "var(--space-xs) var(--space-md)",
+                border: "1px solid var(--muted)",
+                borderRadius: 0,
+                color: "var(--muted)",
+                fontSize: "var(--type-caption)",
+                fontFamily: "var(--font-ui)",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                backgroundColor: "transparent",
+                cursor: "pointer",
+              }}
+            >
+              Skip Intro
+            </button>
+          )}
+          {onExit && (
+            <button
+              type="button"
+              onClick={onExit}
+              style={{
+                minHeight: "var(--touch-min)",
+                padding: "var(--space-xs) var(--space-md)",
+                border: "1px solid var(--muted)",
+                borderRadius: 0,
+                color: "var(--muted)",
+                fontSize: "var(--type-caption)",
+                fontFamily: "var(--font-ui)",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                backgroundColor: "transparent",
+                cursor: "pointer",
+              }}
+            >
+              Exit
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -550,6 +737,28 @@ export function OnboardingFlow({
       >
         {countdown}
       </div>
+      {onExit && (
+        <button
+          type="button"
+          onClick={onExit}
+          style={{
+            minHeight: "var(--touch-min)",
+            marginTop: "var(--space-lg)",
+            padding: "var(--space-xs) var(--space-md)",
+            border: "1px solid var(--muted)",
+            borderRadius: 0,
+            color: "var(--muted)",
+            fontSize: "var(--type-caption)",
+            fontFamily: "var(--font-ui)",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            backgroundColor: "transparent",
+            cursor: "pointer",
+          }}
+        >
+          Exit
+        </button>
+      )}
     </div>
   );
 }

@@ -232,7 +232,7 @@ function createSessionId(): string {
 
 function getInitialKickoffPrompt(storyId: string, publishedStory?: PublishedStoryManifest): string {
   if (publishedStory) {
-    return `Begin the published session now as ${publishedStory.characterName}. Open with one short line anchored to "${publishedStory.openingLine}", then pause for the player.`;
+    return `Begin the published session now as ${publishedStory.characterName}. Speak this exact opening line first: "${publishedStory.openingLine}" Then pause for the player.`;
   }
   if (storyId === "the-call") {
     return "The phone has just been answered. Speak immediately as Alex with one urgent line, then pause for the player.";
@@ -697,8 +697,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         type: "ADD_TRANSCRIPT",
         entry: { source: "ai", text: aiText },
       });
+      committedAiTextRef.current = aiText;
     }
-    committedAiTextRef.current = "";
     aiTextAccumRef.current = "";
   }, [clearFirstResponseWatchdog, clearPendingAiTurnFinalizeTimer, enableMicStreaming, logSessionTimingStage, logger, startMicCapture]);
 
@@ -1716,7 +1716,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         message,
       });
     }
-  }, [attemptLiveRetry, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logSessionTimingStage, logSessionTimingSummary, logger, safeCloseSession, scheduleAiTurnFinalize, startTicker, stopTicker]);
+  }, [attemptLiveRetry, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logSessionTimingStage, logSessionTimingSummary, logger, retryEmptyOpeningTurn, safeCloseSession, scheduleAiTurnFinalize, startTicker, stopTicker]);
 
   startSessionRef.current = startSession;
 

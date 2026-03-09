@@ -18,6 +18,7 @@ import {
 } from "@/lib/config/creator";
 import { createLogger } from "@/lib/logging";
 import { evaluateCreatorStoryPackQuality } from "@/lib/creator/story-pack-quality";
+import { normalizeGameProfileContext, type GameProfileContext } from "@/lib/player-profile";
 
 export const runtime = "nodejs";
 const logger = createLogger("api/creator/story-pack");
@@ -281,7 +282,21 @@ function normalizeStoryPack(raw: unknown, spec: Partial<CreatorSpec>, draftText?
   };
 }
 
-function buildPrompt(spec: Partial<CreatorSpec>, draftText?: string): string {
+function buildProfileContextBlock(playerProfileContext?: GameProfileContext | null): string {
+  if (!playerProfileContext) return "Player profile context: none provided";
+
+  return [
+    "Player profile context:",
+    JSON.stringify(playerProfileContext),
+    "Personalization rules:",
+    "- Use this only as bounded context, not as a diagnosis.",
+    "- Do not claim certainty beyond what the context supports.",
+    "- Prefer specific emotional pressure, unfinished decisions, and candidate selves over generic filler.",
+    "- Respect hardLimits and avoid building scenes around protected material.",
+  ].join("\n");
+}
+
+function buildPrompt(spec: Partial<CreatorSpec>, draftText?: string, playerProfileContext?: GameProfileContext | null): string {
   return [
     "You are a story architect that builds short, playable narrative packs.",
     "Return JSON only. Do not include markdown, code fences, comments, or prose outside JSON.",
@@ -304,9 +319,12 @@ function buildPrompt(spec: Partial<CreatorSpec>, draftText?: string): string {
     "- Each phase needs a concrete goal and distinct tone.",
     "- soundPlan should contain 3 to 6 cues with unique ids.",
     "- Keep writing production-ready and concise.",
+    "- If profile context is provided, let it sharpen the emotional and narrative specificity of the story pack.",
+    "- Never simply restate profile labels back to the player. Turn them into playable tension.",
     "",
     `Creator spec JSON: ${JSON.stringify(spec)}`,
     `Draft text: ${draftText ?? "none provided"}`,
+    buildProfileContextBlock(playerProfileContext),
   ].join("\n");
 }
 
@@ -314,10 +332,11 @@ async function generateStoryPack(
   ai: GoogleGenAI,
   spec: Partial<CreatorSpec>,
   draftText?: string,
+  playerProfileContext?: GameProfileContext | null,
 ): Promise<CreatorStoryPack> {
   const response = await ai.models.generateContent({
     model: CREATOR_INTERVIEW_MODEL,
-    contents: buildPrompt(spec, draftText),
+    contents: buildPrompt(spec, draftText, playerProfileContext),
     config: {
       responseMimeType: "application/json",
       temperature: 0.55,
@@ -367,6 +386,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const sessionId = sanitizeSessionId(body.sessionId);
   const spec = sanitizeCreatorSpecPartial(body.spec);
   const draftText = sanitizeCreatorStoryDraftText(body.draftText);
+  const playerProfileContext = normalizeGameProfileContext(body.playerProfileContext);
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -376,12 +396,13 @@ export async function POST(req: NextRequest): Promise<Response> {
   logInfo("creator.story_pack.request.received", sessionId, {
     hasDraftText: Boolean(draftText),
     specKeys: Object.keys(spec).length,
+    hasPlayerProfileContext: Boolean(playerProfileContext),
   });
 
   let storyPack = buildFallbackStoryPack(spec, draftText);
   try {
     const ai = new GoogleGenAI({ apiKey } as ConstructorParameters<typeof GoogleGenAI>[0]);
-    storyPack = await generateStoryPack(ai, spec, draftText);
+    storyPack = await generateStoryPack(ai, spec, draftText, playerProfileContext);
   } catch (error) {
     logError("creator.story_pack.model_failed", sessionId, error);
   }

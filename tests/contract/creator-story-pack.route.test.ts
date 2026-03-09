@@ -153,9 +153,65 @@ describe("POST /api/creator/story-pack", () => {
     expect(mockGenerateContent).toHaveBeenCalledTimes(1);
     expect(mockGenerateContent).toHaveBeenCalledWith(
       expect.objectContaining({
+        contents: expect.stringContaining("Player profile context: none provided"),
         config: expect.objectContaining({
           responseMimeType: "application/json",
         }),
+      }),
+    );
+  });
+
+  it("threads bounded player profile context into prompt generation", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    mockGenerateContent.mockResolvedValue({
+      text: JSON.stringify({
+        title: "Me and Mes",
+        logline: "A guided chamber reveals the selves that reach for control first.",
+        playerRole: "You enter a room shaped by your inner sequence.",
+        openingLine: "Answer plainly. I am here to show you what speaks first inside you.",
+        phaseOutline: [
+          { phase: "Assessment", goal: "Collect signal", tone: "Precise" },
+          { phase: "Manifestation", goal: "Reveal selves", tone: "Eerie" },
+          { phase: "Cross-Examination", goal: "Force contradiction", tone: "Unsettling" },
+          { phase: "Power Struggle", goal: "Contest authority", tone: "Charged" },
+          { phase: "Integration", goal: "Choose who remains loudest", tone: "Consequential" },
+        ],
+        soundPlan: [
+          { id: "chamber-hum", moment: "Arrival", reason: "Establish inner-space unease." },
+          { id: "pulse-rise", moment: "Conflict spike", reason: "Marks emotional takeover." },
+          { id: "breath-close", moment: "Grief contact", reason: "Draws the player inward." },
+        ],
+        systemPromptDraft: "One self speaks at a time. Keep the sequence emotionally specific.",
+      }),
+    });
+
+    const { POST } = await import("../../src/app/api/creator/story-pack/route");
+    const req = new Request("http://localhost/api/creator/story-pack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "session-profiled",
+        spec: { title: "Me and Mes", mood: "Poetic and eerie" },
+        playerProfileContext: {
+          dominantEmotions: ["fear", "shame"],
+          avoidedEmotions: ["grief"],
+          unfinishedDecisions: ["left a city", "did not leave a relationship"],
+          desiredIdentities: ["steady"],
+          fearedIdentities: ["fraud"],
+          candidateSelves: ["The Alarm", "The Witness"],
+          hardLimits: ["family trauma"],
+          roastTolerance: "low",
+        },
+      }),
+    });
+
+    const response = await POST(req as never);
+    await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mockGenerateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contents: expect.stringContaining("\"candidateSelves\":[\"The Alarm\",\"The Witness\"]"),
       }),
     );
   });
