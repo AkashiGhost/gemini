@@ -14,6 +14,7 @@ import {
 } from "@/lib/config/creator";
 import { createPublishedStoryManifest } from "@/lib/published-story";
 import { savePublishedStory } from "@/lib/published-story-play";
+import { canPublishCreatorStory, getCreatorPublishHint } from "@/lib/creator-publish";
 import { PlayerProfileBuilder } from "@/components/profile/PlayerProfileBuilder";
 import {
   buildGameProfileContext,
@@ -934,6 +935,15 @@ export function CreatorInterview() {
     ],
     [imageStatus, interviewStatus, storyPackStatus],
   );
+  const publishReadiness = useMemo(
+    () => ({
+      hasStoryPack: Boolean(storyPack),
+      hasCoverImage: Boolean(generatedImage),
+    }),
+    [generatedImage, storyPack],
+  );
+  const canPublish = canPublishCreatorStory(publishReadiness);
+  const publishHint = getCreatorPublishHint(publishReadiness);
 
   return (
     <main className="creator-shell">
@@ -1339,11 +1349,12 @@ export function CreatorInterview() {
                 type="button"
                 className="creator-btn"
                 onClick={handlePublishAndPlay}
-                disabled={!storyPack}
+                disabled={!canPublish}
               >
                 Publish &amp; Play
               </button>
             </div>
+            <p className="creator-muted">{publishHint}</p>
           </section>
         </aside>
       </section>

@@ -1,8 +1,8 @@
 """
 Creator roundtrip E2E.
 
-Drives the real creator UI: generate a Story Pack, click Publish & Play,
-and verify the generated draft reaches the live play route.
+Drives the real creator UI: generate an image and a Story Pack, click
+Publish & Play, and verify the published onboarding still renders artwork.
 """
 
 import os
@@ -33,6 +33,11 @@ def run_test() -> int:
             page.locator("#creator-story-draft").fill(
                 "The player answers a ringing phone. The caller is trapped in a room filling with water and may be manipulating the player."
             )
+            page.locator("#creator-image-prompt").fill(
+                "A ringing phone in a dark room, concrete walls, flooded floor reflections, cinematic, no text"
+            )
+            page.get_by_role("button", name="Generate Image").click()
+            page.wait_for_selector(".creator-image-wrap img", timeout=60000)
             page.get_by_role("button", name="Generate Story Pack").click()
             page.wait_for_selector("#story-pack-title", timeout=60000)
             title = page.locator("#story-pack-title").input_value().strip()
@@ -46,6 +51,11 @@ def run_test() -> int:
             body = page.locator("body").inner_text()
             if title and title not in body:
                 print("Creator publish route did not render the generated story title on /play.")
+                print(body[:1400])
+                return 1
+
+            if page.locator("img").count() == 0:
+                print("Published onboarding did not render any image.")
                 print(body[:1400])
                 return 1
 
