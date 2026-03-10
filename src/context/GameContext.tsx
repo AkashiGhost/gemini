@@ -54,6 +54,7 @@ import {
   shouldUseSilenceNudgesInSession,
 } from "@/context/debug-session-mode";
 import { shouldCommitAiTranscript } from "@/context/ai-transcript-commit";
+import { shouldFinalizeTurnOnGenerationComplete } from "@/context/ai-turn-finalization-policy";
 import type { PublishedStoryManifest } from "@/lib/published-story";
 
 export interface TranscriptEntry {
@@ -1541,7 +1542,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
                 committedAiTextRef.current = aiText;
               }
               logSessionTimingStage(sessionId, "generation_complete");
-              scheduleAiTurnFinalize(sessionId, "generation_complete");
+              if (shouldFinalizeTurnOnGenerationComplete({
+                openingTurnLocked: openingTurnStateRef.current.locked,
+                textTurnMode: textTurnModeRef.current,
+              })) {
+                scheduleAiTurnFinalize(sessionId, "generation_complete");
+              }
             }
 
             if ((msg.serverContent as Record<string, unknown> | undefined)?.interrupted) {
