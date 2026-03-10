@@ -22,6 +22,21 @@ export const metadata: Metadata = {
   title: "InnerPlay — Interactive Storytelling You Experience With Your Eyes Closed",
   description:
     "A new kind of game. No screen. No UI. Close your eyes, speak, and play inside your imagination. Voice-powered interactive storytelling powered by Gemini Live.",
+  keywords: [
+    "interactive storytelling",
+    "voice game",
+    "audio adventure",
+    "AI storytelling",
+    "eyes closed game",
+    "Gemini Live",
+    "immersive fiction",
+    "voice-powered game",
+  ],
+  themeColor: "#000000",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+  },
   openGraph: {
     title: "InnerPlay — Interactive Storytelling You Experience With Your Eyes Closed",
     description:
@@ -46,6 +61,39 @@ export const metadata: Metadata = {
   },
 };
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebApplication",
+      "@id": "https://innerplay.app/#webapp",
+      name: "InnerPlay",
+      description:
+        "A new kind of game. No screen. No UI. Close your eyes, speak, and play inside your imagination. Voice-powered interactive storytelling powered by Gemini Live.",
+      url: "https://innerplay.app",
+      applicationCategory: "Game",
+      operatingSystem: "Web",
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+      },
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://innerplay.app/#organization",
+      name: "InnerPlay",
+      url: "https://innerplay.app",
+      logo: {
+        "@type": "ImageObject",
+        url: "https://innerplay.app/images/innerplay-logo.svg",
+        width: 512,
+        height: 512,
+      },
+    },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -54,6 +102,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${bebasNeue.variable} ${cormorantGaramond.variable}`}>
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <a href="#main-content" className="skip-to-content">
           Skip to content
         </a>

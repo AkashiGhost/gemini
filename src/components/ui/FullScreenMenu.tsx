@@ -16,6 +16,12 @@ const MENU_ITEMS = [
   { label: "ABOUT", href: "/#about", accent: false },
 ];
 
+const LEGAL_LINKS = [
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "Terms of Service", href: "/terms" },
+  { label: "Cookie Policy", href: "/cookies" },
+];
+
 export function FullScreenMenu({ open, onClose }: FullScreenMenuProps) {
   const pathname = usePathname();
 
@@ -113,6 +119,64 @@ export function FullScreenMenu({ open, onClose }: FullScreenMenuProps) {
               {item.label}
             </motion.a>
           ))}
+
+          {/* Legal links */}
+          <motion.nav
+            aria-label="Legal links"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5, duration: 0.4 }}
+            style={{
+              position: "absolute",
+              bottom: "calc(var(--space-lg) + env(safe-area-inset-bottom, 0px))",
+              left: 0,
+              right: 0,
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "var(--space-sm)",
+            }}
+          >
+            {LEGAL_LINKS.map((link, i) => (
+              <span
+                key={link.href}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "var(--space-sm)",
+                }}
+              >
+                <a
+                  href={link.href}
+                  onClick={onClose}
+                  style={{
+                    fontFamily: "var(--font-ui)",
+                    fontSize: "var(--type-caption)",
+                    color: "var(--muted)",
+                    opacity: 0.5,
+                    textDecoration: "none",
+                    letterSpacing: "0.5px",
+                  }}
+                >
+                  {link.label}
+                </a>
+                {i < LEGAL_LINKS.length - 1 && (
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      color: "var(--muted)",
+                      opacity: 0.2,
+                      fontSize: "var(--type-caption)",
+                      userSelect: "none",
+                    }}
+                  >
+                    /
+                  </span>
+                )}
+              </span>
+            ))}
+          </motion.nav>
         </motion.div>
       )}
     </AnimatePresence>
