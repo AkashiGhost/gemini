@@ -23,6 +23,7 @@ import {
   selectCuesOffCooldown,
 } from "@/lib/sound-intent-fallback";
 import { useSoundPref } from "@/lib/sound-preferences";
+import type { SoundProfileId } from "@/lib/sound-profile";
 
 // ─────────────────────────────────────────────
 // Story-specific timelines
@@ -106,6 +107,12 @@ const TIMELINES: Record<string, SoundTimelineEvent[]> = {
     // Everything fades toward the end
     { time: 540, action: "fade_all_to_nothing", fadeDurationSeconds: 15 },
   ],
+
+  "me-and-mes": [
+    { time: 0, action: "start_ambient", soundIds: ["sleep_hush"] },
+    { time: 0.15, action: "start_intermittent", soundIds: ["bed_rustle"] },
+    { time: 1.4, action: "start_intermittent", soundIds: ["settling_breath"] },
+  ],
 };
 
 // Story-specific spatial panning
@@ -150,6 +157,16 @@ const SPATIAL_MAPS: Record<string, Record<string, { pan: number }>> = {
     heavy_breathing: { pan: 0 },   // centered (Alex's own breathing)
     glass_break: { pan: 0.25 },    // right-front shard impact
   },
+  "me-and-mes": {
+    sleep_hush: { pan: 0 },
+    bed_rustle: { pan: -0.08 },
+    settling_breath: { pan: 0 },
+    threshold_tone: { pan: 0 },
+    chamber_hum: { pan: 0 },
+    door_creak: { pan: -0.16 },
+    footsteps: { pan: -0.08 },
+    room_close: { pan: 0.04 },
+  },
 };
 
 const DEFAULT_VOLUMES: Record<string, Record<string, number>> = {
@@ -193,6 +210,16 @@ const DEFAULT_VOLUMES: Record<string, Record<string, number>> = {
     heavy_breathing: 0.48,
     glass_break: 0.68,
   },
+  "me-and-mes": {
+    sleep_hush: 0.1,
+    bed_rustle: 0.22,
+    settling_breath: 0.18,
+    threshold_tone: 0.18,
+    chamber_hum: 0.14,
+    door_creak: 0.26,
+    footsteps: 0.2,
+    room_close: 0.34,
+  },
 };
 
 const CUE_COOLDOWN_MS = AUDIO_CONFIG.cueCooldownMs;
@@ -201,6 +228,7 @@ const TRANSCRIPT_TOOL_PRIORITY_WINDOW_MS = AUDIO_CONFIG.transcriptIntentToolPrio
 
 interface UseSoundEngineOptions {
   storyId: string;
+  soundProfileId: SoundProfileId;
   enableAdaptiveMusic: boolean;
   sessionId?: string;
   status: "idle" | "connecting" | "playing" | "ended" | "error";
@@ -214,6 +242,7 @@ interface UseSoundEngineOptions {
 
 export function useSoundEngine({
   storyId,
+  soundProfileId,
   enableAdaptiveMusic,
   sessionId,
   status,
@@ -225,7 +254,7 @@ export function useSoundEngine({
   onToolCall,
 }: UseSoundEngineOptions) {
   const logger = useMemo(() => createLogger("useSoundEngine"), []);
-  const runtimeProfile = useMemo(() => getStoryRuntimeProfile(storyId), [storyId]);
+  const runtimeProfile = useMemo(() => getStoryRuntimeProfile(soundProfileId), [soundProfileId]);
   const soundOn = useSoundPref();
   const engineRef = useRef<SoundEngine | null>(null);
   const musicEngineRef = useRef<MusicEngine | null>(null);
@@ -236,6 +265,8 @@ export function useSoundEngine({
   const cueCooldownsRef = useRef<Map<string, number>>(new Map());
   // Timestamp for latest authoritative trigger_sound tool call.
   const lastToolSoundTriggerAtRef = useRef(0);
+  const meAndMesThresholdTriggeredRef = useRef(false);
+  const meAndMesEndingTriggeredRef = useRef(false);
 
   // ── Initialize engine when game starts playing ────────────
   // Configurable delay defaults to 0. We still keep it tunable for debugging.
@@ -251,15 +282,15 @@ export function useSoundEngine({
           event: "sound.init_start",
           sessionId,
           causalChain: ["sound.init_start"],
-          data: { storyId, initDelayMs: INIT_DELAY_MS },
+          data: { storyId, soundProfileId, initDelayMs: INIT_DELAY_MS },
         });
 
-        const spatialMap = SPATIAL_MAPS[storyId] ?? SPATIAL_MAPS["the-last-session"];
+        const spatialMap = SPATIAL_MAPS[soundProfileId] ?? SPATIAL_MAPS["the-last-session"];
         const engine = new SoundEngine({
           ttsDucking: AUDIO_CONFIG.ttsDucking,
           crossfadeDefaultMs: AUDIO_CONFIG.crossfadeDefaultMs,
           spatialMap,
-          defaultVolumes: DEFAULT_VOLUMES[storyId] ?? DEFAULT_VOLUMES["the-last-session"],
+          defaultVolumes: DEFAULT_VOLUMES[soundProfileId] ?? DEFAULT_VOLUMES["the-last-session"],
           preloadOrder: [],
         });
 
@@ -268,7 +299,7 @@ export function useSoundEngine({
         engine.setSoundEnabled(soundOn, 0);
 
         // Generate and register story-specific synthetic sounds
-        const sounds = await generateSoundsForStory(storyId);
+        const sounds = await generateSoundsForStory(soundProfileId);
         if (cancelled) return;
         for (const [id, buffer] of Object.entries(sounds)) {
           engine.registerBuffer(id, buffer);
@@ -277,7 +308,7 @@ export function useSoundEngine({
         engineRef.current = engine;
 
         // Start the story-specific timeline
-        const timeline = TIMELINES[storyId] ?? TIMELINES["the-last-session"];
+        const timeline = TIMELINES[soundProfileId] ?? TIMELINES["the-last-session"];
         engine.startTimeline(timeline);
 
         if (!LYRIA_RUNTIME_CONFIG.enabled || !enableAdaptiveMusic) {
@@ -316,7 +347,7 @@ export function useSoundEngine({
           event: "sound.init_ready",
           sessionId,
           causalChain: ["sound.init_start", "sound.init_ready"],
-          data: { storyId, timelineEvents: timeline.length },
+          data: { storyId, soundProfileId, timelineEvents: timeline.length },
         });
       } catch (err) {
         logger.error({
@@ -324,7 +355,7 @@ export function useSoundEngine({
           sessionId,
           causalChain: ["sound.init_start", "sound.init_failed"],
           error: err,
-          data: { storyId },
+          data: { storyId, soundProfileId },
         });
         initStartedRef.current = false;
       }
@@ -335,7 +366,7 @@ export function useSoundEngine({
       cancelled = true;
       clearTimeout(delayTimer);
     };
-  }, [enableAdaptiveMusic, logger, sessionId, soundOn, status, storyId]);
+  }, [enableAdaptiveMusic, logger, sessionId, soundOn, soundProfileId, status, storyId]);
 
   // ── TTS Ducking ───────────────────────────────────────
   useEffect(() => {
@@ -518,6 +549,49 @@ export function useSoundEngine({
     return () => clearTimeout(timer);
   }, [lastUserTranscriptSeq, lastUserTranscriptText, logger, runtimeProfile.soundStrategy, sessionId, status, storyId]);
 
+  // ── Me and Mes state-driven sound journey ──────────────────
+  useEffect(() => {
+    if (soundProfileId !== "me-and-mes") return;
+    if (status !== "playing") return;
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    const normalized = lastAiText.trim().toLowerCase();
+    if (!normalized) return;
+
+    if (!meAndMesThresholdTriggeredRef.current && normalized.includes("ok. now you're going to enter the room.")) {
+      meAndMesThresholdTriggeredRef.current = true;
+      engine.triggerCue("threshold_tone", 0.18);
+      engine.triggerCue("door_creak", 0.24);
+      setTimeout(() => engine.triggerCue("footsteps", 0.16), 220);
+      setTimeout(() => engine.handleToolCall("chamber_hum", 0.14, true, 2.8), 450);
+      logger.info({
+        event: "sound.me_and_mes.threshold",
+        sessionId,
+        causalChain: ["sound.me_and_mes.threshold"],
+      });
+    }
+
+    const looksLikeEnding =
+      normalized.includes("the room closes") ||
+      normalized.includes("you leave with") ||
+      normalized.includes("you are free to fully inhabit your present") ||
+      normalized.includes("the room goes quiet") ||
+      normalized.includes("integration begins") ||
+      normalized.includes("the fragmented parts converge");
+
+    if (meAndMesThresholdTriggeredRef.current && !meAndMesEndingTriggeredRef.current && looksLikeEnding) {
+      meAndMesEndingTriggeredRef.current = true;
+      engine.triggerCue("room_close", 0.3);
+      setTimeout(() => engine.fadeAllToNothing(4), 350);
+      logger.info({
+        event: "sound.me_and_mes.ending",
+        sessionId,
+        causalChain: ["sound.me_and_mes.ending"],
+      });
+    }
+  }, [lastAiText, logger, sessionId, soundProfileId, status]);
+
   // ── Pause / Resume ────────────────────────────────────
   useEffect(() => {
     const engine = engineRef.current;
@@ -546,6 +620,8 @@ export function useSoundEngine({
         engineRef.current = null;
         initStartedRef.current = false;
       }
+      meAndMesThresholdTriggeredRef.current = false;
+      meAndMesEndingTriggeredRef.current = false;
     }
   }, [status]);
 
@@ -562,6 +638,8 @@ export function useSoundEngine({
         engine.destroy();
         engineRef.current = null;
       }
+      meAndMesThresholdTriggeredRef.current = false;
+      meAndMesEndingTriggeredRef.current = false;
     };
   }, []);
 

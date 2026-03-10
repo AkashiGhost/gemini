@@ -8,6 +8,7 @@ import { stripSoundMarkers } from "@/lib/sound-cue-parser";
 import { setSoundPref, useSoundPref } from "@/lib/sound-preferences";
 import { AtmosphereLayer } from "./AtmosphereLayer";
 import { BreathingDot } from "@/components/ui/BreathingDot";
+import type { SoundProfileId } from "@/lib/sound-profile";
 
 // ─────────────────────────────────────────────
 // Game Session — Gemini Live API version
@@ -27,6 +28,7 @@ const CHARACTER_NAMES: Record<string, string> = {
 
 interface GameSessionProps {
   storyId: string;
+  soundProfileId: SoundProfileId;
   enableAdaptiveMusic: boolean;
   debugTextMode?: boolean;
   characterName?: string;
@@ -37,6 +39,7 @@ const ATMOSPHERE_STORIES = new Set(["room-4b"]);
 
 export function GameSession({
   storyId,
+  soundProfileId,
   enableAdaptiveMusic,
   debugTextMode = false,
   characterName,
@@ -76,6 +79,7 @@ export function GameSession({
   // ── Sound Engine — story-aware ambient sounds, timeline, TTS ducking ──
   useSoundEngine({
     storyId,
+    soundProfileId,
     enableAdaptiveMusic,
     sessionId,
     status,

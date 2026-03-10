@@ -25,6 +25,10 @@ const STORY_RUNTIME_PROFILES: Record<string, StoryRuntimeProfile> = {
     runtimeMode: "scripted",
     soundStrategy: "timeline_scripted",
   },
+  "me-and-mes": {
+    runtimeMode: "live",
+    soundStrategy: "ambient_first_live",
+  },
 };
 
 export function getStoryRuntimeProfile(storyId: string): StoryRuntimeProfile {

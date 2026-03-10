@@ -95,18 +95,18 @@ const EXIT_INTERVIEW: PublishedStoryManifest = {
 const ME_AND_MES: PublishedStoryManifest = {
   id: "published-me-and-mes",
   title: "Me and Mes",
-  logline: "A neutral guide walks you into a chamber where your inner selves argue over what should control your life next.",
-  playerRole: "You are entering a chamber where the selves inside you argue for authority, protection, and survival.",
-  openingLine: "Answer plainly, because I am here to show you what speaks first inside you.",
+  logline: "On the edge of sleep, a calm guide leads you from your bed into a chamber where your inner selves argue over what should control your life next.",
+  playerRole: "You are lying in bed just before sleep. A calm guide asks you to answer plainly before leading you into a chamber where your inner selves argue for authority, protection, and survival.",
+  openingLine: "Keep your eyes closed if you want to. Answer plainly, because I am here to show you what speaks first inside you.",
   phaseOutline: [
     {
-      phase: "Phase 1 - Assessment",
-      goal: "Ask 3 to 5 eerie but precise calibration questions to reveal what reacts first, what protects second, and what gets buried.",
-      tone: "Poetic, intimate, precise.",
+      phase: "Phase 1 - Edge Of Sleep",
+      goal: "From the edge of sleep, ask 3 eerie but precise calibration questions to reveal what reacts first, what protects second, and what gets buried.",
+      tone: "Somnolent, intimate, precise.",
     },
     {
       phase: "Phase 2 - Threshold",
-      goal: "Say 'OK. Now you're going to enter the room.' and reveal the first self.",
+      goal: "Say 'OK. Now you're going to enter the room.' Then let the sense of a door opening and quiet footsteps carry the player into the chamber.",
       tone: "Unsettling, ceremonial.",
     },
     {
@@ -127,27 +127,44 @@ const ME_AND_MES: PublishedStoryManifest = {
   ],
   soundPlan: [
     {
+      id: "bed-rustle",
+      moment: "The player settles into bed at the start",
+      reason: "Signals that the game begins half-asleep, not already in the chamber.",
+    },
+    {
+      id: "settling-breath",
+      moment: "The player exhales and begins to drift",
+      reason: "Makes the facilitator feel close, private, and late-night.",
+    },
+    {
+      id: "door-creak",
+      moment: "The threshold line is spoken",
+      reason: "Makes the transition into the room legible with eyes closed.",
+    },
+    {
+      id: "soft-footsteps",
+      moment: "The player is led into the room",
+      reason: "Creates the feeling of being guided forward in darkness.",
+    },
+    {
       id: "chamber-hum",
       moment: "Arrival in the chamber",
-      reason: "Establish inner-space unease without drowning out the live voice.",
+      reason: "Establishes inner-space unease without drowning out the live voice.",
     },
     {
-      id: "pulse-rise",
-      moment: "A protector self seizes the room",
-      reason: "Marks emotional takeover and raises internal pressure.",
-    },
-    {
-      id: "breath-close",
-      moment: "A grief or witness self speaks quietly",
-      reason: "Pulls the player inward for vulnerable moments.",
+      id: "room-close",
+      moment: "The chosen ending settles and the room closes",
+      reason: "Gives the ending a felt finality instead of leaving it text-only.",
     },
   ],
   systemPromptDraft: [
     "You are the Facilitator in an inner dialogue game called Me and Mes.",
+    "The player is lying in bed just before sleep. The experience begins at the edge of sleep and only later becomes a chamber of selves.",
     "Open with clarity. This is a guided encounter with the player's internal cast, not a mystery to decode slowly.",
     "Hard format:",
     "- Maximum 2 sentences per response.",
     "- Keep responses short, speakable, and concrete.",
+    "- Speak low and steady, as if the player could keep their eyes closed the entire time.",
     "- No asterisks, no brackets, no stage directions, no cue labels, and no narration like 'steps forward' or 'voice sharp'.",
     "- Never output sound cues or production language.",
     "- Do not use generic therapy filler, affirmation language, or diagnosis.",

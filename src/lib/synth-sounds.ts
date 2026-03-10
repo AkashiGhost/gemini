@@ -549,6 +549,133 @@ async function generateDisconnectTone(): Promise<AudioBuffer> {
   return offlineCtx.startRendering();
 }
 
+async function generateBedRustle(): Promise<AudioBuffer> {
+  const duration = 1.2;
+  const length = SAMPLE_RATE * duration;
+  const offlineCtx = new OfflineAudioContext(1, length, SAMPLE_RATE);
+
+  const noiseBuffer = offlineCtx.createBuffer(1, length, SAMPLE_RATE);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+
+  const source = offlineCtx.createBufferSource();
+  source.buffer = noiseBuffer;
+
+  const low = offlineCtx.createBiquadFilter();
+  low.type = "lowpass";
+  low.frequency.value = 420;
+
+  const env = offlineCtx.createGain();
+  env.gain.setValueAtTime(0, 0);
+  env.gain.linearRampToValueAtTime(0.22, 0.03);
+  env.gain.exponentialRampToValueAtTime(0.001, duration);
+
+  source.connect(low);
+  low.connect(env);
+  env.connect(offlineCtx.destination);
+  source.start(0);
+
+  return offlineCtx.startRendering();
+}
+
+async function generateSettlingBreath(): Promise<AudioBuffer> {
+  const duration = 2.2;
+  const length = SAMPLE_RATE * duration;
+  const offlineCtx = new OfflineAudioContext(1, length, SAMPLE_RATE);
+
+  const noiseBuffer = offlineCtx.createBuffer(1, length, SAMPLE_RATE);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+
+  const source = offlineCtx.createBufferSource();
+  source.buffer = noiseBuffer;
+
+  const filter = offlineCtx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.value = 850;
+  filter.Q.value = 0.8;
+
+  const env = offlineCtx.createGain();
+  env.gain.setValueAtTime(0, 0);
+  env.gain.linearRampToValueAtTime(0.06, 0.35);
+  env.gain.linearRampToValueAtTime(0.02, 1.1);
+  env.gain.linearRampToValueAtTime(0.08, 1.45);
+  env.gain.exponentialRampToValueAtTime(0.001, duration);
+
+  source.connect(filter);
+  filter.connect(env);
+  env.connect(offlineCtx.destination);
+  source.start(0);
+
+  return offlineCtx.startRendering();
+}
+
+async function generateThresholdTone(): Promise<AudioBuffer> {
+  const duration = 1.8;
+  const length = SAMPLE_RATE * duration;
+  const offlineCtx = new OfflineAudioContext(1, length, SAMPLE_RATE);
+
+  const osc = offlineCtx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(180, 0);
+  osc.frequency.linearRampToValueAtTime(310, duration * 0.8);
+
+  const osc2 = offlineCtx.createOscillator();
+  osc2.type = "triangle";
+  osc2.frequency.setValueAtTime(260, 0);
+  osc2.frequency.linearRampToValueAtTime(190, duration);
+
+  const env = offlineCtx.createGain();
+  env.gain.setValueAtTime(0, 0);
+  env.gain.linearRampToValueAtTime(0.12, 0.08);
+  env.gain.setValueAtTime(0.12, 0.9);
+  env.gain.exponentialRampToValueAtTime(0.001, duration);
+
+  osc.connect(env);
+  osc2.connect(env);
+  env.connect(offlineCtx.destination);
+  osc.start(0);
+  osc.stop(duration);
+  osc2.start(0);
+  osc2.stop(duration);
+
+  return offlineCtx.startRendering();
+}
+
+async function generateChamberHum(): Promise<AudioBuffer> {
+  return generateDrone(48, "sine", 8, 0.08);
+}
+
+async function generateRoomClose(): Promise<AudioBuffer> {
+  const duration = 1.4;
+  const length = SAMPLE_RATE * duration;
+  const offlineCtx = new OfflineAudioContext(1, length, SAMPLE_RATE);
+
+  const noiseBuffer = offlineCtx.createBuffer(1, length, SAMPLE_RATE);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+
+  const source = offlineCtx.createBufferSource();
+  source.buffer = noiseBuffer;
+
+  const filter = offlineCtx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = 220;
+
+  const env = offlineCtx.createGain();
+  env.gain.setValueAtTime(0, 0);
+  env.gain.linearRampToValueAtTime(0.5, 0.02);
+  env.gain.exponentialRampToValueAtTime(0.02, 0.45);
+  env.gain.exponentialRampToValueAtTime(0.001, duration);
+
+  source.connect(filter);
+  filter.connect(env);
+  env.connect(offlineCtx.destination);
+  source.start(0);
+
+  return offlineCtx.startRendering();
+}
+
 /** The Call — underground phone call: phone static, electrical hum, sub bass, ring, click, disconnect + reactive environment sounds */
 async function generateTheCallSounds(): Promise<SoundSet> {
   // Sequential rendering — 13 concurrent OfflineAudioContext renders via Promise.all()
@@ -576,6 +703,28 @@ async function generateTheCallSounds(): Promise<SoundSet> {
   };
 }
 
+async function generateMeAndMesSounds(): Promise<SoundSet> {
+  const sleep_hush = await generateFilteredNoise(8, "lowpass", 520, 0.35, 0.06);
+  const bed_rustle = await generateBedRustle();
+  const settling_breath = await generateSettlingBreath();
+  const threshold_tone = await generateThresholdTone();
+  const chamber_hum = await generateChamberHum();
+  const room_close = await generateRoomClose();
+  const footsteps = await generateFootsteps();
+  const door_creak = await generateDoorCreak();
+
+  return {
+    sleep_hush,
+    bed_rustle,
+    settling_breath,
+    threshold_tone,
+    chamber_hum,
+    room_close,
+    footsteps,
+    door_creak,
+  };
+}
+
 /** Generate story-specific sound set */
 export async function generateSoundsForStory(storyId: string): Promise<SoundSet> {
   console.log(`[SYNTH] Generating synthetic sounds for story: ${storyId}`);
@@ -590,6 +739,9 @@ export async function generateSoundsForStory(storyId: string): Promise<SoundSet>
       break;
     case "the-call":
       sounds = await generateTheCallSounds();
+      break;
+    case "me-and-mes":
+      sounds = await generateMeAndMesSounds();
       break;
     default:
       sounds = await generateLastSessionSounds();

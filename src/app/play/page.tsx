@@ -16,6 +16,7 @@ import { BreathingDot } from "@/components/ui/BreathingDot";
 import { LYRIA_RUNTIME_CONFIG } from "@/lib/config/lyria";
 import { classifyPlaySessionError } from "@/lib/play-error-classification";
 import { resolvePlayStorySelection, resolveRequestedPublishedStoryId } from "@/lib/play-story-selection";
+import { resolveSoundProfileId } from "@/lib/sound-profile";
 
 function PlayContent() {
   const searchParams = useSearchParams();
@@ -31,6 +32,13 @@ function PlayContent() {
     [publishedParam, storyParam],
   );
   const debugTextMode = searchParams.get("debugText") === "1";
+  const soundProfileId = useMemo(
+    () => resolveSoundProfileId({
+      storyId,
+      publishedStoryTitle: publishedStory?.title,
+    }),
+    [publishedStory?.title, storyId],
+  );
 
   const [onboardingDone, setOnboardingDone] = useState(false);
   const [sessionPrepared, setSessionPrepared] = useState(false);
@@ -259,6 +267,7 @@ function PlayContent() {
     <GameSession
       storyId={storyId}
       characterName={publishedStory ? getPublishedStoryCharacterName(publishedStory) : undefined}
+      soundProfileId={soundProfileId}
       enableAdaptiveMusic={enableAdaptiveMusic}
       debugTextMode={debugTextMode}
     />
