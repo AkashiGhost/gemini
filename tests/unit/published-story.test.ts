@@ -23,6 +23,8 @@ describe("published story manifest", () => {
         { id: "fog-horn", moment: "first warning", reason: "Marks the harbor closing in." },
       ],
       systemPromptDraft: "Keep the exchange tense, playable, and voice-first.",
+    }, {
+      coverImage: "data:image/png;base64,abc123",
     });
 
     expect(manifest.id).toMatch(/^published-harbor-of-ash-/);
@@ -30,6 +32,7 @@ describe("published story manifest", () => {
     expect(manifest.soundStrategy).toBe("ambient_first_live");
     expect(manifest.characterName).toBe("Guide");
     expect(manifest.title).toBe("Harbor of Ash");
+    expect(manifest.coverImage).toBe("data:image/png;base64,abc123");
   });
 
   it("normalizes published story input and trims unsafe values", () => {
@@ -43,6 +46,7 @@ describe("published story manifest", () => {
       soundPlan: [{ id: " cue 1 ", moment: "dock", reason: "pressure" }],
       systemPromptDraft: " Speak in short, escalating turns. ",
       characterName: " Mara ",
+      coverImage: " data:image/png;base64,cover123 ",
       runtimeMode: "live",
       soundStrategy: "ambient_first_live",
     });
@@ -51,6 +55,7 @@ describe("published story manifest", () => {
     expect(normalized?.id).toBe("published-custom");
     expect(normalized?.title).toBe("Night Channel");
     expect(normalized?.characterName).toBe("Mara");
+    expect(normalized?.coverImage).toBe("data:image/png;base64,cover123");
     expect(normalized?.soundPlan[0]?.id).toBe("cue-1");
   });
 
@@ -65,6 +70,7 @@ describe("published story manifest", () => {
       soundPlan: [{ id: "fog-horn", moment: "dock", reason: "Signals danger in the harbor." }],
       systemPromptDraft: "Speak in short, escalating turns and always wait for the player.",
       characterName: "Mara",
+      coverImage: "data:image/png;base64,cover123",
       runtimeMode: "live",
       soundStrategy: "ambient_first_live",
     });

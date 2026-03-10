@@ -16,6 +16,7 @@ const publishedStory: PublishedStoryManifest = {
   soundPlan: [{ id: "fog-horn", moment: "dock", reason: "Signals danger in the harbor." }],
   systemPromptDraft: "Speak in short, escalating turns and always wait for the player.",
   characterName: "Mara",
+  coverImage: "data:image/png;base64,cover123",
   runtimeMode: "live",
   soundStrategy: "ambient_first_live",
 };
@@ -26,6 +27,8 @@ describe("published story play helpers", () => {
 
     expect(onboarding.firstAudioLine).toBe("Stay on the line. The channel is changing.");
     expect(onboarding.scenes).toHaveLength(2);
+    expect(onboarding.scenes[0]?.image).toBe("data:image/png;base64,cover123");
+    expect(onboarding.scenes[1]?.image).toBe("data:image/png;base64,cover123");
     expect(onboarding.scenes[0]?.text).toContain("Night Channel");
     expect(onboarding.scenes[1]?.text).toContain("A radio voice drags you toward the water.");
   });

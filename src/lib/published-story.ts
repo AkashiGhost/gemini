@@ -13,6 +13,7 @@ export interface PublishedStoryManifest {
   logline: string;
   playerRole: string;
   openingLine: string;
+  coverImage?: string;
   phaseOutline: CreatorStoryPackPhase[];
   soundPlan: CreatorStoryPackSoundCue[];
   systemPromptDraft: string;
@@ -28,6 +29,15 @@ function sanitizeText(value: unknown, maxLength: number): string {
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
     .replace(/\s+/g, " ")
     .slice(0, maxLength);
+}
+
+function sanitizeCoverImage(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("data:image/")) return trimmed;
+  if (/^https?:\/\//.test(trimmed)) return trimmed;
+  return "";
 }
 
 function normalizeCueId(value: unknown, index: number): string {
@@ -110,6 +120,7 @@ export function normalizePublishedStoryInput(input: unknown): PublishedStoryMani
   const logline = sanitizeText(record.logline, 420);
   const playerRole = sanitizeText(record.playerRole, 220);
   const openingLine = sanitizeText(record.openingLine, 240);
+  const coverImage = sanitizeCoverImage(record.coverImage);
   const systemPromptDraft = sanitizeText(record.systemPromptDraft, 3200);
   const characterName = sanitizeText(record.characterName, 80) || inferCharacterName(title);
   const runtimeMode = record.runtimeMode === "scripted" ? "scripted" : "live";
@@ -133,6 +144,7 @@ export function normalizePublishedStoryInput(input: unknown): PublishedStoryMani
     logline,
     playerRole,
     openingLine,
+    ...(coverImage ? { coverImage } : {}),
     phaseOutline,
     soundPlan,
     systemPromptDraft,
@@ -142,9 +154,13 @@ export function normalizePublishedStoryInput(input: unknown): PublishedStoryMani
   };
 }
 
-export function createPublishedStoryManifest(storyPack: CreatorStoryPack): PublishedStoryManifest {
+export function createPublishedStoryManifest(
+  storyPack: CreatorStoryPack,
+  options?: { coverImage?: string },
+): PublishedStoryManifest {
   const title = sanitizeText(storyPack.title, 160) || "Untitled Story";
   const baseId = slugifyTitle(title) || "story";
+  const coverImage = sanitizeCoverImage(options?.coverImage);
 
   return {
     id: `published-${baseId}-${Date.now().toString(36)}`,
@@ -152,6 +168,7 @@ export function createPublishedStoryManifest(storyPack: CreatorStoryPack): Publi
     logline: sanitizeText(storyPack.logline, 420),
     playerRole: sanitizeText(storyPack.playerRole, 220),
     openingLine: sanitizeText(storyPack.openingLine, 240),
+    ...(coverImage ? { coverImage } : {}),
     phaseOutline: normalizePhaseOutline(storyPack.phaseOutline),
     soundPlan: normalizeSoundPlan(storyPack.soundPlan),
     systemPromptDraft: sanitizeText(storyPack.systemPromptDraft, 3200),

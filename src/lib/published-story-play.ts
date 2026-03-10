@@ -43,9 +43,11 @@ export function buildPublishedStoryOnboarding(story: PublishedStoryManifest): Pu
   return {
     scenes: [
       {
+        image: story.coverImage,
         text: `${story.title}. ${story.playerRole}`,
       },
       {
+        image: story.coverImage,
         text: story.logline,
       },
     ],

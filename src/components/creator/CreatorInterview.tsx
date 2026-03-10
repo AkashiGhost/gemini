@@ -905,11 +905,15 @@ export function CreatorInterview() {
     if (!storyPack) return;
 
     try {
-      const manifest = createPublishedStoryManifest(storyPack);
+      const coverImage = generatedImage
+        ? `data:${generatedImage.mimeType};base64,${generatedImage.base64}`
+        : undefined;
+      const manifest = createPublishedStoryManifest(storyPack, { coverImage });
       savePublishedStory(manifest);
       logClientEvent("creator.ui.story_pack.published", {
         storyId: manifest.id,
         title: manifest.title,
+        hasCoverImage: Boolean(coverImage),
       });
       window.location.assign(`/play?published=${encodeURIComponent(manifest.id)}`);
     } catch (publishError) {
