@@ -22,6 +22,8 @@ import { normalizeGameProfileContext, type GameProfileContext } from "@/lib/play
 
 export const runtime = "nodejs";
 const logger = createLogger("api/creator/story-pack");
+type StoryPackTitleMode = "auto" | "manual";
+const PLACEHOLDER_TITLES = new Set(["untitled story pack", "untitled", "story pack"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -53,6 +55,46 @@ function sanitizeCueId(value: unknown, index: number): string {
     .replace(/^-+|-+$/g, "")
     .replace(/-{2,}/g, "-");
   return normalized || `cue-${index + 1}`;
+}
+
+function normalizeText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function sanitizeTitleMode(value: unknown): StoryPackTitleMode {
+  return value === "manual" ? "manual" : "auto";
+}
+
+function toTitleCase(value: string): string {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function inferFallbackTitle(spec: Partial<CreatorSpec>, draftText?: string): string {
+  if (spec.title?.trim()) return spec.title.trim();
+
+  const themeWords = (spec.theme ?? "")
+    .split(/[^a-zA-Z0-9]+/)
+    .map((word) => word.trim())
+    .filter((word) => word.length >= 3)
+    .slice(0, 4);
+  if (themeWords.length > 0) {
+    return toTitleCase(themeWords.join(" "));
+  }
+
+  const draftWords = (draftText ?? "")
+    .split(/[^a-zA-Z0-9]+/)
+    .map((word) => word.trim())
+    .filter((word) => word.length >= 4)
+    .slice(0, 4);
+  if (draftWords.length > 0) {
+    return toTitleCase(draftWords.join(" "));
+  }
+
+  return "The Hidden Room";
 }
 
 function tryParseJson(raw: string): { ok: true; value: unknown } | { ok: false } {
@@ -158,7 +200,7 @@ function extractStoryPackRoot(raw: unknown): unknown {
 
 function buildFallbackStoryPack(spec: Partial<CreatorSpec>, draftText?: string): CreatorStoryPack {
   const merged = { ...EMPTY_CREATOR_SPEC, ...spec };
-  const baseTitle = merged.title || EMPTY_CREATOR_STORY_PACK.title;
+  const baseTitle = inferFallbackTitle(merged, draftText);
   const mood = merged.mood || "moody";
   const theme = merged.theme || "an unstable world";
   const visualStyle = merged.visualStyle || "cinematic realism";
@@ -208,6 +250,11 @@ function buildFallbackStoryPack(spec: Partial<CreatorSpec>, draftText?: string):
         CREATOR_STORY_PACK_LIMITS.systemPromptDraft,
       ) ?? EMPTY_CREATOR_STORY_PACK.systemPromptDraft,
   };
+}
+
+function sanitizeManualTitle(value: unknown): string | undefined {
+  const sanitized = sanitizeText(value, CREATOR_STORY_PACK_LIMITS.title);
+  return sanitized || undefined;
 }
 
 function normalizePhaseOutline(input: unknown, fallback: CreatorStoryPackPhase[]): CreatorStoryPackPhase[] {
@@ -319,6 +366,8 @@ function buildPrompt(spec: Partial<CreatorSpec>, draftText?: string, playerProfi
     "- Each phase needs a concrete goal and distinct tone.",
     "- soundPlan should contain 3 to 6 cues with unique ids.",
     "- Keep writing production-ready and concise.",
+    "- Never return placeholder hero fields like 'Untitled Story Pack' or generic defaults.",
+    "- Title must feel memorable, specific, and publishable.",
     "- If profile context is provided, let it sharpen the emotional and narrative specificity of the story pack.",
     "- Never simply restate profile labels back to the player. Turn them into playable tension.",
     "",
@@ -328,15 +377,96 @@ function buildPrompt(spec: Partial<CreatorSpec>, draftText?: string, playerProfi
   ].join("\n");
 }
 
+function buildStoryPackPrompt(
+  spec: Partial<CreatorSpec>,
+  draftText?: string,
+  playerProfileContext?: GameProfileContext | null,
+  titleMode: StoryPackTitleMode = "auto",
+  manualTitle?: string,
+): string {
+  const basePrompt = buildPrompt(spec, draftText, playerProfileContext);
+  const titleInstruction = titleMode === "manual" && manualTitle
+    ? `Title rule: use this exact title and do not modify it: "${manualTitle}".`
+    : "Title rule: generate an original, specific, publishable title. Do not use placeholders or generic filler.";
+
+  return [basePrompt, titleInstruction].join("\n");
+}
+
+function isPlaceholderHeroField(storyPack: CreatorStoryPack): boolean {
+  const title = normalizeText(storyPack.title);
+  if (!storyPack.title.trim() || PLACEHOLDER_TITLES.has(title)) return true;
+
+  if (normalizeText(storyPack.logline) === normalizeText(EMPTY_CREATOR_STORY_PACK.logline)) return true;
+  if (normalizeText(storyPack.playerRole) === normalizeText(EMPTY_CREATOR_STORY_PACK.playerRole)) return true;
+  if (normalizeText(storyPack.openingLine) === normalizeText(EMPTY_CREATOR_STORY_PACK.openingLine)) return true;
+
+  return false;
+}
+
+function buildHeroRepairPrompt(
+  storyPack: CreatorStoryPack,
+  spec: Partial<CreatorSpec>,
+  draftText?: string,
+  titleMode: StoryPackTitleMode = "auto",
+  manualTitle?: string,
+): string {
+  const titleRule = titleMode === "manual" && manualTitle
+    ? `Use this exact title: "${manualTitle}".`
+    : "Generate a stronger title. Never use placeholders like Untitled Story Pack.";
+
+  return [
+    "You are repairing the hero fields of a creator-generated story pack.",
+    "Return JSON only with exactly these keys:",
+    "{",
+    '  "title": "string",',
+    '  "logline": "string",',
+    '  "playerRole": "string",',
+    '  "openingLine": "string"',
+    "}",
+    "Rules:",
+    `- ${titleRule}`,
+    "- Make the logline sharp and concrete, not generic.",
+    "- Make playerRole precise and specific to the fantasy.",
+    "- Make openingLine short, spoken, and immediately playable.",
+    "- Do not output markdown or commentary.",
+    `Creator spec JSON: ${JSON.stringify(spec)}`,
+    `Draft text: ${draftText ?? "none provided"}`,
+    `Current story pack JSON: ${JSON.stringify(storyPack)}`,
+  ].join("\n");
+}
+
+function mergeHeroFields(
+  storyPack: CreatorStoryPack,
+  repair: unknown,
+  titleMode: StoryPackTitleMode,
+  manualTitle?: string,
+): CreatorStoryPack {
+  const root = extractStoryPackRoot(repair);
+  const record = isRecord(root) ? root : {};
+
+  return {
+    ...storyPack,
+    title:
+      (titleMode === "manual" && manualTitle) ||
+      sanitizeText(record.title, CREATOR_STORY_PACK_LIMITS.title) ||
+      storyPack.title,
+    logline: sanitizeText(record.logline, CREATOR_STORY_PACK_LIMITS.logline) ?? storyPack.logline,
+    playerRole: sanitizeText(record.playerRole, CREATOR_STORY_PACK_LIMITS.playerRole) ?? storyPack.playerRole,
+    openingLine: sanitizeText(record.openingLine, CREATOR_STORY_PACK_LIMITS.openingLine) ?? storyPack.openingLine,
+  };
+}
+
 async function generateStoryPack(
   ai: GoogleGenAI,
   spec: Partial<CreatorSpec>,
   draftText?: string,
   playerProfileContext?: GameProfileContext | null,
+  titleMode: StoryPackTitleMode = "auto",
+  manualTitle?: string,
 ): Promise<CreatorStoryPack> {
   const response = await ai.models.generateContent({
     model: CREATOR_INTERVIEW_MODEL,
-    contents: buildPrompt(spec, draftText, playerProfileContext),
+    contents: buildStoryPackPrompt(spec, draftText, playerProfileContext, titleMode, manualTitle),
     config: {
       responseMimeType: "application/json",
       temperature: 0.55,
@@ -346,6 +476,28 @@ async function generateStoryPack(
 
   const parsed = parseJsonResponse(response.text ?? "");
   return normalizeStoryPack(parsed, spec, draftText);
+}
+
+async function repairHeroFields(
+  ai: GoogleGenAI,
+  storyPack: CreatorStoryPack,
+  spec: Partial<CreatorSpec>,
+  draftText?: string,
+  titleMode: StoryPackTitleMode = "auto",
+  manualTitle?: string,
+): Promise<CreatorStoryPack> {
+  const response = await ai.models.generateContent({
+    model: CREATOR_INTERVIEW_MODEL,
+    contents: buildHeroRepairPrompt(storyPack, spec, draftText, titleMode, manualTitle),
+    config: {
+      responseMimeType: "application/json",
+      temperature: 0.45,
+      maxOutputTokens: 400,
+    },
+  });
+
+  const parsed = parseJsonResponse(response.text ?? "");
+  return mergeHeroFields(storyPack, parsed, titleMode, manualTitle);
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
@@ -387,6 +539,8 @@ export async function POST(req: NextRequest): Promise<Response> {
   const spec = sanitizeCreatorSpecPartial(body.spec);
   const draftText = sanitizeCreatorStoryDraftText(body.draftText);
   const playerProfileContext = normalizeGameProfileContext(body.playerProfileContext);
+  const titleMode = sanitizeTitleMode(body.titleMode);
+  const manualTitle = sanitizeManualTitle(body.manualTitle);
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -397,12 +551,19 @@ export async function POST(req: NextRequest): Promise<Response> {
     hasDraftText: Boolean(draftText),
     specKeys: Object.keys(spec).length,
     hasPlayerProfileContext: Boolean(playerProfileContext),
+    titleMode,
+    hasManualTitle: Boolean(manualTitle),
   });
 
   let storyPack = buildFallbackStoryPack(spec, draftText);
   try {
     const ai = new GoogleGenAI({ apiKey } as ConstructorParameters<typeof GoogleGenAI>[0]);
-    storyPack = await generateStoryPack(ai, spec, draftText, playerProfileContext);
+    storyPack = await generateStoryPack(ai, spec, draftText, playerProfileContext, titleMode, manualTitle);
+    if (titleMode === "manual" && manualTitle) {
+      storyPack = { ...storyPack, title: manualTitle };
+    } else if (isPlaceholderHeroField(storyPack)) {
+      storyPack = await repairHeroFields(ai, storyPack, spec, draftText, titleMode, manualTitle);
+    }
   } catch (error) {
     logError("creator.story_pack.model_failed", sessionId, error);
   }

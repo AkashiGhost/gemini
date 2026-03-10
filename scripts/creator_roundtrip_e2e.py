@@ -41,6 +41,9 @@ def run_test() -> int:
             page.get_by_role("button", name="Generate Story Pack").click()
             page.wait_for_selector("#story-pack-title", timeout=60000)
             title = page.locator("#story-pack-title").input_value().strip()
+            if not title or title.lower() == "untitled story pack":
+                print("Creator story pack title fell back to a placeholder.")
+                return 1
             page.screenshot(path=str(SHOT_DIR / "01_story_pack_ready.png"), full_page=True)
 
             page.get_by_role("button", name="Publish & Play").click()

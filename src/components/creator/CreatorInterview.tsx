@@ -493,6 +493,8 @@ export function CreatorInterview() {
   const [imagePrompt, setImagePrompt] = useState<string>("");
   const [input, setInput] = useState<string>("");
   const [storyDraft, setStoryDraft] = useState<string>("");
+  const [titleMode, setTitleMode] = useState<"auto" | "manual">("auto");
+  const [manualTitle, setManualTitle] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [isSending, setIsSending] = useState<boolean>(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
@@ -823,6 +825,8 @@ export function CreatorInterview() {
           draftText: draftText || undefined,
           spec,
           playerProfileContext: approvedProfileContext,
+          titleMode,
+          manualTitle: titleMode === "manual" ? manualTitle.trim() || undefined : undefined,
         }),
       });
 
@@ -867,7 +871,17 @@ export function CreatorInterview() {
     } finally {
       setIsGeneratingStoryPack(false);
     }
-  }, [ensureSessionId, isGeneratingStoryPack, logClientEvent, playerProfile, spec, storyDraft, useApprovedProfile]);
+  }, [
+    ensureSessionId,
+    isGeneratingStoryPack,
+    logClientEvent,
+    manualTitle,
+    playerProfile,
+    spec,
+    storyDraft,
+    titleMode,
+    useApprovedProfile,
+  ]);
 
   const handleStoryPackFieldChange = useCallback((field: StoryPackTextField, value: string) => {
     setStoryPack((prev) => (prev ? { ...prev, [field]: value } : prev));
@@ -993,6 +1007,36 @@ export function CreatorInterview() {
               placeholder="Paste narrative direction, scene concepts, or constraints to steer Story Pack generation..."
               disabled={isGeneratingStoryPack}
             />
+            <div className="creator-spec-item">
+              <label className="creator-spec-label" htmlFor="creator-title-mode">
+                Title Mode
+              </label>
+              <select
+                id="creator-title-mode"
+                className="creator-text-input"
+                value={titleMode}
+                onChange={(event) => setTitleMode(event.target.value === "manual" ? "manual" : "auto")}
+                disabled={isGeneratingStoryPack}
+              >
+                <option value="auto">Auto-generate title</option>
+                <option value="manual">Use my exact title</option>
+              </select>
+              {titleMode === "manual" ? (
+                <>
+                  <label className="creator-spec-label" htmlFor="creator-manual-title" style={{ marginTop: "0.5rem" }}>
+                    Exact Title
+                  </label>
+                  <input
+                    id="creator-manual-title"
+                    className="creator-text-input"
+                    value={manualTitle}
+                    onChange={(event) => setManualTitle(event.target.value)}
+                    placeholder="Me and Mes"
+                    disabled={isGeneratingStoryPack}
+                  />
+                </>
+              ) : null}
+            </div>
             <div className="creator-actions">
               <button
                 type="button"

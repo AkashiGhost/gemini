@@ -407,4 +407,102 @@ describe("POST /api/creator/story-pack", () => {
     expect(quality.checks.some((check) => check.id === "escalation" && check.status !== "pass")).toBe(true);
     expect(quality.improvementHints.length).toBeGreaterThan(0);
   });
+
+  it("uses the exact manual title when manual title mode is selected", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    mockGenerateContent.mockResolvedValue({
+      text: JSON.stringify({
+        title: "Wrong Generated Title",
+        logline: "A guided chamber reveals the selves that reach for control first.",
+        playerRole: "You enter a room shaped by your inner sequence.",
+        openingLine: "Answer plainly. I am here to show you what speaks first inside you.",
+        phaseOutline: [
+          { phase: "Assessment", goal: "Collect signal", tone: "Precise" },
+          { phase: "Manifestation", goal: "Reveal selves", tone: "Eerie" },
+          { phase: "Cross-Examination", goal: "Force contradiction", tone: "Unsettling" },
+          { phase: "Power Struggle", goal: "Contest authority", tone: "Charged" },
+          { phase: "Integration", goal: "Choose who remains loudest", tone: "Consequential" },
+        ],
+        soundPlan: [
+          { id: "chamber-hum", moment: "Arrival", reason: "Establish inner-space unease." },
+          { id: "pulse-rise", moment: "Conflict spike", reason: "Marks emotional takeover." },
+          { id: "breath-close", moment: "Grief contact", reason: "Draws the player inward." },
+        ],
+        systemPromptDraft: "One self speaks at a time. Keep the sequence emotionally specific.",
+      }),
+    });
+
+    const { POST } = await import("../../src/app/api/creator/story-pack/route");
+    const req = new Request("http://localhost/api/creator/story-pack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "session-manual-title",
+        titleMode: "manual",
+        manualTitle: "Me and Mes",
+        spec: { mood: "Poetic and eerie" },
+      }),
+    });
+
+    const response = await POST(req as never);
+    const payload = await response.json();
+    const storyPack = payload.storyPack as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(storyPack.title).toBe("Me and Mes");
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+  });
+
+  it("repairs placeholder hero fields with a second structured pass", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    mockGenerateContent
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          title: "Untitled Story Pack",
+          logline: "A player is drawn into a world where each choice reshapes what survival means.",
+          playerRole: "You are the protagonist navigating high-stakes uncertainty.",
+          openingLine: "The air hums before dawn, and something in the dark already knows your name.",
+          phaseOutline: [
+            { phase: "Phase 1", goal: "Answer the call", tone: "urgent" },
+            { phase: "Phase 2", goal: "Map the harbor", tone: "uneasy" },
+            { phase: "Phase 3", goal: "Find the missing boat", tone: "paranoid" },
+            { phase: "Phase 4", goal: "Choose what to trust", tone: "desperate" },
+            { phase: "Phase 5", goal: "Leave or stay", tone: "haunting" },
+          ],
+          soundPlan: [
+            { id: "fog-horn", moment: "first warning", reason: "Marks the harbor closing in." },
+          ],
+          systemPromptDraft: "Keep the exchange tense, playable, and voice-first.",
+        }),
+      })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          title: "The Quiet Between Floors",
+          logline: "A sleepless caller is led into a room where every emotion argues for custody.",
+          playerRole: "You are the voice standing at the threshold of your own divided mind.",
+          openingLine: "Before you sleep, tell me which feeling reaches for the light first.",
+        }),
+      });
+
+    const { POST } = await import("../../src/app/api/creator/story-pack/route");
+    const req = new Request("http://localhost/api/creator/story-pack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "session-hero-repair",
+        draftText: "A surreal room of emotional selves that should feel intimate and psychologically exact.",
+      }),
+    });
+
+    const response = await POST(req as never);
+    const payload = await response.json();
+    const storyPack = payload.storyPack as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(storyPack.title).toBe("The Quiet Between Floors");
+    expect(storyPack.logline).toContain("every emotion argues for custody");
+    expect(storyPack.playerRole).toContain("divided mind");
+    expect(storyPack.openingLine).toContain("which feeling reaches for the light first");
+    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+  });
 });

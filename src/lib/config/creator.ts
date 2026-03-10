@@ -45,6 +45,8 @@ export interface CreatorStoryPackRequestBody {
   spec?: unknown;
   draftText?: unknown;
   playerProfileContext?: unknown;
+  titleMode?: unknown;
+  manualTitle?: unknown;
 }
 
 export interface CreatorStoryPackPhase {
