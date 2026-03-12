@@ -929,6 +929,7 @@ export function CreatorInterview() {
         storyId: manifest.id,
         title: manifest.title,
         hasCoverImage: Boolean(coverImage),
+        ...(manifest.soundProfileId ? { soundProfileId: manifest.soundProfileId } : {}),
       });
       window.location.assign(`/play?published=${encodeURIComponent(manifest.id)}`);
     } catch (publishError) {
@@ -939,7 +940,7 @@ export function CreatorInterview() {
         message: messageFromError,
       });
     }
-  }, [logClientEvent, storyPack]);
+  }, [generatedImage, logClientEvent, setError, storyPack]);
 
   const stepStatusRows = useMemo(
     () => [

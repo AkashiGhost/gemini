@@ -36,8 +36,9 @@ function PlayContent() {
     () => resolveSoundProfileId({
       storyId,
       publishedStoryTitle: publishedStory?.title,
+      publishedStorySoundProfileId: publishedStory?.soundProfileId,
     }),
-    [publishedStory?.title, storyId],
+    [publishedStory?.soundProfileId, publishedStory?.title, storyId],
   );
 
   const [onboardingDone, setOnboardingDone] = useState(false);

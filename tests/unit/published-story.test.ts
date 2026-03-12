@@ -35,6 +35,25 @@ describe("published story manifest", () => {
     expect(manifest.coverImage).toBe("data:image/png;base64,abc123");
   });
 
+  it("infers the Me and Mes sound profile from authored sound cues", () => {
+    const manifest = createPublishedStoryManifest({
+      title: "Room Of Selves",
+      logline: "A guide walks you from bed into a chamber of selves.",
+      playerRole: "You answer plainly and listen.",
+      openingLine: "Keep your eyes closed if you want to.",
+      phaseOutline: [
+        { phase: "Phase 1", goal: "Answer plainly", tone: "somnolent" },
+      ],
+      soundPlan: [
+        { id: "bed-rustle", moment: "settling into bed", reason: "Starts at the edge of sleep." },
+        { id: "room-close", moment: "the ending settles", reason: "Closes the chamber." },
+      ],
+      systemPromptDraft: "Keep the voice intimate and precise.",
+    });
+
+    expect(manifest.soundProfileId).toBe("me-and-mes");
+  });
+
   it("normalizes published story input and trims unsafe values", () => {
     const normalized = normalizePublishedStoryInput({
       id: "  published-custom  ",
@@ -49,6 +68,7 @@ describe("published story manifest", () => {
       coverImage: " data:image/png;base64,cover123 ",
       runtimeMode: "live",
       soundStrategy: "ambient_first_live",
+      soundProfileId: " me-and-mes ",
     });
 
     expect(normalized).not.toBeNull();
@@ -56,6 +76,7 @@ describe("published story manifest", () => {
     expect(normalized?.title).toBe("Night Channel");
     expect(normalized?.characterName).toBe("Mara");
     expect(normalized?.coverImage).toBe("data:image/png;base64,cover123");
+    expect(normalized?.soundProfileId).toBe("me-and-mes");
     expect(normalized?.soundPlan[0]?.id).toBe("cue-1");
   });
 

@@ -98,6 +98,7 @@ const ME_AND_MES: PublishedStoryManifest = {
   logline: "On the edge of sleep, a calm guide leads you from your bed into a chamber where your inner selves argue over what should control your life next.",
   playerRole: "You are lying in bed just before sleep. A calm guide asks you to answer plainly before leading you into a chamber where your inner selves argue for authority, protection, and survival.",
   openingLine: "Keep your eyes closed if you want to. Answer plainly, because I am here to show you what speaks first inside you.",
+  soundProfileId: "me-and-mes",
   phaseOutline: [
     {
       phase: "Phase 1 - Edge Of Sleep",

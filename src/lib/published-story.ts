@@ -3,6 +3,7 @@ import type {
   CreatorStoryPackPhase,
   CreatorStoryPackSoundCue,
 } from "@/lib/config/creator";
+import type { SoundProfileId } from "@/lib/sound-profile";
 import type { StoryRuntimeMode } from "@/lib/story-runtime";
 
 export type PublishedStorySoundStrategy = "ambient_first_live" | "timeline_scripted";
@@ -14,6 +15,7 @@ export interface PublishedStoryManifest {
   playerRole: string;
   openingLine: string;
   coverImage?: string;
+  soundProfileId?: SoundProfileId;
   phaseOutline: CreatorStoryPackPhase[];
   soundPlan: CreatorStoryPackSoundCue[];
   systemPromptDraft: string;
@@ -40,6 +42,21 @@ function sanitizeCoverImage(value: unknown): string {
   return "";
 }
 
+function sanitizeSoundProfileId(value: unknown): SoundProfileId | undefined {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+
+  switch (normalized) {
+    case "the-call":
+    case "the-last-session":
+    case "the-lighthouse":
+    case "room-4b":
+    case "me-and-mes":
+      return normalized as SoundProfileId;
+    default:
+      return undefined;
+  }
+}
+
 function normalizeCueId(value: unknown, index: number): string {
   const raw = sanitizeText(value, 50)
     .toLowerCase()
@@ -62,6 +79,28 @@ function inferCharacterName(title: string): string {
   if (!firstWord) return "Guide";
   if (firstWord.length <= 2) return "Guide";
   return "Guide";
+}
+
+function inferSoundProfileId(title: string): SoundProfileId | undefined {
+  return slugifyTitle(title) === "me-and-mes" ? "me-and-mes" : undefined;
+}
+
+function inferSoundProfileIdFromStoryPack(storyPack: CreatorStoryPack): SoundProfileId | undefined {
+  const normalizedCueIds = normalizeSoundPlan(storyPack.soundPlan).map((cue) => cue.id);
+
+  const meAndMesCueCount = normalizedCueIds.filter((id) =>
+    id === "bed-rustle" ||
+    id === "settling-breath" ||
+    id === "door-creak" ||
+    id === "soft-footsteps" ||
+    id === "room-close"
+  ).length;
+
+  if (meAndMesCueCount >= 2) {
+    return "me-and-mes";
+  }
+
+  return inferSoundProfileId(storyPack.title);
 }
 
 function normalizePhaseOutline(input: unknown): CreatorStoryPackPhase[] {
@@ -121,6 +160,7 @@ export function normalizePublishedStoryInput(input: unknown): PublishedStoryMani
   const playerRole = sanitizeText(record.playerRole, 220);
   const openingLine = sanitizeText(record.openingLine, 240);
   const coverImage = sanitizeCoverImage(record.coverImage);
+  const soundProfileId = sanitizeSoundProfileId(record.soundProfileId);
   const systemPromptDraft = sanitizeText(record.systemPromptDraft, 3200);
   const characterName = sanitizeText(record.characterName, 80) || inferCharacterName(title);
   const runtimeMode = record.runtimeMode === "scripted" ? "scripted" : "live";
@@ -145,6 +185,7 @@ export function normalizePublishedStoryInput(input: unknown): PublishedStoryMani
     playerRole,
     openingLine,
     ...(coverImage ? { coverImage } : {}),
+    ...(soundProfileId ? { soundProfileId } : {}),
     phaseOutline,
     soundPlan,
     systemPromptDraft,
@@ -156,11 +197,14 @@ export function normalizePublishedStoryInput(input: unknown): PublishedStoryMani
 
 export function createPublishedStoryManifest(
   storyPack: CreatorStoryPack,
-  options?: { coverImage?: string },
+  options?: { coverImage?: string; soundProfileId?: SoundProfileId },
 ): PublishedStoryManifest {
   const title = sanitizeText(storyPack.title, 160) || "Untitled Story";
   const baseId = slugifyTitle(title) || "story";
   const coverImage = sanitizeCoverImage(options?.coverImage);
+  const normalizedPhaseOutline = normalizePhaseOutline(storyPack.phaseOutline);
+  const normalizedSoundPlan = normalizeSoundPlan(storyPack.soundPlan);
+  const soundProfileId = options?.soundProfileId ?? inferSoundProfileIdFromStoryPack(storyPack);
 
   return {
     id: `published-${baseId}-${Date.now().toString(36)}`,
@@ -169,8 +213,9 @@ export function createPublishedStoryManifest(
     playerRole: sanitizeText(storyPack.playerRole, 220),
     openingLine: sanitizeText(storyPack.openingLine, 240),
     ...(coverImage ? { coverImage } : {}),
-    phaseOutline: normalizePhaseOutline(storyPack.phaseOutline),
-    soundPlan: normalizeSoundPlan(storyPack.soundPlan),
+    ...(soundProfileId ? { soundProfileId } : {}),
+    phaseOutline: normalizedPhaseOutline,
+    soundPlan: normalizedSoundPlan,
     systemPromptDraft: sanitizeText(storyPack.systemPromptDraft, 3200),
     characterName: inferCharacterName(title),
     runtimeMode: "live",

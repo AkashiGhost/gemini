@@ -21,6 +21,16 @@ describe("resolveSoundProfileId", () => {
     ).toBe("me-and-mes");
   });
 
+  it("prefers explicit published story metadata over title matching", () => {
+    expect(
+      resolveSoundProfileId({
+        storyId: "published-mystery-story-123",
+        publishedStoryTitle: "Unknown Story",
+        publishedStorySoundProfileId: "me-and-mes",
+      }),
+    ).toBe("me-and-mes");
+  });
+
   it("falls back to the default built-in profile for unknown published stories", () => {
     expect(
       resolveSoundProfileId({

@@ -18,8 +18,20 @@ function normalizeTitle(value: string | undefined): string {
 export function resolveSoundProfileId(input: {
   storyId: string;
   publishedStoryTitle?: string;
+  publishedStorySoundProfileId?: string;
 }): SoundProfileId {
-  const { storyId, publishedStoryTitle } = input;
+  const { storyId, publishedStoryTitle, publishedStorySoundProfileId } = input;
+
+  switch (publishedStorySoundProfileId) {
+    case "the-call":
+    case "the-last-session":
+    case "the-lighthouse":
+    case "room-4b":
+    case "me-and-mes":
+      return publishedStorySoundProfileId;
+    default:
+      break;
+  }
 
   switch (storyId) {
     case "the-call":
