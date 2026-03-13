@@ -54,7 +54,10 @@ import {
   shouldUseSilenceNudgesInSession,
 } from "@/context/debug-session-mode";
 import { shouldCommitAiTranscript } from "@/context/ai-transcript-commit";
-import { shouldFinalizeTurnOnGenerationComplete } from "@/context/ai-turn-finalization-policy";
+import {
+  getGenerationCompleteFinalizeFallbackDelayMs,
+  shouldFinalizeTurnOnGenerationComplete,
+} from "@/context/ai-turn-finalization-policy";
 import type { PublishedStoryManifest } from "@/lib/published-story";
 
 export interface TranscriptEntry {
@@ -727,6 +730,33 @@ export function GameProvider({ children }: { children: ReactNode }) {
       finalizeAiTurn(session, sessionId, `${reason}:playback_drained`);
     }, decision.unlockAfterMs);
   }, [clearPendingAiTurnFinalizeTimer, finalizeAiTurn, logger]);
+
+  const scheduleGenerationCompleteFallbackFinalize = useCallback((sessionId: string | undefined) => {
+    const fallbackDelayMs = getGenerationCompleteFinalizeFallbackDelayMs({
+      openingTurnLocked: openingTurnStateRef.current.locked,
+      textTurnMode: textTurnModeRef.current,
+    });
+    if (fallbackDelayMs === null) {
+      return;
+    }
+
+    clearPendingAiTurnFinalizeTimer();
+    logger.info({
+      event: "session.generation_complete_finalize_fallback_armed",
+      sessionId,
+      causalChain: ["session.generation_complete_finalize_fallback_armed"],
+      data: { fallbackDelayMs },
+    });
+
+    pendingAiTurnFinalizeTimerRef.current = setTimeout(() => {
+      logger.info({
+        event: "session.generation_complete_finalize_fallback_fired",
+        sessionId,
+        causalChain: ["session.generation_complete_finalize_fallback_fired"],
+      });
+      scheduleAiTurnFinalize(sessionId, "generation_complete_fallback");
+    }, fallbackDelayMs);
+  }, [clearPendingAiTurnFinalizeTimer, logger, scheduleAiTurnFinalize]);
 
   const flushPendingKickoff = useCallback(
     (session: Session, sessionId: string | undefined) => {
@@ -1547,6 +1577,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
                 textTurnMode: textTurnModeRef.current,
               })) {
                 scheduleAiTurnFinalize(sessionId, "generation_complete");
+              } else {
+                scheduleGenerationCompleteFallbackFinalize(sessionId);
               }
             }
 
@@ -1722,7 +1754,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         message,
       });
     }
-  }, [attemptLiveRetry, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logSessionTimingStage, logSessionTimingSummary, logger, retryEmptyOpeningTurn, safeCloseSession, scheduleAiTurnFinalize, startTicker, stopTicker]);
+  }, [attemptLiveRetry, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logSessionTimingStage, logSessionTimingSummary, logger, retryEmptyOpeningTurn, safeCloseSession, scheduleAiTurnFinalize, scheduleGenerationCompleteFallbackFinalize, startTicker, stopTicker]);
 
   startSessionRef.current = startSession;
 

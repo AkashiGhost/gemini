@@ -32,4 +32,39 @@ describe("selectLiveDisplayText", () => {
       "... getting louder.",
     )).toBe("I can hear it... getting louder.");
   });
+
+  it("deduplicates identical streamed chunks", () => {
+    expect(appendLiveDisplayText(
+      "Ghost: If I take control, none of it matters.",
+      "Ghost: If I take control, none of it matters.",
+    )).toBe("Ghost: If I take control, none of it matters.");
+  });
+
+  it("prefers cumulative chunks over re-appending the same prefix", () => {
+    expect(appendLiveDisplayText(
+      "Ghost: If I take control",
+      "Ghost: If I take control, none of it matters.",
+    )).toBe("Ghost: If I take control, none of it matters.");
+  });
+
+  it("merges overlapping streamed chunks without repeating the overlap", () => {
+    expect(appendLiveDisplayText(
+      "I can hear the water getting",
+      "getting louder now.",
+    )).toBe("I can hear the water getting louder now.");
+  });
+
+  it("does not merge unrelated words on a one-character overlap", () => {
+    expect(appendLiveDisplayText(
+      "build",
+      "distance",
+    )).toBe("build distance");
+  });
+
+  it("does not merge a word tail into a different word head on a one-character overlap", () => {
+    expect(appendLiveDisplayText(
+      "abandonment",
+      "hat comes without warning.",
+    )).toBe("abandonment hat comes without warning.");
+  });
 });
