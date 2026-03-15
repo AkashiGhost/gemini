@@ -18,4 +18,33 @@ describe("getSoundManifest", () => {
     expect(manifest.defaultVolumes.phone_ring).toBe(0.8);
     expect(manifest.timeline.length).toBeGreaterThan(0);
   });
+
+  it("uses an escalating layered bed for the-call ambient timeline", () => {
+    const manifest = getSoundManifest("the-call");
+
+    expect(manifest.timeline).toEqual(
+      expect.arrayContaining([
+        {
+          time: 0,
+          action: "start_ambient",
+          soundIds: ["call_bed", "room_ambience", "electrical_hum"],
+        },
+        {
+          time: 160,
+          action: "fade_in",
+          soundIds: ["phone_static"],
+          fadeInSeconds: 6,
+        },
+        {
+          time: 320,
+          action: "fade_in",
+          soundIds: ["sub_bass"],
+          fadeInSeconds: 10,
+        },
+      ]),
+    );
+    expect(manifest.defaultVolumes.call_bed).toBe(0.16);
+    expect(manifest.spatialMap.call_bed?.pan).toBe(0);
+    expect(manifest.defaultVolumes.room_ambience).toBe(0.18);
+  });
 });

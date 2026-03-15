@@ -555,9 +555,10 @@ export class SoundEngine {
   }
 
   /** Trigger a single sound cue (from LLM response) */
-  triggerCue(soundId: string, volume = 0.5): void {
-    console.log(`[SOUND] triggerCue(${soundId}) — volume=${volume}`);
-    this.play(soundId, volume, false);
+  triggerCue(soundId: string, volume?: number): void {
+    const effectiveVolume = volume ?? this.getDefaultVolume(soundId);
+    console.log(`[SOUND] triggerCue(${soundId}) — volume=${effectiveVolume}`);
+    this.play(soundId, effectiveVolume, false);
   }
 
   /** Tool-call-driven sound trigger path (authoritative, no cooldown). */

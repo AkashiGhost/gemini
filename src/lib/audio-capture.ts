@@ -60,6 +60,7 @@ export class AudioCapture {
   private audioCtx: AudioContext | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
   private workletNode: AudioWorkletNode | null = null;
+  private silentSinkNode: GainNode | null = null;
   private blobUrl: string | null = null;
   private isActive = false;
 
@@ -111,8 +112,11 @@ export class AudioCapture {
     };
 
     this.sourceNode.connect(this.workletNode);
-    // WorkletNode must be connected to destination to keep the audio graph running
-    this.workletNode.connect(this.audioCtx.destination);
+    // Keep the graph alive without routing mic monitoring back to the speakers.
+    this.silentSinkNode = this.audioCtx.createGain();
+    this.silentSinkNode.gain.value = 0;
+    this.workletNode.connect(this.silentSinkNode);
+    this.silentSinkNode.connect(this.audioCtx.destination);
 
     this.isActive = true;
   }
@@ -123,6 +127,7 @@ export class AudioCapture {
     this.isActive = false;
 
     this.workletNode?.disconnect();
+    this.silentSinkNode?.disconnect();
     this.sourceNode?.disconnect();
 
     for (const track of this.stream?.getTracks() ?? []) {
@@ -137,6 +142,7 @@ export class AudioCapture {
     }
 
     this.workletNode = null;
+    this.silentSinkNode = null;
     this.sourceNode = null;
     this.stream = null;
     this.audioCtx = null;

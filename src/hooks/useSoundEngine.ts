@@ -5,10 +5,9 @@
 // Story-aware: loads appropriate sounds and timeline per storyId.
 // ─────────────────────────────────────────────
 
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useEffect, useRef, useCallback, useMemo, useState } from "react";
 import { SoundEngine } from "@/lib/sound-engine";
 import { generateSoundsForStory } from "@/lib/synth-sounds";
-import { parseSoundCues } from "@/lib/sound-cue-parser";
 import { AUDIO_CONFIG } from "@/lib/config/audio";
 import { DEBUG_CONFIG } from "@/lib/config/debug";
 import type { LiveToolCallListener } from "@/lib/config/live-tools";
@@ -17,6 +16,7 @@ import { createLogger, extendCausalChain } from "@/lib/logging";
 import { MusicEngine } from "@/lib/music-engine";
 import { getStoryRuntimeProfile } from "@/lib/story-runtime";
 import {
+  detectNarrativeCueSoundIds,
   detectTranscriptIntentCueSoundIds,
   getTranscriptIntentCueRules,
   selectCuesOffCooldown,
@@ -24,7 +24,9 @@ import {
 import { useSoundPref } from "@/lib/sound-preferences";
 import type { SoundProfileId } from "@/lib/sound-profile";
 import { getSoundManifest } from "@/lib/audio/sound-manifests";
+import { getSoundAssetIds, getSoundAssets } from "@/lib/audio/sound-assets";
 import { AudioDirector } from "@/lib/audio/audio-director";
+import { TheCallStateDirector } from "@/lib/audio/the-call-state-director";
 
 const CUE_COOLDOWN_MS = AUDIO_CONFIG.cueCooldownMs;
 const TRANSCRIPT_INTENT_FALLBACK_DELAY_MS = AUDIO_CONFIG.transcriptIntentFallbackDelayMs;
@@ -39,6 +41,8 @@ interface UseSoundEngineOptions {
   isSpeaking: boolean;
   isPaused: boolean;
   lastAiText: string;
+  lastAiTranscriptText: string;
+  lastAiTranscriptSeq: number;
   lastUserTranscriptText: string;
   lastUserTranscriptSeq: number;
   onToolCall: (listener: LiveToolCallListener) => () => void;
@@ -53,23 +57,42 @@ export function useSoundEngine({
   isSpeaking,
   isPaused,
   lastAiText,
+  lastAiTranscriptText,
+  lastAiTranscriptSeq,
   lastUserTranscriptText,
   lastUserTranscriptSeq,
   onToolCall,
 }: UseSoundEngineOptions) {
   const logger = useMemo(() => createLogger("useSoundEngine"), []);
   const runtimeProfile = useMemo(() => getStoryRuntimeProfile(soundProfileId), [soundProfileId]);
+  const useTheCallStateDirector = useMemo(
+    () => soundProfileId === "the-call" && runtimeProfile.audioArchitecture === "state_director_v2_candidate",
+    [runtimeProfile.audioArchitecture, soundProfileId],
+  );
+  const enableReactiveCueFallback = useMemo(
+    () => !useTheCallStateDirector && (runtimeProfile.soundStrategy === "timeline_scripted" || soundProfileId === "the-call"),
+    [runtimeProfile.soundStrategy, soundProfileId, useTheCallStateDirector],
+  );
   const soundOn = useSoundPref();
   const engineRef = useRef<SoundEngine | null>(null);
   const musicEngineRef = useRef<MusicEngine | null>(null);
   const audioDirectorRef = useRef<AudioDirector | null>(null);
+  const theCallStateDirectorRef = useRef<TheCallStateDirector | null>(null);
+  const [theCallDirectorReadyRevision, setTheCallDirectorReadyRevision] = useState(0);
   const initStartedRef = useRef(false);
+  const isSpeakingRef = useRef(isSpeaking);
   // Tracks whether we've already fired the phone-pickup sequence for "the-call"
   const hasPickedUpRef = useRef(false);
+  // Tracks stateful flood escalation for "the-call".
+  const theCallWaterStageRef = useRef(0);
   // Tracks cooldowns for keyword-triggered sound cues (soundId → timestamp)
   const cueCooldownsRef = useRef<Map<string, number>>(new Map());
   // Timestamp for latest authoritative trigger_sound tool call.
   const lastToolSoundTriggerAtRef = useRef(0);
+
+  useEffect(() => {
+    isSpeakingRef.current = isSpeaking;
+  }, [isSpeaking]);
 
   // ── Initialize engine when game starts playing ────────────
   // Configurable delay defaults to 0. We still keep it tunable for debugging.
@@ -88,6 +111,8 @@ export function useSoundEngine({
         });
 
         const manifest = getSoundManifest(soundProfileId);
+        const soundAssets = getSoundAssets(soundProfileId);
+        const authoredAssetIds = getSoundAssetIds(soundProfileId);
         const engine = new SoundEngine({
           ttsDucking: AUDIO_CONFIG.ttsDucking,
           crossfadeDefaultMs: AUDIO_CONFIG.crossfadeDefaultMs,
@@ -100,10 +125,24 @@ export function useSoundEngine({
         if (cancelled) return;
         engine.setSoundEnabled(soundOn, 0);
 
+        if (soundAssets.length > 0) {
+          await engine.preload(soundAssets);
+          if (cancelled) return;
+        }
+
         // Generate and register story-specific synthetic sounds
         const sounds = await generateSoundsForStory(soundProfileId);
         if (cancelled) return;
         for (const [id, buffer] of Object.entries(sounds)) {
+          if (authoredAssetIds.has(id)) {
+            logger.info({
+              event: "sound.synthetic_skipped_for_authored_asset",
+              sessionId,
+              causalChain: ["sound.init_start", "sound.synthetic_skipped_for_authored_asset"],
+              data: { soundId: id, storyId, soundProfileId },
+            });
+            continue;
+          }
           engine.registerBuffer(id, buffer);
         }
 
@@ -112,9 +151,30 @@ export function useSoundEngine({
           engine,
           manifest,
         });
+        theCallStateDirectorRef.current = useTheCallStateDirector
+          ? new TheCallStateDirector(engine)
+          : null;
+        if (useTheCallStateDirector) {
+          setTheCallDirectorReadyRevision((revision) => revision + 1);
+          logger.info({
+            event: "sound.the_call_state_director.ready",
+            sessionId,
+            causalChain: ["sound.init_start", "sound.the_call_state_director.ready"],
+            data: { storyId, soundProfileId },
+          });
+        }
 
         // Start the story-specific timeline
         engine.startTimeline(manifest.timeline);
+
+        if (storyId === "the-call") {
+          if (isSpeakingRef.current) {
+            hasPickedUpRef.current = true;
+            engine.play("pickup_click", manifest.defaultVolumes.pickup_click ?? 0.9, false);
+          } else {
+            engine.play("phone_ring", manifest.defaultVolumes.phone_ring ?? 0.8, true);
+          }
+        }
 
         if (!LYRIA_RUNTIME_CONFIG.enabled || !enableAdaptiveMusic) {
           logger.info({
@@ -171,7 +231,14 @@ export function useSoundEngine({
       cancelled = true;
       clearTimeout(delayTimer);
     };
-  }, [enableAdaptiveMusic, logger, sessionId, soundOn, soundProfileId, status, storyId]);
+  }, [enableAdaptiveMusic, logger, sessionId, soundOn, soundProfileId, status, storyId, useTheCallStateDirector]);
+
+  useEffect(() => {
+    hasPickedUpRef.current = false;
+    theCallWaterStageRef.current = 0;
+    theCallStateDirectorRef.current?.reset();
+    setTheCallDirectorReadyRevision(0);
+  }, [soundProfileId, storyId]);
 
   // ── TTS Ducking ───────────────────────────────────────
   useEffect(() => {
@@ -213,6 +280,29 @@ export function useSoundEngine({
     engine.stop("phone_ring", 0); // hard stop — ring cuts immediately
     engine.play("pickup_click", 0.9, false); // one-shot click
   }, [isSpeaking, storyId]);
+
+  const applyTheCallReactiveLayer = useCallback((engine: SoundEngine, cueId: string) => {
+    if (soundProfileId !== "the-call") return;
+    if (cueId !== "water_drip") return;
+
+    const stage = theCallWaterStageRef.current;
+
+    if (stage === 0) {
+      engine.handleToolCall("water_leak_loop", 0.12, true, 2.5);
+      theCallWaterStageRef.current = 1;
+      return;
+    }
+
+    if (stage === 1) {
+      engine.setVolume("water_leak_loop", 0.16, 2);
+      engine.handleToolCall("water_rising_loop", 0.16, true, 3);
+      theCallWaterStageRef.current = 2;
+      return;
+    }
+
+    engine.setVolume("water_leak_loop", 0.18, 1.5);
+    engine.setVolume("water_rising_loop", 0.22, 1.5);
+  }, [soundProfileId]);
 
   // ── Authoritative tool-call path ───────────────────────────
   useEffect(() => {
@@ -270,19 +360,21 @@ export function useSoundEngine({
     return () => unsubscribe();
   }, [logger, onToolCall, sessionId]);
 
-  // ── Keyword-based reactive sound cues ─────────────────
-  // Parse AI narration text for keywords that match story sounds.
-  // Triggers one-shot cues via triggerCue() with a per-sound cooldown.
+  // ── Reactive narration cues ───────────────────────────
+  // "the-call" still needs deterministic cue fallback even in live mode because
+  // its authored sound design depends on narration and transcript intent moments.
   useEffect(() => {
-    if (runtimeProfile.soundStrategy !== "timeline_scripted") return;
+    if (!enableReactiveCueFallback) return;
     if (!DEBUG_CONFIG.enableKeywordCueFallback) return;
     if (!lastAiText || status !== "playing") return;
     const engine = engineRef.current;
     if (!engine) return;
+    const rules = getTranscriptIntentCueRules(storyId);
 
-    const { cues } = parseSoundCues(lastAiText);
+    const detectedCueIds = detectNarrativeCueSoundIds(lastAiText, rules);
+    if (detectedCueIds.length === 0) return;
     const selection = selectCuesOffCooldown(
-      cues.map((cue) => cue.soundId),
+      detectedCueIds,
       cueCooldownsRef.current,
       { nowMs: Date.now(), cooldownMs: CUE_COOLDOWN_MS },
     );
@@ -293,15 +385,16 @@ export function useSoundEngine({
 
     for (const cueId of selection.readyCueIds) {
       console.log(`[USE-SOUND] Inline cue triggered: "${cueId}"`);
+      applyTheCallReactiveLayer(engine, cueId);
       engine.triggerCue(cueId);
     }
-  }, [lastAiText, runtimeProfile.soundStrategy, status, storyId]);
+  }, [applyTheCallReactiveLayer, enableReactiveCueFallback, lastAiText, status, storyId]);
 
   // ── Deterministic transcript intent fallback (tool-call aware) ──
   // If no authoritative trigger_sound arrives shortly after a user turn,
   // map transcript intent keywords to a deterministic cue list.
   useEffect(() => {
-    if (runtimeProfile.soundStrategy !== "timeline_scripted") return;
+    if (!enableReactiveCueFallback) return;
     if (!DEBUG_CONFIG.enableKeywordCueFallback) return;
     if (status !== "playing") return;
     if (!lastUserTranscriptText.trim()) return;
@@ -347,12 +440,13 @@ export function useSoundEngine({
           causalChain: ["sound.transcript_fallback", "triggered"],
           data: { soundId: cueId, storyId, lastUserTranscriptSeq },
         });
+        applyTheCallReactiveLayer(engine, cueId);
         engine.triggerCue(cueId);
       }
     }, TRANSCRIPT_INTENT_FALLBACK_DELAY_MS);
 
     return () => clearTimeout(timer);
-  }, [lastUserTranscriptSeq, lastUserTranscriptText, logger, runtimeProfile.soundStrategy, sessionId, status, storyId]);
+  }, [applyTheCallReactiveLayer, enableReactiveCueFallback, lastUserTranscriptSeq, lastUserTranscriptText, logger, sessionId, status, storyId]);
 
   function detectMeAndMesAudioEvent(text: string): "threshold_entered" | "ending_reached" | null {
     const normalized = text.trim().toLowerCase();
@@ -409,6 +503,70 @@ export function useSoundEngine({
 
   // ── Cleanup on game end ───────────────────────────────
   useEffect(() => {
+    if (!useTheCallStateDirector) return;
+    if (status !== "playing") return;
+    if (!lastUserTranscriptText.trim()) return;
+    const director = theCallStateDirectorRef.current;
+    if (!director) return;
+
+    const actions = director.applyUserInstruction(lastUserTranscriptSeq, lastUserTranscriptText);
+    if (actions.length === 0) return;
+
+    logger.info({
+      event: "sound.the_call_state_director.user_actions_applied",
+      sessionId,
+      causalChain: ["sound.the_call_state_director", "user_actions_applied"],
+      data: {
+        storyId,
+        transcriptSeq: lastUserTranscriptSeq,
+        transcriptText: lastUserTranscriptText,
+        actions,
+      },
+    });
+  }, [
+    lastUserTranscriptSeq,
+    lastUserTranscriptText,
+    logger,
+    sessionId,
+    status,
+    storyId,
+    theCallDirectorReadyRevision,
+    useTheCallStateDirector,
+  ]);
+
+  useEffect(() => {
+    if (!useTheCallStateDirector) return;
+    if (status !== "playing") return;
+    if (!lastAiTranscriptText.trim()) return;
+    const director = theCallStateDirectorRef.current;
+    if (!director) return;
+
+    const actions = director.applyAiNarration(lastAiTranscriptText);
+    if (actions.length === 0) return;
+
+    logger.info({
+      event: "sound.the_call_state_director.ai_actions_applied",
+      sessionId,
+      causalChain: ["sound.the_call_state_director", "ai_actions_applied"],
+      data: {
+        storyId,
+        transcriptSeq: lastAiTranscriptSeq,
+        transcriptText: lastAiTranscriptText,
+        actions,
+      },
+    });
+  }, [
+    lastAiTranscriptSeq,
+    lastAiTranscriptText,
+    logger,
+    sessionId,
+    status,
+    storyId,
+    theCallDirectorReadyRevision,
+    useTheCallStateDirector,
+  ]);
+
+  useEffect(() => {
     if (status === "ended" || status === "error") {
       const engine = engineRef.current;
       const musicEngine = musicEngineRef.current;
@@ -422,6 +580,8 @@ export function useSoundEngine({
         initStartedRef.current = false;
       }
       audioDirectorRef.current = null;
+      theCallStateDirectorRef.current = null;
+      setTheCallDirectorReadyRevision(0);
     }
   }, [status]);
 
@@ -439,6 +599,7 @@ export function useSoundEngine({
         engineRef.current = null;
       }
       audioDirectorRef.current = null;
+      theCallStateDirectorRef.current = null;
     };
   }, []);
 

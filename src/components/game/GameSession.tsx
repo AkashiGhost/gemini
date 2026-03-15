@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { useSoundEngine } from "@/hooks/useSoundEngine";
 import { stripSoundMarkers } from "@/lib/sound-cue-parser";
@@ -9,6 +9,10 @@ import { setSoundPref, useSoundPref } from "@/lib/sound-preferences";
 import { AtmosphereLayer } from "./AtmosphereLayer";
 import { BreathingDot } from "@/components/ui/BreathingDot";
 import type { SoundProfileId } from "@/lib/sound-profile";
+import {
+  getLatestTranscriptEntryBySource,
+  getTranscriptSequenceForSource,
+} from "@/lib/transcript-utils";
 
 // ─────────────────────────────────────────────
 // Game Session — Gemini Live API version
@@ -65,6 +69,15 @@ export function GameSession({
   const [debugInput, setDebugInput] = useState("");
 
   const showAtmosphere = ATMOSPHERE_STORIES.has(storyId);
+  const lastCommittedAiTranscript = useMemo(
+    () => getLatestTranscriptEntryBySource(transcript, "ai"),
+    [transcript],
+  );
+  const lastAiTranscriptText = lastCommittedAiTranscript?.text ?? "";
+  const lastAiTranscriptSeq = useMemo(
+    () => getTranscriptSequenceForSource(transcript, "ai"),
+    [transcript],
+  );
 
   // ── Responsive dot size: 12px mobile, 20px desktop (≥768px) ──────────
   const [dotSize, setDotSize] = useState(12);
@@ -86,6 +99,8 @@ export function GameSession({
     isSpeaking,
     isPaused,
     lastAiText,
+    lastAiTranscriptText,
+    lastAiTranscriptSeq,
     lastUserTranscriptText,
     lastUserTranscriptSeq,
     onToolCall,

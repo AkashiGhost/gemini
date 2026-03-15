@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  detectNarrativeCueSoundIds,
   detectTranscriptIntentCueSoundIds,
   getTranscriptIntentCueRules,
   selectCuesOffCooldown,
@@ -26,6 +27,19 @@ describe("detectTranscriptIntentCueSoundIds", () => {
     );
 
     expect(cues).toEqual(["footsteps", "door_slam", "keypad_beep"]);
+  });
+});
+
+describe("detectNarrativeCueSoundIds", () => {
+  it("merges inline markers with keyword-derived fallback cues", () => {
+    const rules = getTranscriptIntentCueRules("the-call");
+
+    const cues = detectNarrativeCueSoundIds(
+      "[SOUND:door_creak] Water starts dripping behind you while you reach the keypad.",
+      rules,
+    );
+
+    expect(cues).toEqual(["door_creak", "keypad_beep", "water_drip"]);
   });
 });
 

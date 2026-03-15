@@ -145,10 +145,13 @@ def main() -> int:
             print(f"Dev server is healthy at {base_url}")
 
         env["APP_URL"] = base_url
+        if env.get("PLAY_STORY") == "the-call" and "EXPECT_CONSOLE_MARKER" not in env:
+            env["EXPECT_CONSOLE_MARKER"] = "sound.the_call_state_director.ai_actions_applied"
 
         run_step("Lint (creator scope)", [npm, "run", "lint:creator"], env=env)
         run_step("Contract tests", [npm, "run", "test:creator:contract"], env=env)
         run_step("Closed-loop scenario", [npm, "run", "test:scenario"], env=env)
+        run_step("The Call audio contract", [npm, "run", "test:the-call:audio"], env=env)
         run_step("UI E2E (headless)", [npm, "run", "test:e2e:ui"], env=env)
 
         print("\nAll verification steps passed.")

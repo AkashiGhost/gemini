@@ -12,6 +12,7 @@
     "test:creator:contract": "vitest run tests/contract/creator-interview.route.test.ts tests/contract/creator-image.route.test.ts tests/contract/creator-story-pack.route.test.ts",
     "test:watch": "vitest",
     "test:scenario": "tsx scripts/closed-loop-scenario.ts",
+    "test:the-call:audio": "tsx scripts/verify-the-call-audio.ts",
     "test:e2e:ui": "python scripts/e2e_test.py",
     "verify:loop": "python scripts/verify_loop.py",
     "verify:loop:manual": "npm run lint:creator && npm run test:creator:contract && npm run test:scenario && npm run test:e2e:ui",

@@ -5,7 +5,7 @@ describe("getOpeningTurnUnlockDecision", () => {
   it("keeps the opening turn locked while playback is still draining", () => {
     expect(getOpeningTurnUnlockDecision(640)).toEqual({
       unlockNow: false,
-      unlockAfterMs: 715,
+      unlockAfterMs: 920,
     });
   });
 

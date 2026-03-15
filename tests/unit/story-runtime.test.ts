@@ -6,10 +6,15 @@ describe("story runtime profile", () => {
     expect(getStoryRuntimeProfile("the-call")).toEqual({
       runtimeMode: "live",
       soundStrategy: "ambient_first_live",
+      audioArchitecture: "state_director_v2_candidate",
+      fallbackAudioArchitecture: "hybrid_fallback_v1",
+      candidateAudioArchitecture: "state_director_v2_candidate",
     });
     expect(getStoryRuntimeProfile("the-last-session")).toEqual({
       runtimeMode: "live",
       soundStrategy: "ambient_first_live",
+      audioArchitecture: "hybrid_fallback_v1",
+      fallbackAudioArchitecture: "hybrid_fallback_v1",
     });
   });
 
@@ -17,10 +22,14 @@ describe("story runtime profile", () => {
     expect(getStoryRuntimeProfile("the-lighthouse")).toEqual({
       runtimeMode: "scripted",
       soundStrategy: "timeline_scripted",
+      audioArchitecture: "authored_timeline_v1",
+      fallbackAudioArchitecture: "authored_timeline_v1",
     });
     expect(getStoryRuntimeProfile("room-4b")).toEqual({
       runtimeMode: "scripted",
       soundStrategy: "timeline_scripted",
+      audioArchitecture: "authored_timeline_v1",
+      fallbackAudioArchitecture: "authored_timeline_v1",
     });
   });
 

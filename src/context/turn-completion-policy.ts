@@ -1,4 +1,5 @@
-const PLAYBACK_SETTLE_MS = 75;
+// Give the tail of streamed voice playback time to drain before the turn unlocks.
+const PLAYBACK_SETTLE_MS = 280;
 
 export interface OpeningTurnUnlockDecision {
   unlockNow: boolean;

@@ -17,14 +17,37 @@ from playwright.sync_api import sync_playwright
 
 APP_URL = os.environ.get("APP_URL", "http://127.0.0.1:3000")
 STORY_ID = os.environ.get("PLAY_STORY", "the-last-session")
+EXPECT_CONSOLE_MARKER = os.environ.get("EXPECT_CONSOLE_MARKER", "")
 SHOT_DIR = Path(tempfile.gettempdir()) / "innerplay-e2e"
 SHOT_DIR.mkdir(parents=True, exist_ok=True)
 
-SCENE_TEXT = [
-    "You are a therapist. It's late. Your last patient has arrived.",
-    "She sits across from you. Something about her feels... familiar.",
-    "The door locks behind her. The session has begun.",
-]
+STORY_CONFIGS = {
+    "the-last-session": {
+        "scene_text": [
+            "You are a therapist. It's late. Your last patient has arrived.",
+            "She sits across from you. Something about her feels... familiar.",
+            "The door locks behind her. The session has begun.",
+        ],
+        "transcript_label": "ELARA",
+        "wait_iterations": 25,
+        "console_marker": "",
+    },
+    "the-call": {
+        "scene_text": [
+            "Your phone rings. An unknown number. You answer.",
+            "On the other end — someone trapped in a concrete room underground. They need your help to escape.",
+            "'Please don't hang up. I don't know where I am.' Guide them out. Your voice is all they have.",
+        ],
+        "transcript_label": "ALEX",
+        "wait_iterations": 45,
+        "console_marker": "sound.the_call_state_director.ai_actions_applied",
+    },
+}
+STORY_CONFIG = STORY_CONFIGS.get(STORY_ID, STORY_CONFIGS["the-last-session"])
+SCENE_TEXT = STORY_CONFIG["scene_text"]
+TRANSCRIPT_LABEL = str(STORY_CONFIG["transcript_label"])
+WAIT_ITERATIONS = int(STORY_CONFIG["wait_iterations"])
+REQUIRED_CONSOLE_MARKER = EXPECT_CONSOLE_MARKER or str(STORY_CONFIG["console_marker"])
 ERROR_MARKERS = [
     "MICROPHONE BLOCKED",
     "SESSION DELAYED",
@@ -47,17 +70,23 @@ def safe_print(message: str):
     print(message.encode("ascii", "replace").decode("ascii"))
 
 
-def extract_opening_line(body_text: str) -> str:
+def normalize_line(value: str) -> str:
+    return " ".join(value.strip().split()).upper()
+
+
+def extract_opening_line(body_text: str, transcript_label: str) -> str:
     lines = [line.strip() for line in body_text.splitlines() if line.strip()]
+    transcript_label_normalized = normalize_line(transcript_label)
+    ignored_lines = {normalize_line(line) for line in NON_TRANSCRIPT_LINES}
+    ignored_lines.update(normalize_line(line) for line in SCENE_TEXT)
     for index, line in enumerate(lines):
-        if line != "ELARA":
+        if normalize_line(line) != transcript_label_normalized:
             continue
         for candidate in lines[index + 1:]:
-            if candidate in NON_TRANSCRIPT_LINES:
+            candidate_normalized = normalize_line(candidate)
+            if candidate_normalized in ignored_lines:
                 continue
-            if candidate in SCENE_TEXT:
-                continue
-            if candidate == "ELARA":
+            if candidate_normalized == transcript_label_normalized:
                 continue
             return candidate
     return ""
@@ -108,20 +137,23 @@ def run_test() -> int:
         page.screenshot(path=str(SHOT_DIR / "04_session_starting.png"), full_page=True)
         page.wait_for_timeout(1000)
         has_error_marker = False
-        for _ in range(25):
+        for _ in range(WAIT_ITERATIONS):
             body_text = page.locator("body").inner_text()
             has_error_marker = any(marker in body_text for marker in ERROR_MARKERS)
             if has_error_marker:
                 break
-            if "ELARA" in body_text and "preparing the session..." not in body_text:
+            if normalize_line(TRANSCRIPT_LABEL) in normalize_line(body_text) and "preparing the session..." not in body_text:
                 break
             page.wait_for_timeout(1000)
 
         body_text = page.locator("body").inner_text()
         print(body_text[:800])
         check(not has_error_marker, f"Session entered error state: {body_text[:200]}")
-        opening_line = extract_opening_line(body_text)
-        check("ELARA" in body_text, "Live transcript label did not appear")
+        opening_line = extract_opening_line(body_text, TRANSCRIPT_LABEL)
+        check(
+            normalize_line(TRANSCRIPT_LABEL) in normalize_line(body_text),
+            f"Live transcript label {TRANSCRIPT_LABEL!r} did not appear",
+        )
         check(bool(opening_line), "Opening narration did not appear in the transcript")
         check(
             all(scene_text not in body_text for scene_text in SCENE_TEXT[-1:]),
@@ -129,6 +161,12 @@ def run_test() -> int:
         )
         if opening_line:
             safe_print(f"  Opening line: {opening_line}")
+        if REQUIRED_CONSOLE_MARKER:
+            page.wait_for_timeout(500)
+            check(
+                any(REQUIRED_CONSOLE_MARKER in log for log in logs),
+                f"Console marker {REQUIRED_CONSOLE_MARKER!r} did not appear",
+            )
 
         page.screenshot(path=str(SHOT_DIR / "05_live_opening_turn.png"), full_page=True)
 

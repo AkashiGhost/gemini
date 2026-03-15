@@ -1,3 +1,4 @@
+import { parseSoundCues } from "@/lib/sound-cue-parser";
 import { TRANSCRIPT_INTENT_CUE_RULES, type TranscriptIntentCueRule } from "@/lib/config/audio";
 
 const SPACE_RE = /\s+/g;
@@ -41,6 +42,32 @@ export function detectTranscriptIntentCueSoundIds(
   }
 
   return cueIds;
+}
+
+function appendUniqueCueIds(target: string[], seen: Set<string>, cueIds: readonly string[]): void {
+  for (const cueId of cueIds) {
+    if (!cueId || seen.has(cueId)) continue;
+    seen.add(cueId);
+    target.push(cueId);
+  }
+}
+
+export function detectNarrativeCueSoundIds(
+  text: string,
+  rules: readonly TranscriptIntentCueRule[],
+): string[] {
+  const mergedCueIds: string[] = [];
+  const seen = new Set<string>();
+  const { cues } = parseSoundCues(text);
+
+  appendUniqueCueIds(
+    mergedCueIds,
+    seen,
+    cues.map((cue) => cue.soundId),
+  );
+  appendUniqueCueIds(mergedCueIds, seen, detectTranscriptIntentCueSoundIds(text, rules));
+
+  return mergedCueIds;
 }
 
 export interface CooldownSelectionResult {

@@ -42,7 +42,17 @@ export const TRANSCRIPT_INTENT_CUE_RULES: Record<string, readonly TranscriptInte
     },
     {
       soundId: "keypad_beep",
-      keywords: ["keypad", "key code", "type the code", "enter code", "beep"],
+      keywords: [
+        "keypad",
+        "key code",
+        "type the code",
+        "enter code",
+        "press the keypad",
+        "punch in the code",
+        "tap the keys",
+        "buttons",
+        "beep",
+      ],
     },
     {
       soundId: "metal_scrape",
@@ -54,7 +64,7 @@ export const TRANSCRIPT_INTENT_CUE_RULES: Record<string, readonly TranscriptInte
     },
     {
       soundId: "water_drip",
-      keywords: ["water", "drip", "leak", "dripping"],
+      keywords: ["water", "drip", "leak", "dripping", "running water", "water starts"],
     },
     {
       soundId: "heavy_breathing",
@@ -69,7 +79,7 @@ export const TRANSCRIPT_INTENT_CUE_RULES: Record<string, readonly TranscriptInte
 
 export const AUDIO_CONFIG = {
   engineInitDelayMs: 0,
-  cueCooldownMs: 30_000,
+  cueCooldownMs: 8_000,
   transcriptIntentFallbackDelayMs: 900,
   transcriptIntentToolPriorityWindowMs: 2_200,
   defaultCueVolume: 0.5,
