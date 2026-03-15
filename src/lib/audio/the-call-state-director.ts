@@ -50,6 +50,11 @@ function hasMovementIntent(text: string): boolean {
   return hasAny(text, ["left", "right", "stairs", "corridor", "junction", "go ", "move", "walk", "run", "hurry", "head "]);
 }
 
+const THE_CALL_MOVEMENT_CUE_VOLUMES = {
+  slow: 0.78,
+  fast: 0.86,
+} as const;
+
 function hasForceDoorIntent(text: string): boolean {
   return hasAny(text, [
     "force the door",
@@ -156,6 +161,55 @@ function isLoopResetNarration(text: string): boolean {
   ]);
 }
 
+function inferMovementNarrationCue(
+  text: string,
+  previousLocation: TheCallLocation,
+  nextLocation: TheCallLocation,
+  interactionFocus: TheCallInteractionFocus,
+): "footsteps" | "footsteps_fast" | null {
+  const hasMovementLanguage = hasAny(text, [
+    "i'm moving",
+    "im moving",
+    "i'm walking",
+    "im walking",
+    "i'm heading",
+    "im heading",
+    "i'm going",
+    "im going",
+    "down the stairs",
+    "into the corridor",
+    "through the corridor",
+    "toward the door",
+    "towards the door",
+    "i turn",
+    "i'm turning",
+    "im turning",
+    "i run",
+    "i'm running",
+    "im running",
+    "i hurry",
+    "i'm hurrying",
+    "im hurrying",
+  ]);
+  const locationShifted = previousLocation !== nextLocation;
+  if (!hasMovementLanguage && !(interactionFocus === "movement" && locationShifted)) {
+    return null;
+  }
+
+  const fast = hasAny(text, [
+    "run",
+    "running",
+    "sprint",
+    "hurry",
+    "hurrying",
+    "rush",
+    "rushing",
+    "bolt",
+    "bolting",
+  ]);
+  return fast ? "footsteps_fast" : "footsteps";
+}
+
 export class TheCallStateDirector {
   private readonly engine: TheCallAudioDirectorEngine;
   private state: TheCallAudioState = {
@@ -249,7 +303,10 @@ export class TheCallStateDirector {
       this.state.interactionFocus = "movement";
       const isFast = hasAny(normalized, ["run", "hurry", "sprint"]);
       const soundId = isFast ? "footsteps_fast" : "footsteps";
-      this.engine.triggerCue(soundId);
+      this.engine.triggerCue(
+        soundId,
+        isFast ? THE_CALL_MOVEMENT_CUE_VOLUMES.fast : THE_CALL_MOVEMENT_CUE_VOLUMES.slow,
+      );
       actions.push(this.snapshotAction(isFast ? "movement_fast" : "movement_slow", soundId));
       return actions;
     }
@@ -275,12 +332,33 @@ export class TheCallStateDirector {
       actions.push(this.snapshotAction("loop_reset"));
     }
 
+    const previousLocation = this.state.location;
     const inferredLocation = inferLocation(normalized, this.state.location);
     if (inferredLocation !== this.state.location || this.lastAppliedLocation === null) {
       this.state.location = inferredLocation;
       actions.push(...this.applyLocationMix());
     } else {
       this.state.location = inferredLocation;
+    }
+
+    const movementNarrationSoundId = inferMovementNarrationCue(
+      normalized,
+      previousLocation,
+      inferredLocation,
+      this.state.interactionFocus,
+    );
+    if (movementNarrationSoundId) {
+      const isFast = movementNarrationSoundId === "footsteps_fast";
+      this.engine.triggerCue(
+        movementNarrationSoundId,
+        isFast ? THE_CALL_MOVEMENT_CUE_VOLUMES.fast : THE_CALL_MOVEMENT_CUE_VOLUMES.slow,
+      );
+      actions.push(
+        this.snapshotAction(
+          isFast ? "movement_followthrough_fast" : "movement_followthrough_slow",
+          movementNarrationSoundId,
+        ),
+      );
     }
 
     const targetWater = inferWaterTarget(normalized, this.state.waterLevel);
@@ -293,18 +371,15 @@ export class TheCallStateDirector {
     if (targetTension > this.state.tensionLevel) {
       this.state.tensionLevel = targetTension;
       if (targetTension >= 2) {
-        this.engine.triggerCue("heavy_breathing");
-        actions.push(this.snapshotAction("tension_peak", "heavy_breathing"));
+        actions.push(this.snapshotAction("tension_peak"));
       } else {
-        this.engine.triggerCue("anxious_breathing");
-        actions.push(this.snapshotAction("tension_rise", "anxious_breathing"));
+        actions.push(this.snapshotAction("tension_rise"));
       }
     }
 
     if (hasGasReleaseNarration(normalized)) {
       this.state.tensionLevel = Math.max(this.state.tensionLevel, 3) as 0 | 1 | 2 | 3;
-      this.engine.triggerCue("heavy_breathing");
-      actions.push(this.snapshotAction("gas_release", "heavy_breathing"));
+      actions.push(this.snapshotAction("gas_release"));
     }
 
     if (hasDisconnectNarration(normalized)) {

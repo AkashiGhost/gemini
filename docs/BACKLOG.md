@@ -14,6 +14,11 @@ This file tracks pending features, architectural ideas, and future work items fo
 - Add bounded reconnect policy for transient close codes (`1011`, network reset) with strict cap.
 - Improve user-facing errors for model-not-found vs quota vs auth vs microphone.
 
+### P0 - Audio Architecture Hygiene
+- Keep `docs/audio-architecture-log.md` as the canonical record of tried, active, and failed audio architectures.
+- Test `state_director_v2_candidate` on `the-call` only while preserving `hybrid_fallback_v1` as fallback.
+- Record any promotion or rollback decision in the architecture log before changing the active selector.
+
 ### P1 - Directional Sound
 - Introduce world-space audio entities (`entityId`, `x`, `y`, `velocity`, `bus`, `gain`, `pan`).
 - Add moving cue support (e.g., footsteps left-to-right over time) with interpolation.

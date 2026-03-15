@@ -8,3 +8,13 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+.venv-audio/
+.venv-audio311/
+.tmp_audio_tests/
+.tmp_models/
+.tmp_hf_stable_audio_open_small/
+.tmp_*/
+.tmp_*.py
+.tmp_*.json
+.tmp_*.png
+.playwright-cli/

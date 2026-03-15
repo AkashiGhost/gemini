@@ -31,6 +31,9 @@ import { TheCallStateDirector } from "@/lib/audio/the-call-state-director";
 const CUE_COOLDOWN_MS = AUDIO_CONFIG.cueCooldownMs;
 const TRANSCRIPT_INTENT_FALLBACK_DELAY_MS = AUDIO_CONFIG.transcriptIntentFallbackDelayMs;
 const TRANSCRIPT_TOOL_PRIORITY_WINDOW_MS = AUDIO_CONFIG.transcriptIntentToolPriorityWindowMs;
+const DISABLED_SOUND_IDS_BY_PROFILE: Partial<Record<SoundProfileId, ReadonlySet<string>>> = {
+  "the-call": new Set(["anxious_breathing", "heavy_breathing"]),
+};
 
 interface UseSoundEngineOptions {
   storyId: string;
@@ -46,6 +49,10 @@ interface UseSoundEngineOptions {
   lastUserTranscriptText: string;
   lastUserTranscriptSeq: number;
   onToolCall: (listener: LiveToolCallListener) => () => void;
+}
+
+function isSoundIdBlocked(soundProfileId: SoundProfileId, soundId: string): boolean {
+  return DISABLED_SOUND_IDS_BY_PROFILE[soundProfileId]?.has(soundId) ?? false;
 }
 
 export function useSoundEngine({
@@ -311,6 +318,15 @@ export function useSoundEngine({
       const musicEngine = musicEngineRef.current;
 
       if (toolCall.name === "trigger_sound" && engine) {
+        if (isSoundIdBlocked(soundProfileId, toolCall.args.soundId)) {
+          logger.info({
+            event: "tool.trigger_sound.blocked",
+            sessionId,
+            causalChain: extendCausalChain(toolCall.causalChain, "tool.trigger_sound.blocked"),
+            data: { soundId: toolCall.args.soundId, storyId, soundProfileId },
+          });
+          return;
+        }
         const now = Date.now();
         lastToolSoundTriggerAtRef.current = now;
         cueCooldownsRef.current.set(toolCall.args.soundId, now);
@@ -358,7 +374,7 @@ export function useSoundEngine({
     });
 
     return () => unsubscribe();
-  }, [logger, onToolCall, sessionId]);
+  }, [logger, onToolCall, sessionId, soundProfileId, storyId]);
 
   // ── Reactive narration cues ───────────────────────────
   // "the-call" still needs deterministic cue fallback even in live mode because
@@ -384,11 +400,20 @@ export function useSoundEngine({
     }
 
     for (const cueId of selection.readyCueIds) {
+      if (isSoundIdBlocked(soundProfileId, cueId)) {
+        logger.info({
+          event: "sound.inline_cue.blocked",
+          sessionId,
+          causalChain: ["sound.inline_cue", "blocked"],
+          data: { soundId: cueId, storyId, soundProfileId },
+        });
+        continue;
+      }
       console.log(`[USE-SOUND] Inline cue triggered: "${cueId}"`);
       applyTheCallReactiveLayer(engine, cueId);
       engine.triggerCue(cueId);
     }
-  }, [applyTheCallReactiveLayer, enableReactiveCueFallback, lastAiText, status, storyId]);
+  }, [applyTheCallReactiveLayer, enableReactiveCueFallback, lastAiText, logger, sessionId, soundProfileId, status, storyId]);
 
   // ── Deterministic transcript intent fallback (tool-call aware) ──
   // If no authoritative trigger_sound arrives shortly after a user turn,
@@ -434,6 +459,15 @@ export function useSoundEngine({
       }
 
       for (const cueId of selection.readyCueIds) {
+        if (isSoundIdBlocked(soundProfileId, cueId)) {
+          logger.info({
+            event: "sound.transcript_fallback.blocked",
+            sessionId,
+            causalChain: ["sound.transcript_fallback", "blocked"],
+            data: { soundId: cueId, storyId, soundProfileId, lastUserTranscriptSeq },
+          });
+          continue;
+        }
         logger.info({
           event: "sound.transcript_fallback.triggered",
           sessionId,
@@ -446,7 +480,7 @@ export function useSoundEngine({
     }, TRANSCRIPT_INTENT_FALLBACK_DELAY_MS);
 
     return () => clearTimeout(timer);
-  }, [applyTheCallReactiveLayer, enableReactiveCueFallback, lastUserTranscriptSeq, lastUserTranscriptText, logger, sessionId, status, storyId]);
+  }, [applyTheCallReactiveLayer, enableReactiveCueFallback, lastUserTranscriptSeq, lastUserTranscriptText, logger, sessionId, soundProfileId, status, storyId]);
 
   function detectMeAndMesAudioEvent(text: string): "threshold_entered" | "ending_reached" | null {
     const normalized = text.trim().toLowerCase();

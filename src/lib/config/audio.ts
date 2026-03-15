@@ -67,10 +67,6 @@ export const TRANSCRIPT_INTENT_CUE_RULES: Record<string, readonly TranscriptInte
       keywords: ["water", "drip", "leak", "dripping", "running water", "water starts"],
     },
     {
-      soundId: "heavy_breathing",
-      keywords: ["breathe", "breathing", "panting", "gasping", "out of breath"],
-    },
-    {
       soundId: "glass_break",
       keywords: ["break the glass", "shatter", "glass"],
     },

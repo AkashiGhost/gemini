@@ -182,7 +182,7 @@ const scenarios: Scenario[] = [
     description: "Slow movement uses the authored footsteps cue.",
     steps: [{ kind: "user", seq: 1, text: "Go left toward the heavy door." }],
     expectedActionTypes: ["movement_slow"],
-    expectedCalls: [{ method: "triggerCue", args: ["footsteps", undefined] }],
+    expectedCalls: [{ method: "triggerCue", args: ["footsteps", 0.78] }],
     expectedState: {
       interactionFocus: "movement",
       location: "starting_room",
@@ -193,9 +193,31 @@ const scenarios: Scenario[] = [
     description: "Urgent movement uses the authored fast footsteps cue.",
     steps: [{ kind: "user", seq: 1, text: "Run down the corridor now." }],
     expectedActionTypes: ["movement_fast"],
-    expectedCalls: [{ method: "triggerCue", args: ["footsteps_fast", undefined] }],
+    expectedCalls: [{ method: "triggerCue", args: ["footsteps_fast", 0.86] }],
     expectedState: {
       interactionFocus: "movement",
+    },
+  },
+  {
+    id: "movement-followthrough",
+    description: "Alex's narrated movement triggers a second footsteps cue on the actual move turn.",
+    steps: [
+      { kind: "user", seq: 1, text: "Take the stairs on the right." },
+      { kind: "ai", text: "Okay. I'm moving carefully down the stairs now." },
+    ],
+    expectedActionTypes: ["movement_slow", "location_right_path", "movement_followthrough_slow"],
+    expectedCalls: [
+      { method: "triggerCue", args: ["footsteps", 0.78] },
+      { method: "handleToolCall", args: ["sub_bass", 0.12, true, 3.5] },
+      { method: "setVolume", args: ["call_bed", 0.1, 2] },
+      { method: "setVolume", args: ["room_ambience", 0.18, 2] },
+      { method: "setVolume", args: ["electrical_hum", 0.12, 2] },
+      { method: "setVolume", args: ["sub_bass", 0.12, 2] },
+      { method: "triggerCue", args: ["footsteps", 0.78] },
+    ],
+    expectedState: {
+      interactionFocus: "movement",
+      location: "right_path",
     },
   },
   {
@@ -290,7 +312,7 @@ const scenarios: Scenario[] = [
   },
   {
     id: "tension-and-gas",
-    description: "Threat narration escalates breathing cues deterministically.",
+    description: "Threat narration escalates tension without replaying breathing SFX.",
     steps: [
       { kind: "ai", text: "I'm trapped and I can feel myself shaking. Please don't hang up." },
       { kind: "ai", text: "Wait. There's a smell. I can't breathe." },
@@ -300,8 +322,6 @@ const scenarios: Scenario[] = [
       { method: "setVolume", args: ["call_bed", 0.16, 2] },
       { method: "setVolume", args: ["room_ambience", 0.18, 2] },
       { method: "setVolume", args: ["electrical_hum", 0.08, 2] },
-      { method: "triggerCue", args: ["heavy_breathing", undefined] },
-      { method: "triggerCue", args: ["heavy_breathing", undefined] },
     ],
     expectedState: {
       tensionLevel: 3,

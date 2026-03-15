@@ -97,7 +97,7 @@ describe("TheCallStateDirector", () => {
 
     expect(actions.map((action) => action.type)).toEqual(["movement_slow"]);
     expect(calls).toEqual([
-      { method: "triggerCue", args: ["footsteps", undefined] },
+      { method: "triggerCue", args: ["footsteps", 0.78] },
     ]);
     expect(director.getState().interactionFocus).toBe("movement");
   });
@@ -110,7 +110,30 @@ describe("TheCallStateDirector", () => {
 
     expect(actions.map((action) => action.type)).toEqual(["movement_fast"]);
     expect(calls).toEqual([
-      { method: "triggerCue", args: ["footsteps_fast", undefined] },
+      { method: "triggerCue", args: ["footsteps_fast", 0.86] },
+    ]);
+  });
+
+  it("follows Alex's narrated movement with an audible footsteps cue", () => {
+    const { engine, calls } = createEngineSpy();
+    const director = new TheCallStateDirector(engine);
+
+    director.applyUserInstruction(1, "Take the stairs on the right.");
+    calls.length = 0;
+
+    const actions = director.applyAiNarration("Okay. I'm moving carefully down the stairs now.");
+
+    expect(actions.map((action) => action.type)).toEqual([
+      "location_right_path",
+      "movement_followthrough_slow",
+    ]);
+    expect(calls).toEqual([
+      { method: "handleToolCall", args: ["sub_bass", 0.12, true, 3.5] },
+      { method: "setVolume", args: ["call_bed", 0.1, 2] },
+      { method: "setVolume", args: ["room_ambience", 0.18, 2] },
+      { method: "setVolume", args: ["electrical_hum", 0.12, 2] },
+      { method: "setVolume", args: ["sub_bass", 0.12, 2] },
+      { method: "triggerCue", args: ["footsteps", 0.78] },
     ]);
   });
 
@@ -181,7 +204,7 @@ describe("TheCallStateDirector", () => {
     ]);
   });
 
-  it("treats gas-release narration as a breathing spike", () => {
+  it("treats gas-release narration as a tension spike without breathing SFX", () => {
     const { engine, calls } = createEngineSpy();
     const director = new TheCallStateDirector(engine);
 
@@ -192,7 +215,6 @@ describe("TheCallStateDirector", () => {
       { method: "setVolume", args: ["call_bed", 0.16, 2] },
       { method: "setVolume", args: ["room_ambience", 0.18, 2] },
       { method: "setVolume", args: ["electrical_hum", 0.08, 2] },
-      { method: "triggerCue", args: ["heavy_breathing", undefined] },
     ]);
   });
 

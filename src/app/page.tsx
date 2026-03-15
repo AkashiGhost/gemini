@@ -260,7 +260,7 @@ export default function Home() {
                 marginBlockStart: "var(--space-sm)",
               }}
             >
-              The first game you play with your eyes closed.
+              The platform for audio-only interactive stories. Eyes closed, voice only.
             </motion.p>
 
             <motion.p
@@ -756,7 +756,7 @@ export default function Home() {
                     letterSpacing: "1px",
                   }}
                 >
-                  more darkness coming
+                  more stories coming
                 </span>
               </div>
             ))}

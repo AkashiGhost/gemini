@@ -24,14 +24,18 @@ describe("transcript-utils", () => {
   });
 
   it("returns undefined when no transcript entry matches the source", () => {
+    const userOnly: Array<{ source: "user" | "ai"; text: string }> = [
+      { source: "user", text: "Hello" },
+    ];
     expect(
-      getLatestTranscriptEntryBySource([{ source: "user", text: "Hello" }], "ai"),
+      getLatestTranscriptEntryBySource(userOnly, "ai"),
     ).toBeUndefined();
   });
 
   it("counts transcript entries per source to produce a stable sequence number", () => {
     expect(getTranscriptSequenceForSource(transcript, "ai")).toBe(2);
     expect(getTranscriptSequenceForSource(transcript, "user")).toBe(2);
-    expect(getTranscriptSequenceForSource([], "ai")).toBe(0);
+    const empty: Array<{ source: "user" | "ai"; text: string }> = [];
+    expect(getTranscriptSequenceForSource(empty, "ai")).toBe(0);
   });
 });
