@@ -16,9 +16,9 @@ Paste this entire block into the "About the project" field.
 
 ## Inspiration
 
-I'm an imaginative person. Every night before sleep, I close my eyes and just... wander. I've done it since I was a kid — constructing places, following characters, staying in scenes until they feel real. It's the thing I do best, and I never thought of it as a skill until I tried to explain it to someone and they looked at me like I was weird.
+I'm an imaginative person. Every night before sleep, I close my eyes and just... wander. I've done it since I was a kid constructing places, following characters, staying in scenes until they feel real. It's the thing I do best, and I never thought of it as a skill until I tried to explain it to someone and they looked at me like I was weird.
 
-I'm also an audiobook listener. Not just non-fiction — story audiobooks. The kind where a single narrator carries an entire world. I'd listen in the dark, and my imagination would fill in everything the words left out. The voice was a key, and my mind was the room it opened.
+I'm also an audiobook listener. Not just non fiction  story audiobooks. The kind where a single narrator carries an entire world. I'd listen in the dark, and my imagination would fill in everything the words left out. The voice was a key, and my mind was the room it opened.
 
 At some point I started wondering: what if I could actually be *in* it? Not watching. Not reading. Actually deciding what happens — and having the story respond to what I said?
 
@@ -159,7 +159,7 @@ gemini-live-2.5-flash-native-audio, gemini-2.5-flash, google-genai-sdk, google-c
 
 ## SECTION 3: "Try It Out" Links
 
-- https://innerplay.app
+- https://innerplay-gemini-443171020325.us-central1.run.app
 - https://github.com/AkashiGhost/gemini
 
 ---

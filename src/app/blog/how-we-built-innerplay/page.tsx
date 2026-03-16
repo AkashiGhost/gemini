@@ -40,7 +40,7 @@ export default function HowWeBuiltInnerPlay() {
         }}
       >
         <a
-          href="/"
+          href="https://innerplay-gemini-443171020325.us-central1.run.app"
           style={{
             color: "#E8943C",
             fontFamily: "Georgia, serif",
@@ -497,7 +497,7 @@ export default function HowWeBuiltInnerPlay() {
           </p>
           <p style={{ fontSize: "0.88rem", fontFamily: "Georgia, serif" }}>
             <a
-              href="/"
+              href="https://innerplay-gemini-443171020325.us-central1.run.app"
               style={{
                 color: "#E8943C",
                 textDecoration: "none",
