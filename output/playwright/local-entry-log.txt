@@ -1,0 +1,4 @@
+[console:error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[url] http://127.0.0.1:3012/play?story=the-call
+[body] Skip to content
+[buttons] []

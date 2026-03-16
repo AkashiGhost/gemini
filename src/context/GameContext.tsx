@@ -39,7 +39,10 @@ import {
   type OpeningTurnState,
 } from "@/context/opening-turn-state";
 import { shouldStartMicCapture } from "@/context/mic-activation-policy";
-import { shouldScheduleSilenceNudge } from "@/context/session-flow-guards";
+import {
+  shouldArmOpeningTurnMic,
+  shouldScheduleSilenceNudge,
+} from "@/context/session-flow-guards";
 import {
   buildSessionTimingSummary,
   createSessionTimingState,
@@ -120,6 +123,7 @@ type UIAction =
   | { type: "SET_SPEAKING"; value: boolean }
   | { type: "MARK_AI_SPOKEN" }
   | { type: "AI_TEXT"; text: string }
+  | { type: "SET_USER_TEXT"; text: string }
   | { type: "ADD_TRANSCRIPT"; entry: TranscriptEntry }
   | { type: "GAME_OVER" }
   | { type: "TICK" }
@@ -165,6 +169,9 @@ function uiReducer(state: UIState, action: UIAction): UIState {
 
     case "AI_TEXT":
       return { ...state, lastAiText: action.text, hasAiSpoken: true };
+
+    case "SET_USER_TEXT":
+      return { ...state, lastUserTranscriptText: action.text };
 
     case "ADD_TRANSCRIPT": {
       const transcript = [...state.transcript, action.entry];
@@ -244,6 +251,10 @@ function getInitialKickoffPrompt(storyId: string, publishedStory?: PublishedStor
   return "Begin the session now. Speak first in character with one short opening line, then pause for the player.";
 }
 
+function hasMeaningfulTranscriptText(text: string): boolean {
+  return /[\p{L}\p{N}]/u.test(text);
+}
+
 export function GameProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(uiReducer, initialState);
   const loggerRef = useRef(createLogger("GameContext"));
@@ -296,6 +307,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const firstResponseFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstResponseFailureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingAiTurnFinalizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openingTurnMicArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const micStartInFlightRef = useRef(false);
   const textTurnModeRef = useRef(false);
   const emptyOpeningRetryCountRef = useRef(0);
@@ -353,6 +365,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (pendingAiTurnFinalizeTimerRef.current !== null) {
       clearTimeout(pendingAiTurnFinalizeTimerRef.current);
       pendingAiTurnFinalizeTimerRef.current = null;
+    }
+  }, []);
+
+  const clearOpeningTurnMicArmTimer = useCallback(() => {
+    if (openingTurnMicArmTimerRef.current !== null) {
+      clearTimeout(openingTurnMicArmTimerRef.current);
+      openingTurnMicArmTimerRef.current = null;
     }
   }, []);
 
@@ -515,6 +534,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SET_SPEAKING", value: false });
     dispatch({ type: "SET_TURN_INPUT_READY", value: false });
     clearFirstResponseWatchdog();
+    clearOpeningTurnMicArmTimer();
 
     try {
       session.sendClientContent({
@@ -551,10 +571,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
       });
       return false;
     }
-  }, [clearFirstResponseWatchdog, logger, startFirstResponseWatchdog]);
+  }, [clearFirstResponseWatchdog, clearOpeningTurnMicArmTimer, logger, startFirstResponseWatchdog]);
 
-  const enableMicStreaming = useCallback((sessionId: string | undefined, reason: string) => {
-    if (openingTurnStateRef.current.locked) {
+  const enableMicStreaming = useCallback((
+    sessionId: string | undefined,
+    reason: string,
+    options?: { allowDuringOpeningTurn?: boolean },
+  ) => {
+    if (openingTurnStateRef.current.locked && !options?.allowDuringOpeningTurn) {
       logger.info({
         event: "mic.streaming_deferred",
         sessionId,
@@ -574,7 +598,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
     });
   }, [clearMicEnableFallbackTimer, logger]);
 
-  const startMicCapture = useCallback(async (session: Session, sessionId: string | undefined) => {
+  const startMicCapture = useCallback(async (
+    session: Session,
+    sessionId: string | undefined,
+    options?: { allowDuringOpeningTurn?: boolean },
+  ) => {
     if (!shouldUseMicrophoneInSession(debugTextModeRef.current)) {
       logger.info({
         event: "mic.skipped_debug_text_mode",
@@ -586,7 +614,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     if (!shouldStartMicCapture({
       status: stateRef.current.status,
-      openingTurnLocked: openingTurnStateRef.current.locked,
+      openingTurnLocked: options?.allowDuringOpeningTurn ? false : openingTurnStateRef.current.locked,
       micCaptureStarted: audioCaptureRef.current !== null,
       micStartInFlight: micStartInFlightRef.current,
       textTurnMode: textTurnModeRef.current,
@@ -666,7 +694,35 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [logger, safeCloseSession]);
 
+  const scheduleOpeningTurnMicArm = useCallback((session: Session, sessionId: string | undefined, reason: string) => {
+    clearOpeningTurnMicArmTimer();
+
+    if (!openingTurnStateRef.current.locked || !openingTurnStateRef.current.responseReceived) {
+      return;
+    }
+
+    const remainingPlaybackMs = audioPlaybackRef.current?.getRemainingPlaybackMs() ?? 0;
+    const decision = getOpeningTurnUnlockDecision(remainingPlaybackMs);
+
+    const armMic = () => {
+      if (sessionRef.current !== session) return;
+      if (closingSessionRef.current === session) return;
+      if (!openingTurnStateRef.current.locked || !openingTurnStateRef.current.responseReceived) return;
+
+      enableMicStreaming(sessionId, reason, { allowDuringOpeningTurn: true });
+      void startMicCapture(session, sessionId, { allowDuringOpeningTurn: true });
+    };
+
+    if (decision.unlockNow) {
+      armMic();
+      return;
+    }
+
+    openingTurnMicArmTimerRef.current = setTimeout(armMic, decision.unlockAfterMs);
+  }, [clearOpeningTurnMicArmTimer, enableMicStreaming, startMicCapture]);
+
   const finalizeAiTurn = useCallback((session: Session | null, sessionId: string | undefined, reason: string) => {
+    clearOpeningTurnMicArmTimer();
     clearPendingAiTurnFinalizeTimer();
     const openingTurnWasLocked = openingTurnStateRef.current.locked;
 
@@ -693,6 +749,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       void startMicCapture(session, sessionId);
     }
     dispatch({ type: "SET_SPEAKING", value: false });
+    dispatch({ type: "SET_USER_TEXT", text: "" });
     dispatch({ type: "SET_TURN_INPUT_READY", value: true });
 
     const aiText = aiTextAccumRef.current.trim();
@@ -704,7 +761,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       committedAiTextRef.current = aiText;
     }
     aiTextAccumRef.current = "";
-  }, [clearFirstResponseWatchdog, clearPendingAiTurnFinalizeTimer, enableMicStreaming, logSessionTimingStage, logger, startMicCapture]);
+  }, [clearFirstResponseWatchdog, clearOpeningTurnMicArmTimer, clearPendingAiTurnFinalizeTimer, enableMicStreaming, logSessionTimingStage, logger, startMicCapture]);
 
   const scheduleAiTurnFinalize = useCallback((sessionId: string | undefined, reason: string) => {
     clearPendingAiTurnFinalizeTimer();
@@ -929,6 +986,27 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const commitPendingUserTranscript = useCallback(() => {
+    const text = pendingUserTranscriptRef.current.trim();
+    if (!text || !hasMeaningfulTranscriptText(text)) {
+      pendingUserTranscriptRef.current = "";
+      return false;
+    }
+
+    const lastEntry = stateRef.current.transcript[stateRef.current.transcript.length - 1];
+    if (lastEntry?.source === "user" && lastEntry.text.trim() === text) {
+      pendingUserTranscriptRef.current = "";
+      return false;
+    }
+
+    dispatch({
+      type: "ADD_TRANSCRIPT",
+      entry: { source: "user", text },
+    });
+    pendingUserTranscriptRef.current = "";
+    return true;
+  }, []);
+
   const sendDebugTextTurn = useCallback((text: string): boolean => {
     const message = text.trim();
     const session = sessionRef.current;
@@ -984,6 +1062,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const resetLiveConnectionState = useCallback((session?: Session | null) => {
     clearConnectTimeout();
     clearFirstResponseWatchdog();
+    clearOpeningTurnMicArmTimer();
     clearPendingAiTurnFinalizeTimer();
     clearMicEnableFallbackTimer();
     clearSilenceTimer();
@@ -993,6 +1072,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     textTurnModeRef.current = false;
     emptyOpeningRetryCountRef.current = 0;
     emptyOpeningRetryPendingRef.current = false;
+    commitPendingUserTranscript();
     pendingUserTranscriptRef.current = "";
     pendingEndGameRef.current = null;
     aiTextAccumRef.current = "";
@@ -1013,8 +1093,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [
+    commitPendingUserTranscript,
     clearConnectTimeout,
     clearFirstResponseWatchdog,
+    clearOpeningTurnMicArmTimer,
     clearPendingAiTurnFinalizeTimer,
     clearMicEnableFallbackTimer,
     clearSilenceTimer,
@@ -1095,6 +1177,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       clearMicEnableFallbackTimer();
       clearConnectTimeout();
       clearFirstResponseWatchdog();
+      clearOpeningTurnMicArmTimer();
       clearPendingAiTurnFinalizeTimer();
       micStreamingEnabledRef.current = true;
       micStartInFlightRef.current = false;
@@ -1114,11 +1197,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
       safeCloseSession(sessionRef.current);
       sessionRef.current = null;
       sessionTimingRef.current = null;
+      commitPendingUserTranscript();
       pendingUserTranscriptRef.current = "";
       liveRetryPlanRef.current = null;
       liveRetryAttemptsRef.current = 0;
     };
-  }, [stopTicker, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, safeCloseSession]);
+  }, [stopTicker, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearOpeningTurnMicArmTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, safeCloseSession, commitPendingUserTranscript]);
 
   const aiTextAccumRef = useRef<string>("");
   const committedAiTextRef = useRef("");
@@ -1254,6 +1338,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     clearMicEnableFallbackTimer();
     clearConnectTimeout();
     clearFirstResponseWatchdog();
+    clearOpeningTurnMicArmTimer();
     clearPendingAiTurnFinalizeTimer();
     micStreamingEnabledRef.current = true;
     micStartInFlightRef.current = false;
@@ -1265,6 +1350,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       responseReceived: false,
       completed: false,
     };
+    commitPendingUserTranscript();
     pendingUserTranscriptRef.current = "";
     pendingEndGameRef.current = null;
     pendingKickoffRef.current = null;
@@ -1285,7 +1371,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       sessionId: stateRef.current.sessionId,
       causalChain: ["session.ended"],
     });
-  }, [clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, logSessionTimingSummary, logger, safeCloseSession, stopTicker]);
+  }, [clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearOpeningTurnMicArmTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, logSessionTimingSummary, logger, safeCloseSession, stopTicker, commitPendingUserTranscript]);
 
   useEffect(() => {
     if (!pendingEndGameRef.current) return;
@@ -1317,6 +1403,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         publishedStory: options?.publishedStory,
       };
     }
+    commitPendingUserTranscript();
     pendingUserTranscriptRef.current = "";
     aiTextAccumRef.current = "";
     committedAiTextRef.current = "";
@@ -1360,6 +1447,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     clearMicEnableFallbackTimer();
     clearConnectTimeout();
     clearFirstResponseWatchdog();
+    clearOpeningTurnMicArmTimer();
     clearPendingAiTurnFinalizeTimer();
 
     connectTimeoutRef.current = setTimeout(() => {
@@ -1378,6 +1466,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       safeCloseSession(sessionRef.current);
       sessionRef.current = null;
       clearFirstResponseWatchdog();
+      clearOpeningTurnMicArmTimer();
       dispatch({
         type: "SET_STATUS",
         status: "error",
@@ -1439,6 +1528,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
         model: liveModel,
         callbacks: {
           onopen: () => {
+            if (stateRef.current.sessionId !== sessionId) {
+              return;
+            }
             if (sessionRef.current && sessionRef.current !== session) {
               return;
             }
@@ -1452,6 +1544,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
               flushPendingKickoff(activeSession, sessionId);
             }
             micEnableFallbackTimerRef.current = setTimeout(() => {
+              if (openingTurnStateRef.current.locked && openingTurnStateRef.current.responseReceived) {
+                scheduleOpeningTurnMicArm(session, sessionId, "fallback_timeout");
+                return;
+              }
               enableMicStreaming(sessionId, "fallback_timeout");
             }, 8000);
             logger.info({
@@ -1483,9 +1579,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
                 hadAudio = true;
                 audioPlaybackRef.current?.play(part.inlineData.data);
                 logSessionTimingStage(sessionId, "first_audio_chunk_played");
-                if (!stateRef.current.hasAiSpoken) {
-                  dispatch({ type: "SET_SPEAKING", value: true });
-                }
               }
             }
 
@@ -1504,11 +1597,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
               outputTranscriptionText: sanitizedOutputTranscription,
             });
 
-            if (didReceiveModelResponse({
+            const responseReceivedInMessage = didReceiveModelResponse({
               hasAudio: hadAudio,
               modelText,
               outputTranscriptionText: sanitizedOutputTranscription,
-            }) && !openingTurnStateRef.current.responseReceived) {
+            });
+            let openingResponseReceived = openingTurnStateRef.current.responseReceived;
+
+            if (responseReceivedInMessage && !openingResponseReceived) {
               emptyOpeningRetryPendingRef.current = false;
               logSessionTimingStage(sessionId, "first_response_received", {
                 source: hadAudio && sanitizedOutputTranscription?.trim()
@@ -1520,6 +1616,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
                       : "text",
               });
               openingTurnStateRef.current = markOpeningTurnResponseReceived(openingTurnStateRef.current);
+              openingResponseReceived = true;
               dispatch({ type: "MARK_AI_SPOKEN" });
               logger.info({
                 event: "session.first_response_received",
@@ -1537,6 +1634,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
               });
             }
 
+            if (shouldArmOpeningTurnMic({
+              openingTurnLocked: openingTurnStateRef.current.locked,
+              responseReceived: openingResponseReceived,
+              hasAudio: hadAudio,
+              textTurnMode: textTurnModeRef.current,
+            })) {
+              scheduleOpeningTurnMicArm(session, sessionId, "opening_audio_drained");
+            }
+
             if (selectedDisplayText) {
               aiTextAccumRef.current = appendLiveDisplayText(aiTextAccumRef.current, selectedDisplayText);
               dispatch({ type: "AI_TEXT", text: aiTextAccumRef.current });
@@ -1546,17 +1652,26 @@ export function GameProvider({ children }: { children: ReactNode }) {
               msg.serverContent as Record<string, unknown> | undefined
             )?.inputTranscription as { text?: string; finished?: boolean } | undefined;
 
-            if (inputTranscription?.text?.trim()) {
+            const inputTranscriptText = inputTranscription?.text?.trim();
+            if (inputTranscriptText && hasMeaningfulTranscriptText(inputTranscriptText)) {
               clearSilenceTimer();
-              pendingUserTranscriptRef.current = inputTranscription.text.trim();
+              pendingUserTranscriptRef.current = appendLiveDisplayText(
+                pendingUserTranscriptRef.current,
+                inputTranscriptText,
+              );
+              dispatch({
+                type: "SET_USER_TEXT",
+                text: pendingUserTranscriptRef.current,
+              });
             }
 
-            if (inputTranscription?.finished && pendingUserTranscriptRef.current) {
-              dispatch({
-                type: "ADD_TRANSCRIPT",
-                entry: { source: "user", text: pendingUserTranscriptRef.current },
-              });
-              pendingUserTranscriptRef.current = "";
+            if (
+              inputTranscription?.finished ||
+              msg.serverContent?.generationComplete ||
+              msg.serverContent?.turnComplete ||
+              (msg.serverContent as Record<string, unknown> | undefined)?.interrupted
+            ) {
+              commitPendingUserTranscript();
             }
 
             if (msg.serverContent?.generationComplete) {
@@ -1583,6 +1698,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             }
 
             if ((msg.serverContent as Record<string, unknown> | undefined)?.interrupted) {
+              clearOpeningTurnMicArmTimer();
               clearPendingAiTurnFinalizeTimer();
               audioPlaybackRef.current?.stop();
               aiTextAccumRef.current = "";
@@ -1625,6 +1741,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             }
             clearConnectTimeout();
             clearFirstResponseWatchdog();
+            clearOpeningTurnMicArmTimer();
             clearPendingAiTurnFinalizeTimer();
             if (attemptLiveRetry(errorEvent.message, sessionId, "onerror", session)) {
               return;
@@ -1641,6 +1758,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             micStartInFlightRef.current = false;
             textTurnModeRef.current = false;
             emptyOpeningRetryPendingRef.current = false;
+            commitPendingUserTranscript();
             pendingUserTranscriptRef.current = "";
             openingTurnStateRef.current = {
               locked: false,
@@ -1670,6 +1788,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             }
             clearConnectTimeout();
             clearFirstResponseWatchdog();
+            clearOpeningTurnMicArmTimer();
             clearPendingAiTurnFinalizeTimer();
             closingSessionRef.current = null;
             sessionRef.current = null;
@@ -1681,6 +1800,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             micStreamingEnabledRef.current = true;
             micStartInFlightRef.current = false;
             emptyOpeningRetryPendingRef.current = false;
+            commitPendingUserTranscript();
             pendingUserTranscriptRef.current = "";
             openingTurnStateRef.current = {
               locked: false,
@@ -1723,6 +1843,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       clearConnectTimeout();
       clearFirstResponseWatchdog();
+      clearOpeningTurnMicArmTimer();
       const message = error instanceof Error ? error.message : String(error);
       if (attemptLiveRetry(message, sessionId, "start_failed")) {
         return;
@@ -1736,6 +1857,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       textTurnModeRef.current = false;
       emptyOpeningRetryCountRef.current = 0;
       emptyOpeningRetryPendingRef.current = false;
+      commitPendingUserTranscript();
       pendingUserTranscriptRef.current = "";
       openingTurnStateRef.current = {
         locked: false,
@@ -1754,7 +1876,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         message,
       });
     }
-  }, [attemptLiveRetry, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logSessionTimingStage, logSessionTimingSummary, logger, retryEmptyOpeningTurn, safeCloseSession, scheduleAiTurnFinalize, scheduleGenerationCompleteFallbackFinalize, startTicker, stopTicker]);
+  }, [attemptLiveRetry, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearOpeningTurnMicArmTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logSessionTimingStage, logSessionTimingSummary, logger, retryEmptyOpeningTurn, safeCloseSession, scheduleAiTurnFinalize, scheduleGenerationCompleteFallbackFinalize, scheduleOpeningTurnMicArm, startTicker, stopTicker, commitPendingUserTranscript]);
 
   startSessionRef.current = startSession;
 

@@ -13,3 +13,18 @@ export function shouldScheduleSilenceNudge(input: SilenceNudgeDecisionInput): bo
   if (input.openingTurnLocked) return false;
   return true;
 }
+
+export interface OpeningTurnMicArmDecisionInput {
+  openingTurnLocked: boolean;
+  responseReceived: boolean;
+  hasAudio: boolean;
+  textTurnMode: boolean;
+}
+
+export function shouldArmOpeningTurnMic(input: OpeningTurnMicArmDecisionInput): boolean {
+  if (!input.openingTurnLocked) return false;
+  if (!input.responseReceived) return false;
+  if (!input.hasAudio) return false;
+  if (input.textTurnMode) return false;
+  return true;
+}

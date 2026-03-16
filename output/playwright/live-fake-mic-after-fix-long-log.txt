@@ -1,0 +1,110 @@
+[meta] url=https://innerplay-gemini-443171020325.us-central1.run.app/play?story=the-call
+[console:info] {"ts":"2026-03-16T13:20:03.254Z","level":"info","component":"GameContext","event":"session.timing_stage","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.timing_stage","stage:begin_clicked"],"data":{"storyId":"the-call","stage":"begin_clicked","elapsedMs":0,"deltaMs":0}}
+[console:info] {"ts":"2026-03-16T13:20:03.256Z","level":"info","component":"GameContext","event":"session.timing_stage","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.timing_stage","stage:start_session_enter"],"data":{"storyId":"the-call","stage":"start_session_enter","elapsedMs":3,"deltaMs":3}}
+[console:info] {"ts":"2026-03-16T13:20:03.800Z","level":"info","component":"GameContext","event":"session.kickoff_queued","causalChain":["session.kickoff_requested"],"data":{"storyId":"the-call"}}
+[console:info] {"ts":"2026-03-16T13:20:03.802Z","level":"info","component":"GameContext","event":"session.timing_stage","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.timing_stage","stage:live_token_request_start"],"data":{"storyId":"the-call","stage":"live_token_request_start","elapsedMs":549,"deltaMs":546}}
+[action] clicked skip intro
+[console:info] {"ts":"2026-03-16T13:20:04.157Z","level":"info","component":"GameContext","event":"session.timing_stage","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.timing_stage","stage:live_token_request_end"],"data":{"storyId":"the-call","stage":"live_token_request_end","elapsedMs":904,"deltaMs":355,"model":"gemini-2.5-flash-native-audio-latest"}}
+[console:info] {"ts":"2026-03-16T13:20:04.159Z","level":"info","component":"GameContext","event":"session.timing_stage","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.timing_stage","stage:live_connect_start"],"data":{"storyId":"the-call","stage":"live_connect_start","elapsedMs":906,"deltaMs":2,"model":"gemini-2.5-flash-native-audio-latest"}}
+[console:warning] Warning: Ephemeral token support is experimental and may change in future versions.
+[console:info] {"ts":"2026-03-16T13:20:04.293Z","level":"info","component":"GameContext","event":"session.timing_stage","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.timing_stage","stage:session_open"],"data":{"storyId":"the-call","stage":"session_open","elapsedMs":1040,"deltaMs":134,"model":"gemini-2.5-flash-native-audio-latest"}}
+[console:info] {"ts":"2026-03-16T13:20:04.294Z","level":"info","component":"GameContext","event":"session.open","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.open"],"data":{"model":"gemini-2.5-flash-native-audio-latest","storyId":"the-call"}}
+[console:info] {"ts":"2026-03-16T13:20:04.295Z","level":"info","component":"GameContext","event":"session.kickoff_sent","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.kickoff_requested","session.kickoff_sent"],"data":{"storyId":"the-call"}}
+[console:info] {"ts":"2026-03-16T13:20:04.296Z","level":"info","component":"GameContext","event":"session.timing_stage","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.timing_stage","stage:kickoff_sent"],"data":{"storyId":"the-call","stage":"kickoff_sent","elapsedMs":1042,"deltaMs":2}}
+[console:log] [SESSION] GameSession mounted
+[console:info] {"ts":"2026-03-16T13:20:04.312Z","level":"info","component":"useSoundEngine","event":"sound.init_start","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start"],"data":{"storyId":"the-call","soundProfileId":"the-call","initDelayMs":0}}
+[console:log] [SOUND] SoundEngine constructed with config: {ttsDucking: Object, crossfadeDefaultMs: 2000, spatialMapKeys: Array(24), defaultVolumeKeys: Array(24), preloadOrder: Array(0)}
+[console:log] [SOUND] init() — creating AudioContext
+[console:log] [SOUND] AudioContext state after init: running, sampleRate=48000Hz
+[console:log] [SOUND] setSoundEnabled(true) — fade=0s
+[console:log] [SOUND] preload() — 22 asset(s): [call_bed, room_ambience, electrical_hum, phone_static, sub_bass, water_leak_loop, water_rising_loop, water_slosh_loop, door_creak, footsteps, footsteps_fast, heavy_breathing, anxious_breathing, door_slam, pickup_click, keypad_beep, keypad_confirm, keypad_invalid, disconnect_tone, water_drip, metal_scrape, pipe_clank]
+[console:log] [SOUND] Preloaded: phone_static (3.64s)
+[console:log] [SOUND] Preloaded: electrical_hum (4.36s)
+[console:log] [SOUND] Preloaded: water_leak_loop (2.60s)
+[console:log] [SOUND] Preloaded: call_bed (4.04s)
+[console:log] [SOUND] Preloaded: keypad_confirm (2.01s)
+[console:log] [SOUND] Preloaded: keypad_beep (2.28s)
+[console:log] [SOUND] Preloaded: water_rising_loop (2.20s)
+[console:log] [SOUND] Preloaded: footsteps (3.81s)
+[console:log] [SOUND] Preloaded: disconnect_tone (2.00s)
+[console:log] [SOUND] Preloaded: keypad_invalid (2.33s)
+[console:log] [SOUND] Preloaded: anxious_breathing (2.64s)
+[console:log] [SOUND] Preloaded: heavy_breathing (4.61s)
+[console:log] [SOUND] Preloaded: sub_bass (11.24s)
+[console:log] [SOUND] Preloaded: metal_scrape (2.12s)
+[console:log] [SOUND] Preloaded: door_creak (4.58s)
+[console:log] [SOUND] Preloaded: door_slam (2.00s)
+[console:log] [SOUND] Preloaded: pipe_clank (2.00s)
+[console:log] [SOUND] Preloaded: pickup_click (2.65s)
+[console:log] [SOUND] Preloaded: water_drip (4.97s)
+[console:log] [SOUND] Preloaded: room_ambience (4.04s)
+[console:log] [SOUND] Preloaded: footsteps_fast (11.30s)
+[console:log] [SOUND] Preloaded: water_slosh_loop (4.52s)
+[console:log] [SOUND] preload() complete — 22 buffer(s) cached
+[console:log] [SYNTH] Generating synthetic sounds for story: the-call
+[console:log] [SYNTH] Generated 15 buffers for "the-call": [phone_static, electrical_hum, sub_bass, phone_ring, pickup_click, disconnect_tone, footsteps, water_drip, door_creak, door_slam, keypad_beep, metal_scrape, pipe_clank, heavy_breathing, glass_break]
+[console:info] {"ts":"2026-03-16T13:20:05.770Z","level":"info","component":"useSoundEngine","event":"sound.synthetic_skipped_for_authored_asset","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.synthetic_skipped_for_authored_asset"],"data":{"soundId":"phone_static","storyId":"the-call","soundProfileId":"the-call"}}
+[console:info] {"ts":"2026-03-16T13:20:05.770Z","level":"info","component":"useSoundEngine","event":"sound.synthetic_skipped_for_authored_asset","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.synthetic_skipped_for_authored_asset"],"data":{"soundId":"electrical_hum","storyId":"the-call","soundProfileId":"the-call"}}
+[console:info] {"ts":"2026-03-16T13:20:05.770Z","level":"info","component":"useSoundEngine","event":"sound.synthetic_skipped_for_authored_asset","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.synthetic_skipped_for_authored_asset"],"data":{"soundId":"sub_bass","storyId":"the-call","soundProfileId":"the-call"}}
+[console:log] [SOUND] Registered buffer: phone_ring (6.00s)
+[console:info] {"ts":"2026-03-16T13:20:05.770Z","level":"info","component":"useSoundEngine","event":"sound.synthetic_skipped_for_authored_asset","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.synthetic_skipped_for_authored_asset"],"data":{"soundId":"pickup_click","storyId":"the-call","soundProfileId":"the-call"}}
+[console:info] {"ts":"2026-03-16T13:20:05.771Z","level":"info","component":"useSoundEngine","event":"sound.synthetic_skipped_for_authored_asset","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.synthetic_skipped_for_authored_asset"],"data":{"soundId":"disconnect_tone","storyId":"the-call","soundProfileId":"the-call"}}
+[console:info] {"ts":"2026-03-16T13:20:05.771Z","level":"info","component":"useSoundEngine","event":"sound.synthetic_skipped_for_authored_asset","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.synthetic_skipped_for_authored_asset"],"data":{"soundId":"footsteps","storyId":"the-call","soundProfileId":"the-call"}}
+[console:info] {"ts":"2026-03-16T13:20:05.771Z","level":"info","component":"useSoundEngine","event":"sound.synthetic_skipped_for_authored_asset","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.synthetic_skipped_for_authored_asset"],"data":{"soundId":"water_drip","storyId":"the-call","soundProfileId":"the-call"}}
+[console:info] {"ts":"2026-03-16T13:20:05.771Z","level":"info","component":"useSoundEngine","event":"sound.synthetic_skipped_for_authored_asset","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.synthetic_skipped_for_authored_asset"],"data":{"soundId":"door_creak","storyId":"the-call","soundProfileId":"the-call"}}
+[console:info] {"ts":"2026-03-16T13:20:05.771Z","level":"info","component":"useSoundEngine","event":"sound.synthetic_skipped_for_authored_asset","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.synthetic_skipped_for_authored_asset"],"data":{"soundId":"door_slam","storyId":"the-call","soundProfileId":"the-call"}}
+[console:info] {"ts":"2026-03-16T13:20:05.771Z","level":"info","component":"useSoundEngine","event":"sound.synthetic_skipped_for_authored_asset","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.synthetic_skipped_for_authored_asset"],"data":{"soundId":"keypad_beep","storyId":"the-call","soundProfileId":"the-call"}}
+[console:info] {"ts":"2026-03-16T13:20:05.771Z","level":"info","component":"useSoundEngine","event":"sound.synthetic_skipped_for_authored_asset","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.synthetic_skipped_for_authored_asset"],"data":{"soundId":"metal_scrape","storyId":"the-call","soundProfileId":"the-call"}}
+[console:info] {"ts":"2026-03-16T13:20:05.771Z","level":"info","component":"useSoundEngine","event":"sound.synthetic_skipped_for_authored_asset","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.synthetic_skipped_for_authored_asset"],"data":{"soundId":"pipe_clank","storyId":"the-call","soundProfileId":"the-call"}}
+[console:info] {"ts":"2026-03-16T13:20:05.771Z","level":"info","component":"useSoundEngine","event":"sound.synthetic_skipped_for_authored_asset","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.synthetic_skipped_for_authored_asset"],"data":{"soundId":"heavy_breathing","storyId":"the-call","soundProfileId":"the-call"}}
+[console:log] [SOUND] Registered buffer: glass_break (1.20s)
+[console:info] {"ts":"2026-03-16T13:20:05.772Z","level":"info","component":"useSoundEngine","event":"sound.the_call_state_director.ready","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.the_call_state_director.ready"],"data":{"storyId":"the-call","soundProfileId":"the-call"}}
+[console:log] [SOUND] startTimeline() — 8 event(s)
+[console:log] [SOUND] play(phone_ring) — volume=0.8, loop=true, fadeIn=0s
+[console:log] [SOUND] Creating new channel: phone_ring
+[console:log] [SOUND] Channel phone_ring pan set to 0
+[console:log] [SOUND] Playing: phone_ring (buffer duration=6.00s)
+[console:info] {"ts":"2026-03-16T13:20:05.773Z","level":"info","component":"useSoundEngine","event":"music.disabled_by_config","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","music.disabled_by_config"],"data":{"enableAdaptiveMusic":false,"lyriaEnabled":false}}
+[console:info] {"ts":"2026-03-16T13:20:05.773Z","level":"info","component":"useSoundEngine","event":"sound.init_ready","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.init_start","sound.init_ready"],"data":{"storyId":"the-call","soundProfileId":"the-call","timelineEvents":8}}
+[console:log] [SOUND] Timeline event fired at t=0.1s: {action: start_ambient, soundId: undefined, soundIds: Array(3), time: 0}
+[console:log] [SOUND] play(call_bed) — volume=0.16, loop=true, fadeIn=0s
+[console:log] [SOUND] Creating new channel: call_bed
+[console:log] [SOUND] Channel call_bed pan set to 0
+[console:log] [SOUND] Playing: call_bed (buffer duration=4.04s)
+[console:log] [SOUND] play(room_ambience) — volume=0.18, loop=true, fadeIn=0s
+[console:log] [SOUND] Creating new channel: room_ambience
+[console:log] [SOUND] Channel room_ambience pan set to 0.04
+[console:log] [SOUND] Playing: room_ambience (buffer duration=4.04s)
+[console:log] [SOUND] play(electrical_hum) — volume=0.08, loop=true, fadeIn=0s
+[console:log] [SOUND] Creating new channel: electrical_hum
+[console:log] [SOUND] Channel electrical_hum pan set to 0
+[console:log] [SOUND] Playing: electrical_hum (buffer duration=4.36s)
+[console:info] {"ts":"2026-03-16T13:20:07.801Z","level":"info","component":"GameContext","event":"session.timing_stage","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.timing_stage","stage:first_response_received"],"data":{"storyId":"the-call","stage":"first_response_received","elapsedMs":4548,"deltaMs":3506,"source":"transcription"}}
+[console:info] {"ts":"2026-03-16T13:20:07.801Z","level":"info","component":"GameContext","event":"session.first_response_received","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.first_response_received"],"data":{"source":"transcription"}}
+[console:log] [SESSION] hasAiSpoken changed: false → true
+[console:info] {"ts":"2026-03-16T13:20:08.182Z","level":"info","component":"GameContext","event":"session.timing_stage","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.timing_stage","stage:first_audio_chunk_played"],"data":{"storyId":"the-call","stage":"first_audio_chunk_played","elapsedMs":4929,"deltaMs":381}}
+[console:log] [SOUND] startDucking() — 4 channel(s), -6dB reduction, fadeIn=300ms
+[console:log] [USE-SOUND] AI first speak detected — stopping phone_ring, playing pickup_click
+[console:log] [SOUND] stop(phone_ring) — fade=0s
+[console:log] [SOUND] Hard stop: phone_ring
+[console:log] [SOUND] play(pickup_click) — volume=0.9, loop=false, fadeIn=0s
+[console:log] [SOUND] Creating new channel: pickup_click
+[console:log] [SOUND] Channel pickup_click pan set to 0
+[console:log] [SOUND] Playing: pickup_click (buffer duration=2.65s)
+[console:log] [SESSION] isSpeaking changed: false → true
+[console:info] {"ts":"2026-03-16T13:20:09.924Z","level":"info","component":"GameContext","event":"session.timing_stage","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.timing_stage","stage:generation_complete"],"data":{"storyId":"the-call","stage":"generation_complete","elapsedMs":6671,"deltaMs":1742}}
+[console:info] {"ts":"2026-03-16T13:20:09.924Z","level":"info","component":"GameContext","event":"session.turn_finalize_deferred","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.turn_finalize_deferred"],"data":{"reason":"generation_complete","remainingPlaybackMs":3251,"unlockAfterMs":3531}}
+[console:log] [SOUND] setVolume(call_bed) → 0.16, fade=2s
+[console:log] [SOUND] setVolume(room_ambience) → 0.18, fade=2s
+[console:log] [SOUND] setVolume(electrical_hum) → 0.08, fade=2s
+[console:info] {"ts":"2026-03-16T13:20:09.929Z","level":"info","component":"useSoundEngine","event":"sound.the_call_state_director.ai_actions_applied","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["sound.the_call_state_director","ai_actions_applied"],"data":{"storyId":"the-call","transcriptSeq":1,"transcriptText":"Hello? Oh— you answered; I'm sorry to call you like this, your number was the only one.","actions":[{"type":"location_starting_room","state":{"location":"starting_room","waterLevel":0,"tensionLevel":0,"interactionFocus":"none","keypadState":"unknown"}}]}}
+[console:log] [SOUND] One-shot ended: pickup_click
+[console:info] {"ts":"2026-03-16T13:20:12.296Z","level":"info","component":"GameContext","event":"mic.streaming_deferred","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["mic.streaming_deferred"],"data":{"reason":"fallback_timeout"}}
+[console:info] {"ts":"2026-03-16T13:20:13.133Z","level":"info","component":"GameContext","event":"session.timing_stage","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.timing_stage","stage:turn_complete"],"data":{"storyId":"the-call","stage":"turn_complete","elapsedMs":9880,"deltaMs":3209}}
+[console:info] {"ts":"2026-03-16T13:20:13.134Z","level":"info","component":"GameContext","event":"session.turn_finalize_deferred","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.turn_finalize_deferred"],"data":{"reason":"turn_complete","remainingPlaybackMs":51,"unlockAfterMs":331}}
+[console:info] {"ts":"2026-03-16T13:20:13.472Z","level":"info","component":"GameContext","event":"session.timing_stage","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["session.timing_stage","stage:first_turn_finalized"],"data":{"storyId":"the-call","stage":"first_turn_finalized","elapsedMs":10219,"deltaMs":339,"reason":"turn_complete:playback_drained"}}
+[console:info] {"ts":"2026-03-16T13:20:13.472Z","level":"info","component":"GameContext","event":"mic.streaming_enabled","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["mic.streaming_enabled"],"data":{"reason":"turn_complete:playback_drained"}}
+[console:log] [SOUND] stopDucking() — restoring 3 channel(s), fadeOut=600ms
+[console:log] [SESSION] isSpeaking changed: true → false
+[console:info] {"ts":"2026-03-16T13:20:14.204Z","level":"info","component":"GameContext","event":"mic.started","sessionId":"d470313f-a05c-4960-8c17-e6f999821719","causalChain":["mic.started"]}
+[body] Skip to content YOU x TAP ANYWHERE FOR CONTROLS ALEX Hello? Oh— you answered; I'm sorry to call you like this, your number was the only one. YOU x Hello? Oh— you answered; I'm sorry to call you like this, your number was the only one.

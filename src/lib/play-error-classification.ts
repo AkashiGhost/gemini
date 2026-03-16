@@ -67,19 +67,19 @@ export function classifyPlaySessionError(errorMessage?: string): PlayErrorPresen
     };
   }
 
-  if (msg.includes("500") || msg.includes("server")) {
-    return {
-      title: "Server error (500)",
-      detail,
-      hint: "Check that the Gemini Live session is configured with the correct API key and model.",
-    };
-  }
-
   if (has401) {
     return {
       title: "Authentication failed",
       detail,
       hint: "The Gemini API key may be invalid or expired. Update GEMINI_API_KEY in your environment.",
+    };
+  }
+
+  if (msg.includes("500") || msg.includes("server")) {
+    return {
+      title: "Server error (500)",
+      detail,
+      hint: "Check that the Gemini Live session is configured with the correct API key and model.",
     };
   }
 

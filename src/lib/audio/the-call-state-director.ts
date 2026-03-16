@@ -495,6 +495,7 @@ export class TheCallStateDirector {
     this.stopLoop("water_slosh_loop", 0.8);
     this.stopLoop("water_rising_loop", 0.8);
     this.stopLoop("water_leak_loop", 0.8);
+    this.lastAiNarrationKey = "";
     this.state = {
       location: "starting_room",
       waterLevel: 0,

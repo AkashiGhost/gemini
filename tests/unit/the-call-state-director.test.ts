@@ -259,6 +259,28 @@ describe("TheCallStateDirector", () => {
     expect(director.getState().waterLevel).toBe(0);
   });
 
+  it("allows the same opening narration to trigger again after a loop reset", () => {
+    const { engine, calls } = createEngineSpy();
+    const director = new TheCallStateDirector(engine);
+    const openingLine = "Hello? Is... is someone there? I just woke up in this room. I found this phone.";
+
+    director.applyAiNarration("I'm in the mechanical room by the heavy door. The water is rising and sloshing around my feet.");
+    calls.length = 0;
+
+    const firstReset = director.applyAiNarration(openingLine);
+    calls.length = 0;
+    const secondReset = director.applyAiNarration(openingLine);
+
+    expect(firstReset.map((action) => action.type)).toContain("loop_reset");
+    expect(secondReset.map((action) => action.type)).toContain("loop_reset");
+    expect(calls).toEqual([
+      { method: "setVolume", args: ["call_bed", 0.16, 2] },
+      { method: "setVolume", args: ["room_ambience", 0.18, 2] },
+      { method: "setVolume", args: ["electrical_hum", 0.08, 2] },
+      { method: "setVolume", args: ["sub_bass", 0.08, 3] },
+    ]);
+  });
+
   it("ignores duplicate user transcript sequence numbers", () => {
     const { engine, calls } = createEngineSpy();
     const director = new TheCallStateDirector(engine);

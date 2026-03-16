@@ -79,6 +79,16 @@ export function GameSession({
     () => getTranscriptSequenceForSource(transcript, "ai"),
     [transcript],
   );
+  const lastCommittedUserTranscript = useMemo(
+    () => getLatestTranscriptEntryBySource(transcript, "user"),
+    [transcript],
+  );
+  const pendingUserTranscriptText = useMemo(() => {
+    const liveText = lastUserTranscriptText.trim();
+    if (!liveText) return "";
+    if (lastCommittedUserTranscript?.text.trim() === liveText) return "";
+    return liveText;
+  }, [lastCommittedUserTranscript, lastUserTranscriptText]);
 
   // ── Responsive dot size: 12px mobile, 20px desktop (≥768px) ──────────
   const [dotSize, setDotSize] = useState(12);
@@ -152,7 +162,7 @@ export function GameSession({
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [transcript]);
+  }, [pendingUserTranscriptText, transcript]);
 
   // ── Tap-to-reveal controls ──────────────────────────────────
   const [showControls, setShowControls] = useState(false);
@@ -311,7 +321,7 @@ export function GameSession({
       </div>
 
       {/* Scrolling transcript overlay — bottom portion of screen */}
-      {transcript.length > 0 && (
+      {(transcript.length > 0 || pendingUserTranscriptText) && (
         <div
           style={{
             position: "relative",
@@ -343,8 +353,8 @@ export function GameSession({
                   style={{
                     fontSize: "var(--type-caption)",
                     fontFamily: "var(--font-ui)",
-                    color: "var(--muted)",
-                    opacity: 0.55,
+                    color: isUser ? "rgba(214,230,255,0.9)" : "var(--muted)",
+                    opacity: isUser ? 0.95 : 0.55,
                     letterSpacing: "0.06em",
                     textTransform: "uppercase",
                     marginBottom: 2,
@@ -360,7 +370,7 @@ export function GameSession({
                     fontFamily: "var(--font-literary)",
                     fontStyle: isUser ? "normal" : "italic",
                     lineHeight: 1.55,
-                    color: isUser ? "var(--muted)" : "var(--white)",
+                    color: isUser ? "rgba(244,248,255,0.98)" : "var(--white)",
                     textAlign: isUser ? "right" : "left",
                   }}
                 >
@@ -369,6 +379,43 @@ export function GameSession({
               </div>
             );
           })}
+          {pendingUserTranscriptText && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-end",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "var(--type-caption)",
+                  fontFamily: "var(--font-ui)",
+                  color: "rgba(214,230,255,0.9)",
+                  opacity: 0.95,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  marginBottom: 2,
+                }}
+              >
+                You
+              </span>
+              <p
+                style={{
+                  margin: 0,
+                  maxWidth: "72ch",
+                  fontSize: "var(--type-ui)",
+                  fontFamily: "var(--font-literary)",
+                  fontStyle: "normal",
+                  lineHeight: 1.55,
+                  color: "rgba(244,248,255,0.98)",
+                  textAlign: "right",
+                }}
+              >
+                {pendingUserTranscriptText}
+              </p>
+            </div>
+          )}
           {/* Anchor for auto-scroll to bottom */}
           <div ref={transcriptEndRef} />
         </div>

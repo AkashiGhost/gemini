@@ -26,6 +26,12 @@ describe("classifyPlaySessionError", () => {
     expect(result.title).toBe("Rate limit or quota");
   });
 
+  it("keeps auth failures classified as auth failures even when the message also mentions the server", () => {
+    const result = classifyPlaySessionError("Server rejected request (401 unauthorized): API key invalid.");
+
+    expect(result.title).toBe("Authentication failed");
+  });
+
   it("classifies tokenizer inference failures as transient live service interruptions", () => {
     const result = classifyPlaySessionError(
       'Failed to run inference for model: go/debugstr name: "prod-common-global__/aistudio/gemini-v3-streaming-audio-tokenizer_"',

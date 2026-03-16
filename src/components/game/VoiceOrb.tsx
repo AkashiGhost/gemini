@@ -10,7 +10,7 @@ import { stripSoundMarkers } from "@/lib/sound-cue-parser";
 // Does not replace the history transcript — that lives at the bottom.
 // ─────────────────────────────────────────────
 
-type OrbState = "waiting" | "ai-speaking" | "player-turn";
+type OrbState = "waiting" | "listening" | "ai-speaking" | "player-turn";
 
 interface VoiceOrbProps {
   isSpeaking: boolean;
@@ -43,6 +43,17 @@ const ORB_CONFIG: Record<
     textColor: "var(--muted)",
     fontStyle: "italic",
   },
+  listening: {
+    translateX: "18%",
+    orbGradient:
+      "radial-gradient(circle at 38% 32%, rgba(205,225,255,0.78), rgba(120,170,255,0.08) 68%)",
+    orbShadow:
+      "0 0 36px rgba(170,210,255,0.18), 0 0 84px rgba(120,170,255,0.08)",
+    labelColor: "rgba(195,220,255,0.82)",
+    textAlign: "right",
+    textColor: "rgba(238,245,255,0.94)",
+    fontStyle: "normal",
+  },
   "ai-speaking": {
     translateX: "-28%",
     orbGradient:
@@ -60,9 +71,9 @@ const ORB_CONFIG: Record<
       "radial-gradient(circle at 38% 32%, rgba(190,215,255,0.9), rgba(160,190,255,0.15) 68%)",
     orbShadow:
       "0 0 48px rgba(180,210,255,0.3), 0 0 100px rgba(160,190,255,0.1)",
-    labelColor: "rgba(180,210,255,0.75)",
+    labelColor: "rgba(214,230,255,0.94)",
     textAlign: "right",
-    textColor: "var(--muted)",
+    textColor: "rgba(242,247,255,0.98)",
     fontStyle: "normal",
   },
 };
@@ -71,10 +82,13 @@ function getOrbState(
   status: string,
   isSpeaking: boolean,
   hasAiSpoken: boolean,
+  lastUserTranscriptText: string,
 ): OrbState {
   if (status !== "playing") return "waiting";
   if (isSpeaking) return "ai-speaking";
-  if (hasAiSpoken) return "player-turn";
+  if (hasAiSpoken) {
+    return lastUserTranscriptText.trim() ? "player-turn" : "listening";
+  }
   return "waiting";
 }
 
@@ -94,7 +108,7 @@ export function VoiceOrb({
   lastUserTranscriptText,
   characterName,
 }: VoiceOrbProps) {
-  const orbState = getOrbState(status, isSpeaking, hasAiSpoken);
+  const orbState = getOrbState(status, isSpeaking, hasAiSpoken, lastUserTranscriptText);
   const cfg = ORB_CONFIG[orbState];
 
   const liveText =
@@ -133,7 +147,7 @@ export function VoiceOrb({
           alignItems:
             orbState === "ai-speaking"
               ? "flex-start"
-              : orbState === "player-turn"
+              : orbState === "player-turn" || orbState === "listening"
                 ? "flex-end"
                 : "center",
           gap: "10px",
