@@ -7,6 +7,7 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import type { LiveServerMessage, Session } from "@google/genai";
 import type { StoryEngine, IntentParser, LLMTurn } from "../types/llm";
 import type { IntentResult, IntentType, EmotionalRegister, ChallengeLevel } from "../types/intent";
+import { LIVE_RUNTIME_CONFIG } from "../config/live-tools";
 
 // ─────────────────────────────────────────────
 // Gemini Story Engine (Live API — voice + text)
@@ -66,7 +67,7 @@ export class GeminiStoryEngine implements StoryEngine {
         realtimeInputConfig: {
           automaticActivityDetection: {
             endOfSpeechSensitivity: "END_SENSITIVITY_LOW",
-            silenceDurationMs: 1200,
+            silenceDurationMs: LIVE_RUNTIME_CONFIG.realtimeInputSilenceDurationMs,
           },
         },
 

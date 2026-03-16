@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
                 realtimeInputConfig: {
                   automaticActivityDetection: {
                     endOfSpeechSensitivity: "END_SENSITIVITY_LOW",
-                    silenceDurationMs: 1200,
+                    silenceDurationMs: LIVE_RUNTIME_CONFIG.realtimeInputSilenceDurationMs,
                   },
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 } as any,

@@ -45,7 +45,9 @@ export const LIVE_RUNTIME_CONFIG = {
   enableTools: false,
   voiceName: "Charon",
   silenceNudgeMs: 12_000,
-  realtimeInputSilenceDurationMs: 1_200,
+  // Native-audio VAD was finalizing hesitant player replies too aggressively,
+  // splitting natural pauses like "I'm... but..." into separate turns.
+  realtimeInputSilenceDurationMs: 2_000,
   ephemeralTokenLifetimeMs: 60 * 60 * 1000,
 } as const;
 

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LIVE_RUNTIME_CONFIG } from "../../src/lib/config/live-tools";
 
 const { mockAuthTokenCreate, mockGoogleGenAIConstructor } = vi.hoisted(() => {
   const authTokenCreate = vi.fn();
@@ -89,8 +90,18 @@ describe("POST /api/live-token", () => {
     const text = (((call.config as Record<string, unknown>).liveConnectConstraints as Record<string, unknown>).config as Record<string, unknown>).systemInstruction as {
       parts: Array<{ text: string }>;
     };
+    const realtimeInputConfig = (((call.config as Record<string, unknown>).liveConnectConstraints as Record<string, unknown>).config as Record<string, unknown>).realtimeInputConfig as {
+      automaticActivityDetection?: {
+        endOfSpeechSensitivity?: string;
+        silenceDurationMs?: number;
+      };
+    };
     expect(text.parts[0]?.text).toContain("Night Channel");
     expect(text.parts[0]?.text).toContain("Stay on the line. The channel is changing.");
     expect(text.parts[0]?.text).toContain("Speak in short, escalating turns");
+    expect(realtimeInputConfig.automaticActivityDetection).toEqual({
+      endOfSpeechSensitivity: "END_SENSITIVITY_LOW",
+      silenceDurationMs: LIVE_RUNTIME_CONFIG.realtimeInputSilenceDurationMs,
+    });
   });
 });
