@@ -4,7 +4,7 @@
 
 InnerPlay is a voice-only AI storytelling game built for the Gemini Live Agent Challenge 2026. Players close their eyes, put on headphones, and speak with a live AI character through Gemini 2.5 Flash Native Audio. The story adapts in real time based on their voice choices. A separate creator pipeline lets anyone build and publish new story packs through a Gemini-powered interview flow.
 
-**Live:** https://innerplay.app
+**Live:** https://innerplay-gemini-443171020325.us-central1.run.app
 
 ---
 
