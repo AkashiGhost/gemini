@@ -8,6 +8,7 @@ import { stripSoundMarkers } from "@/lib/sound-cue-parser";
 import { setSoundPref, useSoundPref } from "@/lib/sound-preferences";
 import { AtmosphereLayer } from "./AtmosphereLayer";
 import { BreathingDot } from "@/components/ui/BreathingDot";
+import { VoiceOrb } from "./VoiceOrb";
 import type { SoundProfileId } from "@/lib/sound-profile";
 import {
   getLatestTranscriptEntryBySource,
@@ -259,55 +260,51 @@ export function GameSession({
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: "var(--space-sm)",
+            gap: "var(--space-md)",
+            width: "100%",
           }}
         >
-          {/* Breathing / speaking indicator — phase-aware animation */}
-          <BreathingDot size={dotSize} phase={phase} isSpeaking={isSpeaking} />
+          {/* Voice orb — drifts left (AI) or right (player) with live text */}
+          <VoiceOrb
+            isSpeaking={isSpeaking}
+            hasAiSpoken={hasAiSpoken}
+            status={status}
+            lastAiText={lastAiText}
+            lastUserTranscriptText={lastUserTranscriptText}
+            characterName={transcriptCharacterName}
+          />
+          {/* Waiting for opening line */}
           {status === "playing" && !hasAiSpoken && (
-            <>
-              <p
-                style={{
-                  color: "var(--muted)",
-                  fontSize: "var(--type-body)",
-                  fontFamily: "var(--font-literary)",
-                  fontStyle: "italic",
-                  margin: 0,
-                  opacity: 0.6,
-                }}
-              >
-                waiting for the opening line...
-              </p>
-              <p
-                style={{
-                  color: "var(--muted)",
-                  fontSize: "var(--type-caption)",
-                  fontFamily: "var(--font-ui)",
-                  margin: 0,
-                  opacity: 0.35,
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                }}
-              >
-                session live, response pending
-              </p>
-            </>
+            <p
+              style={{
+                color: "var(--muted)",
+                fontSize: "var(--type-caption)",
+                fontFamily: "var(--font-ui)",
+                margin: 0,
+                opacity: 0.35,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                marginTop: "var(--space-sm)",
+              }}
+            >
+              session live, response pending
+            </p>
           )}
-          {/* "tap anywhere" hint — only visible when controls are hidden */}
-          {status === "playing" && hasAiSpoken && !showControls && (
+          {/* "tap anywhere" hint */}
+          {status === "playing" && hasAiSpoken && !showControls && !isSpeaking && (
             <p
               style={{
                 color: "var(--muted)",
                 fontSize: "var(--type-ui)",
                 fontFamily: "var(--font-ui)",
                 margin: 0,
-                opacity: 0.3,
+                opacity: 0.25,
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
                 marginTop: "var(--space-lg)",
               }}
             >
-              your turn. tap anywhere for controls
+              tap anywhere for controls
             </p>
           )}
         </div>

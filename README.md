@@ -1,51 +1,52 @@
 # InnerPlay
 
-InnerPlay is a voice-first interactive storytelling game built for the Gemini
-Live Agent Challenge. The player speaks with a live AI character, hears
-story-specific sound design in the browser, and can also create new stories
-through a Gemini-powered creator flow.
+**The first game designed to be played with your eyes closed.**
+
+InnerPlay is a voice-only AI storytelling game built for the Gemini Live Agent Challenge 2026. Players close their eyes, put on headphones, and speak with a live AI character through Gemini 2.5 Flash Native Audio. The story adapts in real time based on their voice choices. A separate creator pipeline lets anyone build and publish new story packs through a Gemini-powered interview flow.
+
+**Live:** https://innerplay.app
+
+---
 
 ## Stack
 
-- Next.js 16
-- React 19
-- TypeScript
-- Google GenAI SDK: `@google/genai`
-- Gemini Live Native Audio
-- Gemini 2.5 Flash
-- Imagen 4
-- Google Cloud Run
-- Web Audio API
+- **Next.js 16** + React 19 + TypeScript
+- **Google GenAI SDK** (`@google/genai`) — Gemini Live Native Audio, Gemini 2.5 Flash, Imagen 4
+- **Google Cloud Run** — WebSocket-capable backend hosting
+- **Web Audio API** — three-layer in-browser spatial audio (voice + ambient + score)
 
 ## Core Features
 
-- Real-time Gemini Live voice sessions for playable stories
-- Story-specific audio direction and spatial sound cues in-browser
-- Creator interview flow that generates and publishes new story packs
-- Google Cloud deployment on Cloud Run
+- Real-time Gemini Live bidirectional voice sessions (no turn-taking, natural barge-in)
+- State-director audio engine: footsteps, ambience, tension layers triggered by narrative state
+- Creator interview pipeline: describe a story premise, Gemini generates a complete story pack
+- Eyes-closed, voice-only UX — no screen required to play
 
 ## Repository Structure
 
-- `src/app/` App routes and API routes
-- `src/context/` live game session state
-- `src/hooks/` audio and runtime hooks
-- `src/lib/` story runtime, audio engine, creator pipeline, shared utilities
-- `stories/` authored story assets and YAML content
-- `schemas/` validation schemas
-- `tests/` unit and contract coverage
-- `scripts/` deterministic verifiers and closed-loop checks
-- `docs/` architecture, submission, demo, and investigation notes
+```
+src/app/          App routes and API routes (Next.js App Router)
+src/context/      Live game session state (Gemini session lifecycle)
+src/hooks/        Audio and runtime hooks (useSoundEngine, useGameSession)
+src/lib/          Story runtime, audio engine, creator pipeline, shared utilities
+stories/          Authored story assets and YAML content
+schemas/          Validation schemas
+tests/            Unit and contract coverage
+scripts/          Deterministic verifiers and closed-loop checks
+docs/             Architecture, submission, demo, and investigation notes
+```
 
 ## Prerequisites
 
 - Node.js 22+
 - npm 10+
 - A Google AI API key with access to Gemini Live and Gemini 2.5 Flash
-- Optional: Google Cloud SDK for Cloud Run deploys
+  → Get one at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+- Optional: Google Cloud SDK (`gcloud`) for Cloud Run deploys
 
 ## Environment Variables
 
-Create `.env.local` with:
+Create `.env.local` in the project root:
 
 ```bash
 GEMINI_API_KEY=your_google_ai_api_key
@@ -62,35 +63,17 @@ NEXT_PUBLIC_ENABLE_LYRIA_REALTIME=false
 
 ## Local Development
 
-Install dependencies:
-
 ```bash
 npm ci
-```
-
-Run the app locally:
-
-```bash
 npm run dev
 ```
 
-Open:
-
-```text
-http://localhost:3000
-```
+Open: http://localhost:3000
 
 ## Production Build
 
-Build the app:
-
 ```bash
 npm run build
-```
-
-Start the production server locally:
-
-```bash
 npm run start
 ```
 
@@ -102,54 +85,57 @@ curl http://localhost:3000/api/health
 
 ## Verification
 
-Run the targeted the-call audio verification:
-
-```bash
-npm run test:the-call:audio
-```
-
 Run unit tests:
 
 ```bash
 npm test
 ```
 
-Run the closed-loop tool-call scenario:
+Run the closed-loop tool-call scenario (verifies `trigger_sound`, `set_tension`, `end_game` parsing):
 
 ```bash
 npx tsx scripts/closed-loop-scenario.ts
 ```
 
-## Cloud Run Deployment
-
-Manual source deploy:
+Run targeted audio verification for "The Call":
 
 ```bash
-gcloud run deploy innerplay-gemini ^
-  --source . ^
-  --region us-central1 ^
-  --project innerplay-488718 ^
+npm run test:the-call:audio
+```
+
+## Cloud Run Deployment
+
+The app is pre-configured for Cloud Run via `Dockerfile`. Deploy from source:
+
+```bash
+gcloud run deploy innerplay-gemini \
+  --source . \
+  --region us-central1 \
+  --project innerplay-488718 \
   --allow-unauthenticated
 ```
 
-After deploy:
+Set the required secret before deploying:
 
 ```bash
-gcloud run services describe innerplay-gemini ^
-  --region us-central1 ^
+gcloud run services update innerplay-gemini \
+  --set-secrets GEMINI_API_KEY=GEMINI_API_KEY:latest \
+  --region us-central1
+```
+
+Check service status:
+
+```bash
+gcloud run services describe innerplay-gemini \
+  --region us-central1 \
   --project innerplay-488718
 ```
 
-## Submission-Oriented Docs
+Live service: https://innerplay-gemini-443171020325.us-central1.run.app
 
-- [Devpost submission draft](C:\Users\akash\Desktop\AI_projects\InnerPlay\hackathons\gemini\docs\DEVPOST-SUBMISSION.md)
-- [Submission checklist](C:\Users\akash\Desktop\AI_projects\InnerPlay\hackathons\gemini\docs\SUBMISSION-CHECKLIST.md)
-- [Architecture diagram source notes](C:\Users\akash\Desktop\AI_projects\InnerPlay\hackathons\gemini\docs\ARCHITECTURE-DIAGRAM.md)
-- [Submission readiness status](C:\Users\akash\Desktop\AI_projects\InnerPlay\hackathons\gemini\docs\SUBMISSION-READINESS.md)
-- [Cloud Run deployment proof notes](C:\Users\akash\Desktop\AI_projects\InnerPlay\hackathons\gemini\docs\GCP-DEPLOYMENT-PROOF.md)
+## Docs
 
-## Deployed URLs
-
-- Production domain: `https://innerplay.app`
-- Cloud Run service URL: `https://innerplay-gemini-443171020325.us-central1.run.app`
-
+- [Architecture diagram](docs/ARCHITECTURE-DIAGRAM.md)
+- [Devpost submission draft](docs/DEVPOST-SUBMISSION.md)
+- [Submission checklist](docs/SUBMISSION-CHECKLIST.md)
+- [GCP deployment proof notes](docs/GCP-DEPLOYMENT-PROOF.md)

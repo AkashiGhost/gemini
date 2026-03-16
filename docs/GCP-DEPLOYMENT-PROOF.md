@@ -14,7 +14,7 @@ InnerPlay and the commands used to verify it.
 
 Verified on March 15, 2026 from the local workspace with `gcloud`.
 
-- Latest ready revision before this patch deploy: `innerplay-gemini-00066-dk7`
+- Latest ready revision: `innerplay-gemini-00068-q6m`
 - Public Cloud Run URL: `https://innerplay-gemini-443171020325.us-central1.run.app`
 - Alternate service URL: `https://innerplay-gemini-zet5yjbw2q-uc.a.run.app`
 
