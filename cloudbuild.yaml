@@ -1,0 +1,171 @@
+# =============================================================================
+# cloudbuild.yaml — InnerPlay Cloud Build Pipeline
+#
+# Triggered automatically on pushes to `master` (configure in Cloud Console:
+#   Cloud Build → Triggers → Connect Repository → Branch: ^master$)
+#
+# Pipeline stages:
+#   1. build   — docker build via Kaniko (layer-caching for fast rebuilds)
+#   2. push    — push image to Artifact Registry
+#   3. deploy  — gcloud run deploy
+#   4. verify  — smoke test the /health endpoint
+#
+# Manual run:
+#   gcloud builds submit . \
+#     --config=cloudbuild.yaml \
+#     --substitutions=_GEMINI_API_KEY=<key>
+#
+# Required substitutions (set in Trigger config or pass via --substitutions):
+#   _GEMINI_API_KEY   — Gemini API key (use Secret Manager in production)
+#
+# Optional substitutions (have defaults):
+#   _REGION, _SERVICE_NAME, _REPO_NAME, _MEMORY, _CPU, _MAX_INSTANCES
+# =============================================================================
+
+substitutions:
+  # ── Infrastructure ──────────────────────────────────────────────────────────
+  _PROJECT_ID: "innerplay-prod"             # overridden by $PROJECT_ID at runtime
+  _REGION: "us-central1"
+  _SERVICE_NAME: "innerplay"
+  _REPO_NAME: "innerplay"
+
+  # ── Image ───────────────────────────────────────────────────────────────────
+  # $SHORT_SHA is injected automatically by Cloud Build from the git commit
+  _IMAGE_TAG: "${SHORT_SHA}"
+
+  # ── Cloud Run resource limits ───────────────────────────────────────────────
+  _PORT: "3000"
+  _MEMORY: "512Mi"
+  _CPU: "1"
+  _MIN_INSTANCES: "0"
+  _MAX_INSTANCES: "3"
+  _CONCURRENCY: "80"
+  _TIMEOUT: "300"
+
+  # ── App config ──────────────────────────────────────────────────────────────
+  _ELARA_VOICE: "Aoede"
+  _STORIES_BASE_PATH: "./stories/the-last-session"
+
+  # ── Secrets (pass via --substitutions or Trigger secret bindings) ───────────
+  _GEMINI_API_KEY: ""                       # REQUIRED — never commit a real key here
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: "E2_MEDIUM"                  # 2 vCPU / 4 GB — faster npm ci + Next.js build
+  dynamic_substitutions: true
+
+timeout: "1200s"                            # 20-min global timeout (Next.js cold builds ~5-8 min)
+
+steps:
+  # ───────────────────────────────────────────────────────────────────────────
+  # Step 1: Build the Docker image
+  #
+  # Uses Cloud Build's built-in docker builder. The image is tagged with:
+  #   - :$SHORT_SHA  — immutable, used for this deployment
+  #   - :latest      — convenience alias, always points to newest build
+  # ───────────────────────────────────────────────────────────────────────────
+  - id: "build"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "--tag=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${_IMAGE_TAG}"
+      - "--tag=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest"
+      - "--cache-from=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest"
+      - "--build-arg=BUILDKIT_INLINE_CACHE=1"
+      - "."
+    env:
+      - "DOCKER_BUILDKIT=1"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Step 2: Push both tags to Artifact Registry
+  # ───────────────────────────────────────────────────────────────────────────
+  - id: "push-sha"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${_IMAGE_TAG}"
+    waitFor: ["build"]
+
+  - id: "push-latest"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest"
+    waitFor: ["build"]
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Step 3: Deploy to Cloud Run
+  #
+  # --allow-unauthenticated  — public game, no auth required
+  # --min-instances=0        — scale-to-zero when idle (cost efficient)
+  # --timeout=300            — long WebSocket sessions can run up to 5 min
+  # ───────────────────────────────────────────────────────────────────────────
+  - id: "deploy"
+    name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "${_SERVICE_NAME}"
+      - "--image=${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${_IMAGE_TAG}"
+      - "--platform=managed"
+      - "--region=${_REGION}"
+      - "--allow-unauthenticated"
+      - "--port=${_PORT}"
+      - "--memory=${_MEMORY}"
+      - "--cpu=${_CPU}"
+      - "--min-instances=${_MIN_INSTANCES}"
+      - "--max-instances=${_MAX_INSTANCES}"
+      - "--concurrency=${_CONCURRENCY}"
+      - "--timeout=${_TIMEOUT}"
+      - "--set-env-vars=NODE_ENV=production,PORT=${_PORT},HOST=0.0.0.0"
+      - "--set-env-vars=GEMINI_API_KEY=${_GEMINI_API_KEY}"
+      - "--set-env-vars=ELARA_VOICE=${_ELARA_VOICE}"
+      - "--set-env-vars=STORIES_BASE_PATH=${_STORIES_BASE_PATH}"
+      - "--labels=app=innerplay,git-sha=${_IMAGE_TAG},managed-by=cloudbuild"
+      - "--quiet"
+    waitFor: ["push-sha"]
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Step 4: Smoke test — verify /health returns 200 before marking build green
+  # ───────────────────────────────────────────────────────────────────────────
+  - id: "smoke-test"
+    name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        set -e
+        echo "→ Fetching service URL..."
+        SERVICE_URL=$(gcloud run services describe ${_SERVICE_NAME} \
+          --region=${_REGION} \
+          --format='value(status.url)')
+        echo "   Service URL: $${SERVICE_URL}"
+
+        echo "→ Running health check..."
+        # Retry up to 5 times — Cold start on first request can take a few seconds
+        for i in 1 2 3 4 5; do
+          HTTP_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$${SERVICE_URL}/health" || echo '000')
+          echo "   Attempt $${i}: HTTP $${HTTP_STATUS}"
+          if [[ "$${HTTP_STATUS}" == "200" ]]; then
+            echo "   ✓ Health check passed"
+            exit 0
+          fi
+          sleep 3
+        done
+
+        echo "   ✗ Health check failed after 5 attempts"
+        echo ""
+        echo "   Tail recent logs:"
+        gcloud run services logs read ${_SERVICE_NAME} \
+          --region=${_REGION} \
+          --limit=30
+        exit 1
+    waitFor: ["deploy"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Images produced — listed here so Cloud Build tracks them in the build history
+# ─────────────────────────────────────────────────────────────────────────────
+images:
+  - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${_IMAGE_TAG}"
+  - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest"
