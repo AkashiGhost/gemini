@@ -316,6 +316,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const pendingUserTranscriptRef = useRef("");
   const liveRetryPlanRef = useRef<LiveRetryPlan | null>(null);
   const liveRetryAttemptsRef = useRef(0);
+  const currentSessionIdRef = useRef<string | undefined>(undefined);
   const startSessionRef = useRef<(storyId: string, options?: StartSessionOptions) => Promise<void>>(async () => {});
   const debugTextModeRef = useRef(false);
 
@@ -1061,6 +1062,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [clearSilenceTimer, logger]);
 
   const resetLiveConnectionState = useCallback((session?: Session | null) => {
+    currentSessionIdRef.current = undefined;
     clearConnectTimeout();
     clearFirstResponseWatchdog();
     clearOpeningTurnMicArmTimer();
@@ -1427,6 +1429,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       });
     }
     logSessionTimingStage(sessionId, "start_session_enter");
+    currentSessionIdRef.current = sessionId;
     dispatch({ type: "SET_SESSION_ID", sessionId });
     dispatch({ type: "SET_STATUS", status: "connecting", errorMessage: undefined });
     dispatch({ type: "SET_PHASE", phase: 0 });
@@ -1466,6 +1469,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       audioCaptureRef.current = null;
       safeCloseSession(sessionRef.current);
       sessionRef.current = null;
+      currentSessionIdRef.current = undefined;
       clearFirstResponseWatchdog();
       clearOpeningTurnMicArmTimer();
       dispatch({
@@ -1529,7 +1533,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
         model: liveModel,
         callbacks: {
           onopen: () => {
-            if (stateRef.current.sessionId !== sessionId) {
+            if (currentSessionIdRef.current !== sessionId) {
+              logger.info({
+                event: "session.open_ignored_stale_session",
+                sessionId,
+                causalChain: ["session.open_ignored_stale_session"],
+                data: {
+                  currentSessionId: currentSessionIdRef.current,
+                },
+              });
               return;
             }
             if (sessionRef.current && sessionRef.current !== session) {
@@ -1760,6 +1772,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             micStartInFlightRef.current = false;
             textTurnModeRef.current = false;
             emptyOpeningRetryPendingRef.current = false;
+            currentSessionIdRef.current = undefined;
             commitPendingUserTranscript();
             pendingUserTranscriptRef.current = "";
             openingTurnStateRef.current = {
@@ -1794,6 +1807,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
             clearPendingAiTurnFinalizeTimer();
             closingSessionRef.current = null;
             sessionRef.current = null;
+            currentSessionIdRef.current = undefined;
             audioCaptureRef.current?.stop();
             audioCaptureRef.current = null;
             stopTicker();
@@ -1855,6 +1869,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         status: "error",
         errorMessage: message,
       });
+      currentSessionIdRef.current = undefined;
       micStartInFlightRef.current = false;
       textTurnModeRef.current = false;
       emptyOpeningRetryCountRef.current = 0;

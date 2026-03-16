@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "lib": ["ES2021", "dom"],
+    "module": "ESNext",
+    "target": "ES2020",
+    "strict": true,
+    "outDir": "dist",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "jsx": "react",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true
+  },
+  "include": ["src", "remotion.config.ts"]
+}

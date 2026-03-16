@@ -1,0 +1,21 @@
+{
+  "name": "innerplay-video",
+  "version": "1.0.0",
+  "description": "InnerPlay demo video for Gemini Live Agent Challenge",
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion render",
+    "render": "remotion render src/index.ts InnerPlayDemo out/innerplay-demo.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.435",
+    "remotion": "4.0.435",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.6.3"
+  }
+}
