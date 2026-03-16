@@ -4,3 +4,8 @@ node_modules
 .next
 .git
 *.log
+video-edit
+output
+assets
+.venv-audio311
+scripts/generate_audioldm2_sfx.py
