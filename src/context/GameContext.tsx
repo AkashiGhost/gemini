@@ -614,10 +614,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     if (!shouldStartMicCapture({
       status: stateRef.current.status,
-      openingTurnLocked: options?.allowDuringOpeningTurn ? false : openingTurnStateRef.current.locked,
+      openingTurnLocked: openingTurnStateRef.current.locked,
       micCaptureStarted: audioCaptureRef.current !== null,
       micStartInFlight: micStartInFlightRef.current,
       textTurnMode: textTurnModeRef.current,
+      allowDuringOpeningTurn: options?.allowDuringOpeningTurn,
     })) {
       return;
     }
@@ -1640,6 +1641,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
               hasAudio: hadAudio,
               textTurnMode: textTurnModeRef.current,
             })) {
+              void startMicCapture(session, sessionId, { allowDuringOpeningTurn: true });
               scheduleOpeningTurnMicArm(session, sessionId, "opening_audio_drained");
             }
 
@@ -1876,7 +1878,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         message,
       });
     }
-  }, [attemptLiveRetry, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearOpeningTurnMicArmTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logSessionTimingStage, logSessionTimingSummary, logger, retryEmptyOpeningTurn, safeCloseSession, scheduleAiTurnFinalize, scheduleGenerationCompleteFallbackFinalize, scheduleOpeningTurnMicArm, startTicker, stopTicker, commitPendingUserTranscript]);
+  }, [attemptLiveRetry, clearConnectTimeout, clearFirstResponseWatchdog, clearMicEnableFallbackTimer, clearOpeningTurnMicArmTimer, clearPendingAiTurnFinalizeTimer, clearSilenceTimer, enableMicStreaming, flushPendingKickoff, handleLiveToolCalls, logSessionTimingStage, logSessionTimingSummary, logger, retryEmptyOpeningTurn, safeCloseSession, scheduleAiTurnFinalize, scheduleGenerationCompleteFallbackFinalize, scheduleOpeningTurnMicArm, startMicCapture, startTicker, stopTicker, commitPendingUserTranscript]);
 
   startSessionRef.current = startSession;
 

@@ -14,6 +14,19 @@ describe("shouldStartMicCapture", () => {
     ).toBe(false);
   });
 
+  it("allows microphone prewarm during the locked opening turn when explicitly requested", () => {
+    expect(
+      shouldStartMicCapture({
+        status: "playing",
+        openingTurnLocked: true,
+        micCaptureStarted: false,
+        micStartInFlight: false,
+        textTurnMode: false,
+        allowDuringOpeningTurn: true,
+      }),
+    ).toBe(true);
+  });
+
   it("starts microphone capture once the opening turn is complete", () => {
     expect(
       shouldStartMicCapture({
