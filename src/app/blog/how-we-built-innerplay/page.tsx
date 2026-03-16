@@ -206,6 +206,26 @@ export default function HowWeBuiltInnerPlay() {
             I haven&apos;t seen documented elsewhere.
           </BlogP>
 
+          {/* Architecture diagram image */}
+          <div
+            style={{
+              margin: "2rem 0",
+              border: "1px solid #1a1a1a",
+              backgroundColor: "#050505",
+              padding: "1.5rem",
+            }}
+          >
+            <img
+              src="/images/architecture-diagram.png"
+              alt="InnerPlay Architecture — Phase 1: Token Exchange via Cloud Run, Phase 2: Direct WebSocket to Gemini 2.5 Flash with State Director and 3-Layer Audio"
+              style={{
+                width: "100%",
+                height: "auto",
+                display: "block",
+              }}
+            />
+          </div>
+
           <ArchDiagram />
 
           <h3
@@ -397,25 +417,25 @@ export default function HowWeBuiltInnerPlay() {
             style={{
               width: "100%",
               aspectRatio: "16 / 9",
-              backgroundColor: "#070707",
-              border: "1px solid #1a1a1a",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
               marginTop: "1.5rem",
+              position: "relative",
+              overflow: "hidden",
             }}
           >
-            <p
+            <iframe
+              src="https://www.youtube.com/embed/50qCVzTnP6I"
+              title="InnerPlay Demo — Gemini Live Agent Challenge"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
               style={{
-                fontSize: "0.9rem",
-                color: "#2a2a2a",
-                fontStyle: "italic",
-                fontFamily: "Georgia, serif",
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                border: "1px solid #1a1a1a",
               }}
-            >
-              {/* YouTube embed will go here */}
-              Video embed coming soon
-            </p>
+            />
           </div>
         </BlogSection>
 
